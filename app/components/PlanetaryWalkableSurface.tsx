@@ -27,6 +27,7 @@ import {
 } from '@/lib/game/spatial/localSceneRuntime'
 import type { PreparedCorridor, PlanetarySurfaceEntity, MobileSurfaceObject } from '@/app/components/PlanetarySurfaceMap'
 import { WALKABLE_VIEW, WalkableActor, WalkableObject, WalkablePlayer, WalkableRoute, WalkableSurfaceSvg, projectSurfacePoint as iso, surfaceBuildingTop as buildingTop, surfacePathD as pathD, surfacePointsAttr as attrs } from '@/app/components/WalkableSurfaceRenderer'
+import ConversationReport from './ConversationReport'
 
 type SpatialPayload={
   frame?:{body?:string;origin_status?:string|null;terrain_dataset_id?:string|null}|null
@@ -460,7 +461,7 @@ export default function PlanetaryWalkableSurface({
         <div className="person-head"><div><small>PERSON · LOKALE SZENE</small><b>{residentLabel(selectedResident)}</b><span>{residentRole(selectedResident)}</span></div><button onClick={()=>setPersonPanelOpen(false)}>×</button></div>
         <div className="person-facts"><span>Aktivität</span><b>{selectedResident.activityState}</b><span>Letzte Aktion</span><b>{selectedResident.lastAction??'–'}</b></div>
         {(conversationByNpc[selectedResident.id]??[]).map((entry,index)=><p key={entry.role+'-'+index}><b>{entry.role==='user'?'Du':residentLabel(selectedResident)}:</b> „{entry.content}“</p>)}
-        <div className="person-chat"><input value={message} maxLength={400} disabled={conversationEnd.isEnded(selectedResident?.id)} onChange={event=>setMessage(event.target.value)} onKeyDown={event=>{if(event.key==='Enter')void talk()}} placeholder={conversationEnd.isEnded(selectedResident?.id)?CONVERSATION_ENDED_PLACEHOLDER:'Kurze Antwort …'}/><button disabled={sending||conversationEnd.isEnded(selectedResident?.id)||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div>
+        <div className="person-chat"><input value={message} maxLength={400} disabled={conversationEnd.isEnded(selectedResident?.id)} onChange={event=>setMessage(event.target.value)} onKeyDown={event=>{if(event.key==='Enter')void talk()}} placeholder={conversationEnd.isEnded(selectedResident?.id)?CONVERSATION_ENDED_PLACEHOLDER:'Kurze Antwort …'}/><button disabled={sending||conversationEnd.isEnded(selectedResident?.id)||!message.trim()} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div><ConversationReport npcId={selectedResident?.id} compact/>
       </aside>}
     </div>
     <style jsx>{`

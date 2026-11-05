@@ -52,6 +52,7 @@ import {
   type VenueFigure,
   type TableServicePhase,
 } from '@/lib/game/hospitality/venues'
+import ConversationReport from '@/app/components/ConversationReport'
 
 export type Point = { x:number; y:number }
 export type ShownFigure = { figure:VenueFigure; resident:ColonyResident; moment:GuestMoment|null }
@@ -740,7 +741,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
             ?<div className="chat give"><input type="number" min={1} max={10000} value={giveAmount} onChange={e=>setGiveAmount(e.target.value)} aria-label="Credits geben"/><button disabled={giving} onClick={()=>void giveCredits()}>{giving?'…':'Geben'}</button><button onClick={()=>setGiveOpen(false)}>×</button></div>
             :<button className="give-open" onClick={()=>setGiveOpen(true)}>Credits geben …</button>)}
           {!isRobot(selected)&&(()=>{const f=served.find(x=>x.id===selected.id);if(!f||Math.hypot(f.spot.x-pos.x,f.spot.y-pos.y)>150)return null;const extra=fitting.jointContext?.(selected.id);return <div className="moves joint"><small>GEMEINSAM</small>{(Object.keys(JOINTS) as JointName[]).filter(a=>(a!=='paartanz'||layout.danceFloor)&&(a!=='troesten'||extra?.mourning)).map(a=><button key={a} onClick={()=>jointWithNpc(selected,a)}>{JOINTS[a].label}</button>)}</div>})()}
-          <div className="chat"><input value={message} maxLength={400} disabled={endedBy===selected.id} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder={endedBy===selected.id?'Gespräch beendet':'Kurze Antwort …'}/><button disabled={sending||!message.trim()||endedBy===selected.id} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div>
+          <div className="chat"><input value={message} maxLength={400} disabled={endedBy===selected.id} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder={endedBy===selected.id?'Gespräch beendet':'Kurze Antwort …'}/><button disabled={sending||!message.trim()||endedBy===selected.id} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div><ConversationReport npcId={selected.id} compact/>
         </>}
         {!closed&&<div className="moves">
           {!gateOpen&&layout.entry?<button onClick={()=>walkTo(layout.entry!.payAt)}>Zum Türsteher</button>:!nearService&&<button onClick={()=>walkTo(layout.servicePoint)}>{fitting.goToServiceLabel(service)}</button>}

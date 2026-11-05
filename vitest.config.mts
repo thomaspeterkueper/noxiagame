@@ -76,7 +76,7 @@ export default defineConfig({
       'lib/world/spatial/earthCoastline.test.ts',
       'lib/game/landmarks/interiors.test.ts',
       'lib/game/spatial/buildingMassing.test.ts',
-      'lib/game/cognition/conversationRecall.test.ts',
+      'lib/game/cognition/conversationRecall.test.ts', 'lib/game/conversationInsights.test.ts',
       'lib/game/business/establishments.test.ts',
       'lib/game/chronicle.test.ts',
       'lib/game/merchantQualification.test.ts',

@@ -41,6 +41,7 @@ const CREDIT_ACTION_MARKER = '[[ACTION:ACCEPT_CREDITS]]'
 const VISIT_PLACE_ACTION_RE = /\[\[ACTION:VISIT_PLACE:(p\d{1,2})\]\]/g
 const MIN_PERSISTED_EXCHANGES = 6
 const MAX_PERSISTED_EXCHANGES = 18
+const MEMORY_EXCHANGE_CHARS = 200
 type PersistedExchange = {
   player?: unknown
   npc?: unknown
@@ -602,8 +603,9 @@ export async function POST(request: NextRequest) {
       const recentExchanges = [
         ...pruneExchanges(previous, { now: now.getTime(), retention: recentEncounterScore, rewarmed: recall.rewarmed, limit: memoryLimit }),
         {
-          player,
-          npc: reply,
+          // Kurzform statt Protokoll (NOXIA-PRIVACY-0004): die Figur erinnert sich, zitiert nicht.
+          player: clean(player, MEMORY_EXCHANGE_CHARS),
+          npc: clean(reply, MEMORY_EXCHANGE_CHARS),
           action: worldAction?.type ?? null,
           amount: null,
           at: now.toISOString(),

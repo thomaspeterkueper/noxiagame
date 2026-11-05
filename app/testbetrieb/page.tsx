@@ -1,18 +1,36 @@
 import Link from 'next/link'
 
+// NOXIA-PRIVACY-0004 (05.11.2026): Gespräche werden nur automatisch ausgewertet.
+
 export default function TestbetriebInformation() {
   return <main className="min-h-screen bg-[#f6f4ee] px-5 py-10 text-[#1d2a30]">
     <article className="mx-auto max-w-3xl rounded-xl border bg-white p-6">
       <p className="text-xs font-semibold uppercase tracking-wide text-[#1f4f54]">NOXIAGAME · Testbetrieb</p>
-      <h1 className="mt-2 text-3xl font-bold">Gespräche in der Testphase</h1>
-      <p className="mt-4">NOXIAGAME ist eine noch in Entwicklung befindliche simulierte Welt. NPC-Gespräche können zu Zwecken der technischen Analyse und Verbesserung vollständig protokolliert werden. Dabei kann der Projektbetreiber deine Eingaben, Antworten der NPCs und die daraus erkannten Themen, Aktionen und Fehler im geschützten Adminbereich lesen.</p>
-      <h2 className="mt-6 text-lg font-semibold">Was wird erfasst?</h2>
-      <p className="mt-2">Spieler- und NPC-Nachrichten, Zeitpunkte, NPC, Spielort, Gesprächsausgang, erkannte Wünsche und technische Aktionshinweise. Nur angemeldete Administratoren können die Diagnoseansicht nutzen; ihre Abrufe werden protokolliert. Die Aufzeichnung betrifft ausschließlich Spielinteraktionen, keine Gespräche außerhalb von NOXIAGAME.</p>
-      <h2 className="mt-6 text-lg font-semibold">Zweck und Grenzen</h2>
-      <p className="mt-2">Ziel sind Reproduktion und Behebung von Fehlern sowie die Verbesserung von NPC-Sprache, Gedächtnis, Verhalten und Simulation. Die Daten dürfen nicht für eine Bewertung oder öffentliche Bloßstellung von Testspielern verwendet werden. Bitte gib keine realen Passwörter, Adressen, Finanzdaten oder vertrauliche Informationen ein.</p>
+      <h1 className="mt-2 text-3xl font-bold">Gespräche in NOXIA</h1>
+      <p className="mt-4 text-lg">Gespräche in NOXIA werden automatisch ausgewertet, um die Welt und ihre Figuren zu verbessern. Kein Mensch liest sie. NPCs merken sich in Kurzform, was ihr miteinander erlebt habt. Wenn du willst, dass wir ein Gespräch ansehen, nutze „Gespräch melden“.</p>
+
+      <h2 className="mt-6 text-lg font-semibold">Was ausgewertet wird</h2>
+      <p className="mt-2">Gespräche mit NPCs und Nachrichten an andere Spieler im Raum. Ein Programm erkennt daraus Themen, Gesprächsausgang, Fehler der Figuren, Wünsche und ausgelöste Aktionen in der Spielwelt. Das Team sieht davon nur zusammengefasste Zahlen, und zwar erst, wenn mindestens fünf verschiedene Spieler beteiligt sind – nie, was ein einzelner Spieler gesagt hat.</p>
+
+      <h2 className="mt-6 text-lg font-semibold">Was nicht passiert</h2>
+      <p className="mt-2">Es gibt im Adminbereich keine Ansicht, keinen Export und keine Schnittstelle, über die der Wortlaut deiner Gespräche gelesen werden kann. Die Datenbankrechte sind entsprechend gesetzt; die Zusage ist technisch umgesetzt, nicht nur versprochen.</p>
+
+      <h2 className="mt-6 text-lg font-semibold">Wie lange etwas bleibt</h2>
+      <ul className="mt-2 list-disc space-y-1 pl-5">
+        <li>Der Wortlaut von Gesprächen wird nach 14 Tagen automatisch gelöscht. Die daraus gewonnenen Kennzahlen bleiben.</li>
+        <li>NPCs behalten eine gekürzte Erinnerung an eure gemeinsamen Gespräche – das gehört zum Spiel. Diese Erinnerung ist für das Team nicht einsehbar und verschwindet mit deinem Konto.</li>
+        <li>Gemeldete Ausschnitte werden nach 90 Tagen gelöscht.</li>
+      </ul>
+
+      <h2 className="mt-6 text-lg font-semibold">Gespräch melden</h2>
+      <p className="mt-2">Unter jedem NPC-Gespräch und neben Nachrichten anderer Spieler findest du „melden“. Dann werden die letzten Sätze dieses Gesprächs an das Team geschickt und sind für das Team lesbar – nur dieser Ausschnitt, nur weil du es so willst. Nutze das bei Fehlern der Figuren, bei unangenehmen Erlebnissen oder wenn du uns etwas zeigen möchtest.</p>
+
+      <h2 className="mt-6 text-lg font-semibold">Testkonten des Teams</h2>
+      <p className="mt-2">Das Team prüft Figuren mit eigenen, gekennzeichneten Testkonten. Nur deren Gespräche sind vollständig lesbar.</p>
+
       <h2 className="mt-6 text-lg font-semibold">Datenschutz</h2>
-      <p className="mt-2">Vor Freischaltung der wörtlichen Adminauswertung muss der Betreiber die konkrete Rechtsgrundlage, eine dokumentierte Interessenabwägung und Aufbewahrungs-/Löschregeln festlegen. Ohne diese Voraussetzungen bleibt die Adminauswertung technisch deaktiviert. Für Auskunft, Löschung oder Widerspruch nutze die Kontaktmöglichkeit des Spielbetreibers in den allgemeinen Datenschutzhinweisen. Es wird kein eigener Einwilligungsklick für jedes Gespräch verlangt.</p>
-      <p className="mt-4 text-sm text-[#5d6b70]">Der Projektbetreiber muss diese Hinweise mit seiner vollständigen Datenschutzerklärung einschließlich Kontaktdaten, Rechtsgrundlage, Speicherdauer und Betroffenenrechten abstimmen. Diese Seite allein ersetzt keine vollständige Datenschutzerklärung.</p>
+      <p className="mt-2">Für die Antworten der Figuren werden deine Nachrichten an einen KI-Dienst übermittelt. Allgemeine Hinweise stehen in der <Link className="underline" href="/datenschutz">Datenschutzerklärung</Link>. Bitte gib keine Passwörter, Adressen, Finanzdaten oder andere vertrauliche Angaben ein. Für Auskunft, Löschung oder Widerspruch nutze die Kontaktmöglichkeit dort.</p>
+
       <Link href="/dashboard" className="mt-7 inline-block rounded-lg border px-4 py-2 text-sm font-semibold">Zurück zum Spiel</Link>
     </article>
   </main>

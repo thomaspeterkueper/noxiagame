@@ -15,6 +15,7 @@ import { worldDistance } from '@/lib/game/interactions'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { useColonyInteractionStore } from '@/lib/store/colonyInteractionStore'
 import { getSessionInfo } from '@/lib/supabase/auth'
+import ConversationReport from '@/app/components/ConversationReport'
 
 type TileEntity = { id:string; entity_id:string; entity_type:string; tile_row:number; tile_col:number; profile_id:string|null }
 type ChatEntry = { role:'user'|'assistant'; content:string }
@@ -169,6 +170,7 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
         </div>
         <div style={{marginTop:3,textAlign:'right',color:message.length>=350?'#f1d57a':'#738795',fontSize:9}}>{message.length}/{MAX_PLAYER_CHARS}</div>
         {chatError&&<div style={{marginTop:5,color:'#e29a86',fontSize:10}}>{chatError}</div>}
+        <ConversationReport npcId={scene.first.id} compact/>
       </div>}
       <div style={{marginTop:8,color:'#8fa3b1',fontSize:10}}>Reale Meldung: {scene.source?.name??scene.conversation.item.sourceId}. Die Reaktionen der Bewohner sind fiktional.</div>
       <a href={scene.conversation.item.url} target="_blank" rel="noreferrer" style={{display:'inline-block',marginTop:7,color:'#f1d57a',fontSize:10}}>Originalquelle öffnen ↗</a>

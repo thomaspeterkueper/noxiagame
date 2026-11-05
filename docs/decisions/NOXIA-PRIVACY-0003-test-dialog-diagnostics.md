@@ -1,5 +1,7 @@
 # NOXIA-PRIVACY-0003 · Rohdialoge während der Testphase
 
+> **Abgelöst** durch [NOXIA-PRIVACY-0004](NOXIA-PRIVACY-0004-auswertung-ohne-mitlesen.md) (05.11.2026): Keine Rohtext-Ansicht mehr im Adminbereich.
+
 **Stand:** 2026-11-05  
 **Entscheidung:** Keine separate Opt-in-Abfrage für NPC-Gesprächsdiagnostik. Stattdessen klare, jederzeit sichtbare Information VOR der Eingabe.  
 **Status:** Datenschutz- und Freigabeprüfung vor Aktivierung der Administrator-Transkriptansicht erforderlich.

@@ -40,6 +40,7 @@ import TravelAgency, { type EarthTrip } from '@/app/components/TravelAgency'
 import { NpcPortrait, NpcVisualStyles } from '@/lib/grid/NpcVisual'
 import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 import LearnLink from '@/app/academy/learn/LearnLink'
+import ConversationReport from '@/app/components/ConversationReport'
 
 export type Panel =
   | { kind: 'none' }
@@ -648,7 +649,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       <dl><dt>Tut gerade</dt><dd>{leading[person.id] ? 'geht voraus' : visits[person.id] ? 'geht zu ' + (noxia.find(item => item.id === visits[person.id])?.name ?? visitNames[visits[person.id]] ?? 'einem Ort') : person.activityState}</dd><dt>Zuletzt</dt><dd>{person.lastAction ?? '–'}</dd></dl>
       {(conversations[person.id] ?? []).map((line, index) => <p key={index}><b>{line.role === 'user' ? 'Du' : personSceneLabel(person)}:</b> „{line.content}“</p>)}
       {personDistance !== null && personDistance <= TALK_RANGE_M
-        ? <div className="row"><input value={message} maxLength={400} disabled={conversationEnd.isEnded(person.id)} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={conversationEnd.isEnded(person.id) ? CONVERSATION_ENDED_PLACEHOLDER : 'Ansprechen …'} autoFocus/><button disabled={sending || conversationEnd.isEnded(person.id) || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
+        ? <><div className="row"><input value={message} maxLength={400} disabled={conversationEnd.isEnded(person.id)} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={conversationEnd.isEnded(person.id) ? CONVERSATION_ENDED_PLACEHOLDER : 'Ansprechen …'} autoFocus/><button disabled={sending || conversationEnd.isEnded(person.id) || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div><ConversationReport npcId={person.id} compact/></>
         : <div className="row"><span>{personDistance === null ? 'Nicht in Sichtweite.' : `${Math.round(personDistance)} m entfernt – zu weit zum Ansprechen.`}</span>{personDistance !== null && <button onClick={() => walkTo(() => engine?.personAt(person.id) ?? null, TALK_RANGE_M - 2)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
     </>}
     {!person && panel.kind === 'person' && <div className="head"><div><small>PERSON</small><b>Nicht mehr da</b></div><button onClick={close}>×</button></div>}

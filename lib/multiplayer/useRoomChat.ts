@@ -4,7 +4,8 @@
 // Raum-Chat zwischen Spielern (04.11.2026). Gesendet wird über den Server
 // (/api/game/room-chat: gespeichert, Kontaktdaten entfernt, höchstens sechs je
 // Minute); zugestellt über Ably (`noxia:room:<Haus>`, nur lesen). Dazu werden
-// Kommen, Gehen und Gesten protokolliert – für die Auswertung der Testphase.
+// Kommen, Gehen und Gesten protokolliert – ausgewertet nur automatisch, Wortlaut
+// wird nach 14 Tagen gelöscht (NOXIA-PRIVACY-0004).
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
@@ -63,7 +64,15 @@ export function useRoomChat(room: string | null, roomName: string, peers: number
       if (r.data.message) add(r.data.message)
       return { ok: true, cleaned: Boolean(r.data.cleaned) }
     },
-    report(messageId: string, detail?: string) { if (room) void post({ action: 'report', room, roomName, messageId, detail, peers: peersRef.current }).catch(() => {}) },
+    // Meldung mit Ausschnitt: nur was gemeldet wird, ist für Admins lesbar (NOXIA-PRIVACY-0004).
+    report(messageId: string, reason: 'harassment' | 'error' | 'feedback' | 'other' = 'harassment', comment?: string) {
+      if (!room) return
+      void (async () => {
+        const { token } = await getSessionInfo()
+        if (!token) return
+        await fetch('/api/game/conversation-report', { method: 'POST', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify({ source: 'room', room, messageId, reason, comment }) })
+      })().catch(() => {})
+    },
     logGesture(detail: string) { if (room) void post({ action: 'event', room, roomName, kind: 'gesture', detail, peers: peersRef.current }).catch(() => {}) },
   }
 }

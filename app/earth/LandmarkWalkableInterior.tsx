@@ -39,6 +39,7 @@ import RoundBubbles from './RoundBubbles'
 import { RoomAudioControls, useLoungeMusic, useSpeech } from './RoomAudio'
 import { nextReadingChunk, readingSource } from '@/lib/game/landmarks/readAloud'
 import { useRoundTalk } from './useRoundTalk'
+import ConversationReport from '@/app/components/ConversationReport'
 
 // Aufbau und Begehbarkeit kommen aus lib/game/landmarks/interiors.ts; diese
 // Datei zeichnet und führt das Gespräch mit der angestellten Person. Der Raum
@@ -690,8 +691,8 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           </button>}
           {!partner && services.length > 0 && <div className="services">{services.map(service => <button key={service.id} className={'act' + (service.available ? '' : ' quiet')} onClick={() => setStatus(service.available ? `${service.label}: ${service.note}.` : `${staffName}: „${service.label} – das geht hier noch nicht. ${service.note}.“`)}>{service.label}{!service.available && <small> · bald</small>}</button>)}</div>}
           <div className="row">{isLibrary && !partner && <button className="act" onClick={giveTip}>Buchtipp erbitten</button>}<button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
-          <p className="muted">Testphase: Dieser NPC-Dialog wird zu Diagnosezwecken protokolliert und kann von autorisierten Entwicklern eingesehen werden. <a href="/testbetrieb" style={{color:"#9fd3c0",textDecoration:"underline"}}>Informationen zu Testgesprächen</a>.</p>
           <div className="chat"><textarea value={message} rows={3} maxLength={500} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void talk() } }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Deine Nachricht …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
+          <ConversationReport npcId={partner ? partner.person.id : undefined}/>
         </>}
         {!talkingNow && resonanceShelfOpen && !book && <div className="book">
           <b>Philosophie · Lesen & denken</b>
