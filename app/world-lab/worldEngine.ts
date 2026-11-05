@@ -7,6 +7,7 @@
 
 import type { Application, Container, Graphics as PixiGraphics, Texture } from 'pixi.js'
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
+import { terrainShade, type TileTerrainPart } from '@/lib/worldlab/terrain'
 import { shouldReanchor } from '@/lib/worldlab/reanchor'
 import { kieselDirFrom, kieselSVG, type KieselDir, type KieselLook } from '@/lib/figures/kiesel'
 import { effectivePlaceKind, isTravelPlace } from '@/lib/worldlab/landmarks'
@@ -640,6 +641,20 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         g.moveTo(p[i], p[i + 1]).lineTo(p[i + 2], p[i + 3])
       }
       g.stroke({ width: outline.widthM * 0.75, color: outline.color, cap: 'square' })
+    }
+    // Gelände (NOXIA-WORLD-0004): Hangschattierung mit Licht aus Nordwesten und
+    // Höhenlinien alle 10 m, auf dem flachen Boden unter Straßen und Häusern.
+    const terrain = (data as TileTerrainPart).terrain
+    if (terrain) {
+      const shade = terrainShade(terrain, data.size)
+      for (const quad of shade.quads) {
+        g.poly(path(quad.p)).fill({ color: quad.light > 0 ? 0xfff6dc : 0x1d2a2e, alpha: Math.min(0.42, Math.abs(quad.light) * (quad.light > 0 ? 0.32 : 0.4)) })
+      }
+      for (const line of shade.contours) {
+        const p = path(line.s)
+        for (let i = 0; i + 3 < p.length; i += 4) g.moveTo(p[i], p[i + 1]).lineTo(p[i + 2], p[i + 3])
+        g.stroke({ width: line.major ? 0.55 : 0.3, color: 0x6b5a3a, alpha: line.major ? 0.38 : 0.22 })
+      }
     }
     const l = new PIXI.Graphics()
     const sf = new PIXI.Graphics()

@@ -168,11 +168,13 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       const response = await fetch('/api/world-lab/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(at) })
       // Bei Zeitüberschreitung antwortet der Server mit einer Textseite statt JSON (W-2).
       const raw = await response.text()
-      let json: { error?: string; regions?: Array<{ ok: boolean; error?: string }>; detail?: { ok?: boolean; cached?: boolean; total?: number; error?: string } } | null = null
+      let json: { error?: string; regions?: Array<{ ok: boolean; error?: string }>; terrain?: { fetched: number; failed: number }; detail?: { ok?: boolean; cached?: boolean; total?: number; error?: string } } | null = null
       try { json = JSON.parse(raw) } catch { console.error('[world-lab] refresh: keine JSON-Antwort', response.status, raw.slice(0, 300)) }
       if (!response.ok || !json) throw new Error(json?.error ?? 'HTTP ' + response.status)
       const parts: string[] = []
       for (const region of json.regions ?? []) parts.push(region.ok ? 'Region erneuert' : 'Region nicht erneuert (' + (region.error ?? 'Fehler') + ')')
+      if (json.terrain?.fetched) parts.push(json.terrain.fetched + ' Geländezellen geholt')
+      if (json.terrain?.failed) parts.push(json.terrain.failed + ' Geländezellen nicht geholt')
       if (json.detail?.ok) parts.push(json.detail.cached ? 'Ortsdetail war schon da' : json.detail.total + ' Objekte Ortsdetail geholt')
       else parts.push('Ortsdetail nicht geholt (' + (json.detail?.error ?? 'Fehler') + ')')
       fresh.current = String(Date.now())
