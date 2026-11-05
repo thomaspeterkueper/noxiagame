@@ -577,6 +577,11 @@ Umgesetzt (Thomas, 05.11.2026: „W-13“):
 - **Menschen:** wer laut Simulation dort ist (`peopleAtPlace`, Umkreis 120 m statt 45 m, weil Friedhöfe groß sind); ansprechbar. Die Gesprächsfakten sagen: leise, ruhig, ernsthaft, keine erfundenen Verstorbenen; bei Verzweiflung die Telefonseelsorge (0800 111 0 111, 0800 111 0 222, telefonseelsorge.de).
 - **Gedenkort für Spieler** (Vorschlag übernommen: nur für ihn selbst sichtbar): Kerze anzünden, wahlweise mit Namen; Tabelle `player_memorials` (nur über den Server, höchstens 12 je Tag), `GET/POST /api/game/memorial`. Die eigenen Kerzen brennen an der Gedenkwand jedes Friedhofs.
 - **Würde:** keine Musik, kein Rennen (Umschalt-Taste wirkt dort nicht).
+- **Nachtrag 05.11.2026 (Thomas: „beim Neuen Friedhof die Auferstehungskapelle“):**
+  - Befund: In Sundern gab es gar keine Friedhofsflächen. Die Region `earth-sauerland` steht noch auf Importprofil 4; ihr Neuimport (Profil 6, mit Friedhöfen) scheitert immer wieder an der Zeit. Die Kapelle (`osm:way:246550928`, `building=chapel`) war da, aber in OSM ohne Namen.
+  - **Friedhöfe nachholen:** `POST /api/world-lab/areas` holt je Zelle einmal nur die Friedhöfe aus OSM (`landuse=cemetery`, `amenity=grave_yard`) und legt sie als `place_area` in die umfassende Region (`lib/worldlab/placeAreas.server.ts`, Zellen in `earth_area_cells`). Die Karte stößt das für die Zelle um die Figur selbst an; danach werden die Kacheln neu gelesen.
+  - **Bekannte Namen:** `lib/worldlab/placeNames.ts` – Namen, die in OSM fehlen, aber bekannt sind (von Thomas genannt), zuerst „Auferstehungskapelle“. Gehört zur Kachelerzeugung (Kachelformat `2026-11-05.2`).
+  - **Kapelle am Friedhof:** Steht eine Kapelle (Blockart Kirche) auf dem Friedhof oder bis 25 m davor, zeigt die Friedhofstafel zusätzlich „Auferstehungskapelle betreten“ (Kirchenraum). Die Kapelle selbst ist auch direkt anklickbar.
 - **Offen:** Punkt 4 (Gräber mit Namen, Angehörige am Grab, Kerze/Blumen am Grab) wartet auf R-23 (`person_graves` gibt es noch nicht); Trauerhalle, sobald ein Gebäude auf der Fläche erkannt wird.
 
 
