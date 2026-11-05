@@ -41,7 +41,7 @@ jobs:
       - name: Compile population persistence engine
         run: pnpm exec tsc lib/game/population/engine.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --noEmit
       - name: Compile authoritative tick orchestration
-        run: pnpm exec tsc lib/game/tick.ts lib/game/personBrain.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --noEmit
+        run: pnpm exec tsc -p tsconfig.tick-ci.json
       - name: Validate Core invariants
         run: pnpm run test:core-invariants
       - name: Reproduce production Next build

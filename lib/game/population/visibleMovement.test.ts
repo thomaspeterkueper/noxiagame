@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { commuteSeconds, distanceToNearestVertex, pathLength, pointAlong, shouldCommute, visibleTarget } from './visibleMovement'
+import { ANCHOR_VISIBLE_MAX, anchorSpread, commuteSeconds, distanceToNearestVertex, pathLength, pointAlong, shouldCommute, visibleTarget } from './visibleMovement'
 
 const assignments = [
   { type: 'home', tileEntityId: 'home-1' },
@@ -9,8 +9,8 @@ const assignments = [
 describe('visible movement', () => {
   it('walks for a time that grows with distance but stays bounded', () => {
     expect(commuteSeconds(0)).toBe(4)
-    expect(commuteSeconds(160)).toBe(20)
-    expect(commuteSeconds(5000)).toBe(90)
+    expect(commuteSeconds(160)).toBe(40)
+    expect(commuteSeconds(5000)).toBe(150)
   })
 
   it('only commutes when the place really changes', () => {
@@ -37,5 +37,14 @@ describe('visible movement', () => {
     expect(pointAlong(path, 15)).toEqual({ x: 10, y: 5 })
     expect(pointAlong(path, 99)).toEqual({ x: 10, y: 10 })
     expect(distanceToNearestVertex(path, { x: 9, y: 1 })).toBe(10)
+  })
+})
+
+describe('people in front of a house', () => {
+  it('stand side by side, centred, 3.2 m apart, at most three', () => {
+    expect(ANCHOR_VISIBLE_MAX).toBe(3)
+    expect(anchorSpread(0, 1)).toBe(0)
+    expect([0, 1, 2].map(slot => anchorSpread(slot, 3))).toEqual([-3.2, 0, 3.2])
+    expect(anchorSpread(5, 3)).toBe(3.2)
   })
 })

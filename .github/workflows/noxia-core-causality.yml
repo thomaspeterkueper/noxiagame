@@ -35,5 +35,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Verify SSF unlock candidate guard fixtures
+        run: node --test scripts/ssfUnlockResolutionGuard.test.mjs
       - name: Run existing core invariants
         run: npm run test:core-invariants

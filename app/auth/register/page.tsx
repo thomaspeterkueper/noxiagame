@@ -49,7 +49,7 @@ export default function RegisterPage() {
       password,
       options: {
         data: { username },
-        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/dashboard`,
+        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/auth/login`,
       },
     })
 
@@ -60,12 +60,16 @@ export default function RegisterPage() {
     }
 
     if (data.session) {
-      window.location.assign('/dashboard')
+      // Supabase can return a session when e-mail confirmation is disabled.
+      // Preserve the explicit onboarding hand-off rather than auto-login.
+      await supabase.auth.signOut()
+      setRegisteredEmail(email.trim().toLowerCase())
+      setLoading(false)
       return
     }
 
     if (data.user) {
-      setRegisteredEmail(email)
+      setRegisteredEmail(email.trim().toLowerCase())
       setLoading(false)
       return
     }
@@ -85,7 +89,7 @@ export default function RegisterPage() {
       type: 'signup',
       email: registeredEmail,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/dashboard`,
+        emailRedirectTo: `${window.location.origin}/auth/confirm?next=/auth/login`,
       },
     })
 
@@ -121,10 +125,10 @@ export default function RegisterPage() {
         {registeredEmail ? (
           <div>
             <div style={s.success}>
-              <strong>Konto erstellt.</strong>
+              <strong>Fast geschafft!</strong>
               <div style={{ marginTop: '0.45rem' }}>
                 Wir haben eine Bestätigungs-E-Mail an <strong>{registeredEmail}</strong> gesendet.
-                Öffne den Link in dieser E-Mail. Danach wirst du automatisch zum NOXIA-Dashboard weitergeleitet.
+                Bitte öffne deinen Maileingang und bestätige dein Konto über den Link. Prüfe gegebenenfalls auch deinen Spam-Ordner. Anschließend kannst du dich anmelden.
               </div>
             </div>
             {resendMessage && (
@@ -137,6 +141,9 @@ export default function RegisterPage() {
               style={{ ...s.btn, marginTop: '1rem', background: resendBusy ? '#94a3b8' : '#2a4e7a' }}
             >
               {resendBusy ? 'Wird gesendet...' : 'Bestätigungs-E-Mail erneut senden'}
+            </button>
+            <button type="button" onClick={() => router.push('/auth/login')} style={{ ...s.btn, marginTop: '0.75rem', background: '#315b49' }}>
+              Weiter zur Anmeldung
             </button>
             <p style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.75rem', color: '#94a3b8' }}>
               Bereits bestätigt?{' '}

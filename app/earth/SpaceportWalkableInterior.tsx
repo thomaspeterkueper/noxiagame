@@ -6,13 +6,17 @@
 // Personal kennt die echten Zielorte und das Schiff des Gastes; das Angebot
 // sind die bestehenden Hafenfunktionen – Navigation, Fracht, Wartung, Kantine –
 // die als Tafeln darüber öffnen.
+// Aktualisiert: 29.10.2026 — Mitflug auf Handelsschiffen: Anheuern an der Flugleitung, Personal kennt die Frachtrouten
+// Version:      1.1.1
 
-import { useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import WalkableInterior, { type InteriorContext, type InteriorFitting } from '@/app/interiors/WalkableInterior'
 import { SPACEPORT_INTRODUCTION, SPACEPORT_LAYOUT, spaceportKnowledge, type SpaceportFacts } from '@/lib/game/spaceport/spaceportInterior'
 import { baseInteriorFacts, withExtraFacts } from '@/lib/game/interiors/baseFacts'
 import { learningGateFacts, statusesFromViews } from '@/lib/game/interiors/learningGates'
 import type { ColonyResident } from '@/lib/store/colonyStateStore'
+import { getSessionInfo } from '@/lib/supabase/auth'
+import { crewKnowledge, crewStatusLine, durationText, sinceText, type CrewState } from '@/lib/game/jobs/crewSignon'
 
 type Props = {
   entityId: string
@@ -25,7 +29,28 @@ type Props = {
 
 export default function SpaceportWalkableInterior({ entityId, buildingName, facts, companion = null, onClose, onOpen }: Props) {
   const ctxRef = useRef<InteriorContext | null>(null)
-  const knowledge = useMemo(() => spaceportKnowledge(facts), [facts])
+  const [crew, setCrew] = useState<CrewState | null>(null)
+  const [crewBusy, setCrewBusy] = useState(false)
+  const [crewNote, setCrewNote] = useState<string | null>(null)
+  const loadCrew = useCallback(async (init?: RequestInit) => {
+    try {
+      const { token } = await getSessionInfo()
+      const res = await fetch('/api/game/crew', { ...init, headers: { ...(init?.headers ?? {}), Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, cache: 'no-store' })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) { setCrewNote(data?.error ?? 'Anheuern ist gerade nicht möglich.'); return }
+      if (data) { setCrew(data as CrewState); setCrewNote(null) }
+    } catch { setCrewNote('Die Heuerliste ist gerade nicht erreichbar.') }
+  }, [])
+  useEffect(() => {
+    const timer = setTimeout(() => { void loadCrew() }, 0)
+    return () => clearTimeout(timer)
+  }, [loadCrew])
+  async function crewAction(body: Record<string, string>) {
+    setCrewBusy(true)
+    await loadCrew({ method: 'POST', body: JSON.stringify(body) })
+    setCrewBusy(false)
+  }
+  const knowledge = useMemo(() => [...spaceportKnowledge(facts), ...crewKnowledge(crew)], [facts, crew])
   const layout = SPACEPORT_LAYOUT
 
   const fitting: InteriorFitting = {
@@ -61,6 +86,19 @@ export default function SpaceportWalkableInterior({ entityId, buildingName, fact
           <button className="tile" onClick={() => onOpen('maintenance')}><span className="domain">Service</span><span>Wartung & Werft</span><b>Schiff prüfen</b></button>
           {facts?.canteen && <button className="tile" onClick={() => onOpen('canteen')}><span className="domain">Hafen</span><span>Hafenkantine</span><b>Wasser & Ration</b></button>}
         </div>
+        <small>MITFLIEGEN ALS CREW</small>
+        {!crew && !crewNote && <p>Die Heuerliste wird geholt …</p>}
+        {crew && crewStatusLine(crew) && <p>{crewStatusLine(crew)}</p>}
+        {crew && crew.hasShip && <p className="hint">Mit eigenem Schiff fliegst du selbst; anheuern können Leute ohne Schiff.</p>}
+        {crew && !crew.hasShip && crew.routes.length === 0 && <p className="hint">Von hier fährt zurzeit keine Fracht ab.</p>}
+        {crew && !crew.hasShip && !crew.inTransit && crew.signon?.status !== 'waiting' && crew.routes.length > 0 && <div className="tiles">
+          {crew.routes.map(r => <button key={r.destination} className="tile" disabled={crewBusy} onClick={() => void crewAction({ action: 'sign_on', destination: r.destination })}>
+            <span className="domain">Epona Fracht</span><span>Nach {r.name} · {durationText(r.hours)}</span><b>Anheuern · {r.wage} Cr Heuer</b>
+            <span className="hint">Letzte Fracht {sinceText(Math.max(0, crew.tick - r.lastDepartTick))}</span>
+          </button>)}
+        </div>}
+        {crew?.signon?.status === 'waiting' && <button className="tile" disabled={crewBusy} onClick={() => void crewAction({ action: 'cancel' })}><span>Von der Heuerliste abmelden</span></button>}
+        {crewNote && <p className="hint">{crewNote}</p>}
       </div>
     },
   }

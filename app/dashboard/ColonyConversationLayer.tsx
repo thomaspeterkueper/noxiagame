@@ -20,7 +20,7 @@ type TileEntity = { id:string; entity_id:string; entity_type:string; tile_row:nu
 type ChatEntry = { role:'user'|'assistant'; content:string }
 type Props = { locationSlug:string; population:number; entities:TileEntity[]; pending:unknown[]; userId:string; residents:ColonyResident[] }
 
-const COLS=32, ROWS=24, MAX_PLAYER_CHARS=80, PLAYER_JOIN_DISTANCE=1.25
+const COLS=32, ROWS=24, MAX_PLAYER_CHARS=400, PLAYER_JOIN_DISTANCE=1.25
 
 function residentRole(resident:ColonyResident){
   return resident.assignments.find(assignment=>assignment.type==='work')?.roleCode ?? resident.activityState ?? 'general'
@@ -167,7 +167,7 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
           <input value={message} maxLength={MAX_PLAYER_CHARS} onChange={event=>setMessage(event.target.value)} onKeyDown={event=>{if(event.key==='Enter')void sendMessage()}} placeholder={conversationEnd.isEnded(scene.first.id)?CONVERSATION_ENDED_PLACEHOLDER:'Kurze Antwort …'} disabled={sending||conversationEnd.isEnded(scene.first.id)} autoFocus={scene.mode==='direct'} style={{flex:1,minWidth:0,padding:'8px 9px',border:'1px solid #45657c',borderRadius:6,background:'#06111a',color:'#eef5f8'}}/>
           <button onClick={()=>void sendMessage()} disabled={sending||conversationEnd.isEnded(scene.first.id)||!message.trim()} style={{border:'1px solid #3976a5',borderRadius:6,background:'#0a3150',color:'#fff',padding:'0 10px',cursor:sending?'wait':'pointer'}}>{sending?'…':'Senden'}</button>
         </div>
-        <div style={{marginTop:3,textAlign:'right',color:message.length>=70?'#f1d57a':'#738795',fontSize:9}}>{message.length}/{MAX_PLAYER_CHARS}</div>
+        <div style={{marginTop:3,textAlign:'right',color:message.length>=350?'#f1d57a':'#738795',fontSize:9}}>{message.length}/{MAX_PLAYER_CHARS}</div>
         {chatError&&<div style={{marginTop:5,color:'#e29a86',fontSize:10}}>{chatError}</div>}
       </div>}
       <div style={{marginTop:8,color:'#8fa3b1',fontSize:10}}>Reale Meldung: {scene.source?.name??scene.conversation.item.sourceId}. Die Reaktionen der Bewohner sind fiktional.</div>

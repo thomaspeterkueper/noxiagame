@@ -8,6 +8,7 @@
 
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from './mercator'
 import { buildingUseCode } from './buildingUse'
+import { nearestRoadAngle, octagonRing, worshipMassing, type WorshipMassing } from './worshipShapes'
 
 export interface SourceFeature {
   id: string
@@ -44,6 +45,10 @@ export interface TileBlock {
   nm?: string
   /** Kennung der Quelle, z. B. „osm:way:123“ – für Kauf und Eigentum. */
   i?: string
+  /** 1: Anbau (Chor, Vorhalle) – gehört zum Gebäude davor, nicht einzeln anklickbar. */
+  o?: 1
+  /** 1: Dachreiter auf dem First. */
+  t?: 1
   /** Heutige Nutzung aus OSM als kurze Kennung, z. B. „a:bar“, „s:bakery“, „b:apartments“ (`lib/worldlab/buildingUse.ts`). */
   u?: string
 }
@@ -358,6 +363,12 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
 
   const out: SimplifiedTile = { z, x: tile.x, y: tile.y, size: round1(size), roads: [], rivers: [], areas: [], blocks: [] }
   const seen = new Set<string>()
+  // Gebäude mit echtem Umriss (Quelle): dort wird kein Ersatzhaus gesetzt.
+  const buildingKeys = new Set<string>()
+  for (const feature of features) {
+    if (feature.featureType === 'building') { const id = (feature.properties as Record<string, unknown> | null)?.noxia_source_id; if (typeof id === 'string') buildingKeys.add(id) }
+  }
+  const synthesized: Array<{ block: TileBlock; massing: WorshipMassing }> = []
   // Dieselbe Linie aus mehreren Importen (Region grob auf ~13 m, Ortsdetail, genaue
   // Hauptstraßen und Gleise): die mit den meisten Punkten zählt.
   const finest = new Map<string, SourceFeature>()
@@ -370,17 +381,32 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
   for (const feature of features) {
     const properties = (feature.properties ?? {}) as Record<string, unknown>
     const key = String(properties.noxia_source_id ?? feature.id)
-    if (seen.has(key)) continue
+    // Ein Wahrzeichen (Punkt) und das Gebäude derselben Quelle sind zwei Objekte: Der Punkt darf
+    // das Gebäude nicht verdrängen, sonst fehlt die Kirche auf der Karte (31.10.2026).
+    const landmarkLike = (feature.featureType === 'landmark' || feature.featureType === 'poi') && feature.geometry?.kind === 'point'
+    const seenKey = landmarkLike ? 'L:' + key : key
+    if (seen.has(seenKey)) continue
     if (feature.geometry?.kind === 'line' && finest.has(key) && finest.get(key) !== feature) continue
     const coordinates = feature.geometry?.coordinates
     // Wahrzeichen: Punkt mit Namen; gehört der Kachel, in der es liegt.
     if ((feature.featureType === 'landmark' || feature.featureType === 'poi') && feature.geometry.kind === 'point' && typeof properties.name === 'string') {
       const at = local(feature.geometry.coordinates as GeoPoint)
       if (at.x < 0 || at.x >= size || at.y < 0 || at.y >= size) continue
-      seen.add(key)
+      seen.add(seenKey)
       const tags: Record<string, string> = {}
       for (const tag of PLACE_TAGS) if (typeof properties[tag] === 'string' && properties[tag]) tags[tag] = String(properties[tag]).slice(0, 200)
       ;(out.places ??= []).push({ x: round1(at.x), y: round1(at.y), n: properties.name.slice(0, 80), k: String(properties.visual_class ?? 'landmark'), ...(Object.keys(tags).length ? { t: tags } : {}), ...(feature.featureType === 'poi' ? { p: 1 as const } : {}) })
+      // Gotteshaus ohne Gebäudeumriss in den Daten: Haus in passender Größe an den Punkt setzen.
+      const source = typeof properties.noxia_source_id === 'string' ? properties.noxia_source_id : ''
+      if (feature.featureType === 'landmark' && properties.amenity === 'place_of_worship' && source.startsWith('osm:way:') && !buildingKeys.has(source)) {
+        const massing = worshipMassing(properties)
+        const block: TileBlock = { x: round1(at.x), y: round1(at.y), w: massing.w, d: massing.d, a: 0, k: 'church', l: massing.levels, nm: properties.name.slice(0, 80), i: source.slice(0, 40) }
+        const use = buildingUseCode(properties)
+        if (use) block.u = use
+        out.blocks.push(block)
+        if (massing.turret) block.t = 1
+        synthesized.push({ block, massing })
+      }
       continue
     }
     // Einzelbaum: gehört der Kachel, in der er steht.
@@ -498,5 +524,18 @@ export function buildTile(features: readonly SourceFeature[], tile: TileId, z: n
   const roadOrder: Record<RoadClass, number> = { path: 0, service: 1, street: 2, main: 3 }
   out.roads.sort((a, b) => roadOrder[a.c] - roadOrder[b.c])
   if (out.rw && out.rw.length !== out.rivers.length) delete out.rw
+  // Ersatzhäuser für Gotteshäuser stehen längs der nächsten Straße; das Achteck bekommt seinen Grundriss.
+  for (const { block, massing } of synthesized) {
+    block.a = Math.round(nearestRoadAngle(block.x, block.y, out.roads) * 1000) / 1000
+    if (massing.octagon) block.f = octagonRing(block.x, block.y, block.w, block.d, block.a)
+    // Anbauten liegen an den Enden der Längsachse: Chor hinten (+), Vorhalle vorn (−).
+    const cos = Math.cos(block.a), sin = Math.sin(block.a)
+    const annex = (part: { w: number; d: number }, side: 1 | -1, kind: BlockKind, levels: number) => {
+      const along = side * (block.w / 2 + part.w / 2 - 0.4)
+      out.blocks.push({ x: round1(block.x + along * cos), y: round1(block.y + along * sin), w: part.w, d: part.d, a: block.a, k: kind, l: levels, o: 1 })
+    }
+    if (massing.choir) annex(massing.choir, 1, 'church', 2)
+    if (massing.porch) annex(massing.porch, -1, 'shed', 1)
+  }
   return out
 }

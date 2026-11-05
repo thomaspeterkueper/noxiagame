@@ -73,8 +73,10 @@ export function buildSurfaceDecor(input: {
   const extent = input.extentM
   const pick = () => ({ xM: (random() * 2 - 1) * extent, yM: (random() * 2 - 1) * extent })
   const moon = input.body === 'moon'
+  // Stationen haben kein Gelände: Deck statt Regolith, keine Krater und Felsbrocken (30.10.2026).
+  const station = input.body === 'station'
   const craters: SurfaceCrater[] = []
-  const craterCount = moon ? 70 : 55
+  const craterCount = station ? 0 : moon ? 70 : 55
   for (let tries = 0; craters.length < craterCount && tries < craterCount * 12; tries++) {
     const at = pick()
     // Größenverteilung: viele kleine, wenige große (r von 3 bis 40 m)
@@ -84,7 +86,7 @@ export function buildSurfaceDecor(input: {
     craters.push({ ...at, rM: Math.round(rM * 10) / 10 })
   }
   const boulders: SurfaceBoulder[] = []
-  for (let tries = 0; boulders.length < 90 && tries < 900; tries++) {
+  for (let tries = 0; !station && boulders.length < 90 && tries < 900; tries++) {
     const at = pick()
     const rM = 0.6 + Math.pow(random(), 2) * 2.6
     if (clearanceM(at, input.keepOut) < rM + 3) continue

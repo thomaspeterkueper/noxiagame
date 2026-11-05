@@ -76,6 +76,24 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
     - Gebündelt in der Sicht `player_feature_wishes`, geprüft in `player_feature_wish_reviews`: Spielidee, Ethik, Spielraum (Eigen-, Fremd-, Folge-, Gemeinraum – hilft es beim Werden oder schränkt es ein).
     - Die tägliche Auswertung empfiehlt, Thomas entscheidet; erst dann wird ein Request geschrieben.
     - Prüfweg und erste acht Prüfungen: `docs/reviews/spielerwuensche.md` (Migration `20261029110000_player_feature_wishes.sql`, live).
+22. ✅ **Mitflug auf Handelsschiffen (29.10.2026, Spielerwunsch „Raumhafen“, entschieden von Thomas; R-21 Punkt 4).**
+    - Wer kein eigenes Schiff hat, heuert an der Flugleitung im Raumhafen bei Epona Fracht für ein Ziel an, das von dort bedient wird. Er kommt auf die Heuerliste.
+    - Läuft die nächste Fracht dorthin aus, geht er an Bord (im Tick oder beim Anheuern). Die Reise läuft über `profiles.transit_*` wie der Linienflug.
+    - Bei der Ankunft zahlt der Frachtführer die Heuer aus seinem Konto: Lohnschlüssel `logistics` je Reisestunde, mindestens 10 Cr. Das ist ein Transfer.
+    - Gebaut: `crew_signons`, `noxia_crew_sign_on`/`_cancel`/`_board_due`/`_routes`, Ankunft in `noxia_complete_passenger_transit` (Migration `20261029120000_crew_signon_trade_ships.sql`, live); `app/api/game/crew`; Panel an der Flugleitung (`SpaceportWalkableInterior` 1.1.0); Personal und Agentur kennen die Frachtrouten (`lib/game/jobs/crewSignon.ts`).
+    - **Grenze:** Frachten laufen selten aus. Bisher gab es 12, die letzte vor etwa 5 Tagen, nur Erde → Mond und Erde → Mars. Wer anheuert, wartet, bis die Handelsfirma wieder liefert.
+    - Mit eigenem Schiff kann man nicht anheuern.
+23. ✅ **Zuzug in die Kolonien mit der Fracht (29.10.2026, Spielerwunsch „mehr Menschen“, entschieden von Thomas).**
+    - Kommt eine Fracht von der Erde an, kann eine Person mitkommen. Voraussetzung: Am Ort sind eine Wohnung und eine bezahlte Stelle in einem Haus des Staates oder einer Figur frei, und der Arbeitgeber kann sieben Tage Lohn decken.
+    - Spielerhäuser stellen nicht von selbst ein.
+    - Stellen in staatlichen Kolonie-Häusern: Kantine, Werkstatt, Lebenserhaltung, Roverhof, Funk, Lager, Verwaltung, je eine.
+    - Jede Fracht wird einmal geprüft; der Grund, wenn niemand kommt, steht in `colony_arrivals` (Sicht `colony_arrivals_summary`). Migration `20261029130000_colony_immigration_with_freight.sql`, live.
+    - **Offen, Entscheidung Thomas:** Die öffentlichen Kassen der Kolonien sind leer (Mond 8 Cr, Phobos 36 Cr, Mars 144 Cr). Damit kommt dort niemand (`no_money`), bis die Kolonien Einnahmen oder einen Haushalt haben (NOXIA-FIN-0001: Fiskaltransfer oder ausgewiesene Emission).
+    - **Vorschlag dazu (29.10.2026):** `docs/decisions/NOXIA-FIN-0002-haushalt-der-kolonien.md`. Er sieht Förderabgabe, Miete und Konsumsteuer vor, private Stellen an Förderanlagen und eine befristete Anlaufhilfe. Fünf Entscheidungsfragen an Thomas.
+24. ✅ **Vorhandenes auffindbar (29.10.2026, Spielerwünsche „vorhanden“, entschieden von Thomas).**
+    - Fragt ein Spieler nach Toilette, eigenem Lokal, Büchern, Akademie, Tanz, Raumhafen oder Arbeit, bekommt die Figur die Wege als belegtes Wissen, mit den echten Häusern am Ort (`lib/game/cognition/gameGuide.ts`, Gesprächsroute 1.8.0).
+    - Was fehlt, sagt sie ehrlich: Einen Nachtclub gibt es auf der Erde noch nicht.
+    - Sexuelle Inhalte bleiben abgelehnt; der Abbruch beim dritten Grenztest bleibt.
 
 ## Requests aus anderen Teilprojekten
 
@@ -547,6 +565,32 @@ Das ist ein Teil von Aufgabe 12 hier („Angebote für Spieler als Daten“).
 4. **Missbrauch:** Aufgaben je Minute begrenzen. Eine Schicht endet spätestens nach einer Stunde, auch ohne `end`.
 5. **Später:** Wer öfter dort arbeitet, könnte fest angestellt werden (`person_assignments` für Spieler) – das wäre eine eigene Entscheidung.
 
+**✅ Bezahlung freigeschaltet (Gastronomie, 30.10.2026, live):** Thomas: „Ich glaube, wir können die Bezahlung bei Arbeiten freischalten, aber Geld gibt es nur, wenn auch die Aufgaben erfüllt wurden, sonst Abzüge; eventuell auch keine Folgeanstellung am selben Ort, wenn bei drei Schichten immer noch keine Aufgaben erledigt wurden. Das sollte der Besitzer auch erklären. Für Nichtstun gibt es kein Geld.“
+
+Gebaut hat das die Gastronomie, weil der Schichtweg fehlte. Bitte prüft es und übernehmt es, wenn ihr wollt.
+- **Migration** `20261030090000_player_shifts_paid.sql`:
+  - Tabelle `player_shifts`;
+  - Funktionen `noxia_player_shift_state`, `noxia_start_player_shift`, `noxia_player_shift_task`, `noxia_end_player_shift`, `noxia_close_player_shift`, `noxia_venue_employer`.
+- **Wege:** `/api/game/hospitality/shift` (wie oben in der Tabelle) und `/api/game/jobs` (R-21 Punkt 2).
+- **Lohn:**
+  - Wer drei Viertel der erschienenen Pflichten erledigt, bekommt den vollen Lohn; Gästeaufgaben zählen mit.
+  - Darunter gibt es anteilig weniger, das ist der Abzug. Ohne erledigte Aufgabe gibt es 0 Cr.
+  - Der Server zählt nur Pflichten, deren Takt schon erschienen ist. Jede Aufgabe zählt einmal, höchstens eine je 2 Sekunden.
+- **Sperre:**
+  - Drei Schichten in Folge ohne erledigte Aufgabe im selben Haus bedeuten dort sieben Tage keine Schicht.
+  - Je Haus gibt es eine Schicht je 24 echte Minuten.
+  - Das Personal erklärt beides im Namen des Betreibers. Der Betreiber sagt es auch am Ende der Schicht („Für Nichtstun gibt es kein Geld“).
+- **Wer zahlt:** wie bei `pay_npc_wage` – Betreiber, sonst Eigentümer, sonst Gemeinde (`npc_ledger`, Art `wage`, `ref` `player_shift:<id>`).
+  - Gutgeschrieben wird auf `profiles.credits`.
+  - Kann der Arbeitgeber nicht voll zahlen, bekommt der Spieler, was da ist, und es steht als `shortPaid` in der Antwort. Ohne Deckung für eine volle Schicht bietet das Haus die Stelle nicht an.
+  - Im eigenen Haus gibt es keinen Lohn.
+- **Lohnsätze** stehen noch fest in `noxia_shift_wage_rate`: Tür 9, Tresen 8, DJ 10, Bedienung und Empfang 7, Putzen 6 Cr je Spielstunde.
+- **Offen für euch:**
+  - Trinkgeld (Punkt 3) – `tip` ist bisher immer 0;
+  - Lohnsätze aus `role_wage_rates`;
+  - Steuer auf Lohn, falls gewünscht;
+  - feste Anstellung (R-21 Punkt 5).
+
 **Nachtrag Zeit (Thomas, 28.10.2026: „kein Spieler wartet 4 echte Stunden als Türsteher“), entschieden: „Einsatz, als Schicht gebucht“.**
 - Man spielt einen kurzen, dichten Einsatz: `EINSATZ_S` = 5 echte Minuten.
 - Gebucht wird eine ganze Schicht von `SHIFT_GAME_HOURS` Spielstunden (4, Putzen 3). Das folgt NOXIA-TIME-0001: Echtzeit-Begegnung als Ereignis fester Dauer.
@@ -584,7 +628,7 @@ Thomas, 28.10.2026: „Nebenbei sollte es dann auch eine Arbeitsvermittlung gebe
    - Dazu `staff_capacity` 3: Vermittlung, Beratung, Büro. Personal wie bei der Bank (R-14), Lohnschlüssel z. B. `job_advisor`.
 2. **Stellenliste:** `GET /api/game/jobs?location=earth` → `{ venues: { [tileEntityId]: { open: ShiftRole[], wages: { [role]: CrJeStunde } } } }`. Der Innenraum ruft das schon auf und zeigt dann nur freie, bezahlte Stellen ohne „Probe“. Später kommen weitere Arten dazu (`business`, `ship`, `permanent`).
 3. **Betriebe und Läden:** Stellen für Spieler in Bank, Warenhaus, Reisebüro, Werkstätten. Die Schicht-Mechanik ist allgemein; Gastronomie baut je Gebäudeart die Aufgaben im Innenraum, sobald die Stellen als Daten kommen. Vorschlag zuerst: Bank (Schalter: Ein- und Auszahlungen echter Kunden), Warenhaus (Ware einräumen, Aufträge packen).
-4. **Mitflug auf Handelsschiffen:** Stelle an Bord als Weg zum Herumkommen (Thomas’ Einstiegsidee, R-10). Mit Handel und Schiffe abzustimmen: wer anheuert, Lohn, Ziel, Dauer als Ereignis fester Dauer wie die Schicht.
+4. **Mitflug auf Handelsschiffen:** Stelle an Bord als Weg zum Herumkommen (Thomas’ Einstiegsidee, R-10). ✅ **Erledigt 29.10.2026** (Aufgabe 22): Anheuern an der Flugleitung, Heuer bei Ankunft. Mit Handel und Schiffe abzustimmen: wer anheuert, Lohn, Ziel, Dauer als Ereignis fester Dauer wie die Schicht.
 5. **Feste Anstellung:** Wer an einem Ort öfter arbeitet, kann fest angestellt werden – regelmäßige Schichten, fester Lohn, `person_assignments` bzw. eine eigene Tabelle für Spieler. Kündigen und Fehlschichten wären zu klären.
 
 ### R-19 (Erdkarte, 29.10.2026): Selbstbau der Bewohner mit Weltlage
@@ -592,4 +636,30 @@ Thomas, 28.10.2026: „Nebenbei sollte es dann auch eine Arbeitsvermittlung gebe
 `run_npc_self_build` legt Wohnhabitate als `legacy_tile` ohne `x_m`/`y_m` an (zuletzt sieben auf dem Mars am 22. und 25.10.2026). Die begehbaren Ansichten zeigen nur Bauten mit Weltlage; diese Häuser waren unsichtbar. Sie stehen seit 29.10.2026 in einem Wohnviertel nordöstlich der Schule im Tharsis Hub (Migration `20261029020000_offworld_buildings_into_world.sql`).
 
 **Bitte:** Neue Bauten aus dem Selbstbau mit `placement_mode = 'world'`, `x_m`, `y_m`, `rotation_deg`, `footprint_width_m`, `footprint_depth_m` anlegen – frei von bestehenden Bauten und Korridoren, möglichst im Wohnviertel des Ortes (auf dem Mars ab 70 / 200 nach Osten weiter). Die Prüfung von Lage und Abstand gibt es serverseitig schon in `POST /api/game/build/spatial`; derselbe Weg ist für Bewohner am einfachsten.
+
+### R-22 (Gastronomie, 29.10.2026): Wünsche aus der Arbeitsvermittlung auswerten
+
+Thomas, 29.10.2026: „Es sollte Personal oder wenigstens Roboter geben, damit wir Arbeitssuchende sowohl beraten als auch aus dem Gespräch neue Ideen für NOXIA entwickeln können. Und vielleicht hilft das ja auch Personen, die im echten Leben noch orientierungslos sind, eine Idee zu bekommen.“
+
+**Was schon da ist (Gastronomie):**
+- In der Agentur für Arbeit (Freiheitsmühle 7) arbeitet immer **VERA, ein Vermittlungsroboter** (`lib/game/jobs/jobAgency.ts`, `lib/grid/RobotVisual.tsx`).
+  - Ohne Personal steht sie an der Vermittlung, mit Personal am Beratungstisch.
+  - Sie ist eine Maschine, kein Eintrag in `people`, und sagt das offen.
+- VERA fragt zuerst, was jemand gern tut, und schlägt dann eine Schicht von der Stellenwand vor.
+- Nennt jemand eine Arbeit, die es noch nicht gibt, fragt sie nach, was daran reizt, und sagt, dass der Wunsch festgehalten und ausgewertet wird.
+- Spricht jemand über sein echtes Leben, hilft sie ernsthaft: Sie fragt nach Stärken und Interessen und nennt die echte Berufsberatung der Bundesagentur für Arbeit (kostenlos, 0800 4 555500) und den Test Check-U. Sie sagt, dass sie eine Spielfigur ist, und rät bei Verzweiflung, mit einem Menschen zu sprechen.
+- Gespräche mit VERA stehen im Gesprächsprotokoll unter `npc_key` `robot:job-agency:<Haus>`. Ein persönliches Gedächtnis hat sie nicht (keine Person).
+
+**Bitte:**
+1. **Tägliche Auswertung:** In „NOXIA Gesprächsauswertung“ einen eigenen Abschnitt „Wünsche aus der Arbeitsvermittlung“ anlegen.
+   - Welche Arbeiten sich Spieler wünschen, die es noch nicht gibt; was sie daran reizt; wie oft.
+   - Daraus Vorschläge für neue Stellen oder Gebäude, wie heute die Befunde in G-6.
+   - Am einfachsten über eine Sicht `npc_conversation_job_wishes`, Filter `npc_key like 'robot:job-agency:%'`.
+2. **Echtes Leben – sorgsam:** Gespräche über das echte Leben (Ausbildung, Beruf, Orientierung) sind persönlich. In der Auswertung bitte nur zusammengefasst und ohne Zuordnung zu Spielern; keine Zitate mit persönlichen Angaben. Der offene Punkt „Hinweis an die Spieler, dass Gespräche gespeichert werden“ (Testphasen-Review) wird damit dringlicher; am Schalter der Agentur wäre ein kurzer Hinweis sinnvoll.
+3. **Personal (zu R-21):** VERA überbrückt. Echte Vermittler bleiben gewünscht – Lohnschlüssel `job_advisor`, `building_staff_roles` für `job_agency`.
+4. **Vermittlungsschein serverseitig (zu R-20/R-21, 29.10.2026):**
+   - Die Agentur vermittelt jetzt direkt. Der Schein liegt bis auf Weiteres nur im Browser (`lib/game/jobs/referral.ts`, zwei echte Stunden gültig, je Spieler einer).
+   - Der Schichtweg nimmt seit 30.10.2026 `referral: { by, issuedAt }` an und legt ihn in `player_shifts.referral` ab. Offen bleibt:
+     - den Schein selbst serverseitig ausstellen und prüfen;
+     - optional eine Tabelle `job_referrals` (player, building, role, issued_at, used_at), damit die Auswertung sieht, welche Vermittlungen angetreten werden.
 

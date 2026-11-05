@@ -171,7 +171,9 @@ export function hostWindowsAt(spec:Pick<RealPlaceHost,'windows'>,tick:number,slo
 /** Wandernde Termine laden; fehlt die Tabelle noch, gibt es keine. */
 export async function loadSlotRows(supabase:SupabaseLike):Promise<SlotRow[]>{
   const {data,error}=await supabase.from('place_activity_slots').select('*').eq('active',true)
-  if(error){ if(String(error.code)==='42P01'||/does not exist|schema cache/i.test(String(error.message)))return []; throw error }
+  // Fehlt die Tabelle oder das Recht, laufen die Wochenpläne ohne wandernde Termine weiter –
+  // ein Fehler hier darf nie den ganzen Tick abbrechen (29.10.2026: 42501 brach zwei Ticks ab).
+  if(error){ console.error('loadSlotRows failed',{code:error.code,message:error.message}); return [] }
   return (data??[]) as SlotRow[]
 }
 

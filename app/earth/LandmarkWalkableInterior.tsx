@@ -24,7 +24,10 @@ import {
   type LandmarkRoomKind,
   type LandmarkSpot,
 } from '@/lib/game/landmarks/interiors'
-import { LIBRARY_BOOKS, LIBRARY_SHELVES, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
+import { LIBRARY_BOOKS, LIBRARY_SHELVES, RESONANCE_READING_IDS, type LibraryBook } from '@/lib/game/landmarks/libraryCatalogue'
+import { READING_TEXTS } from '@/lib/game/landmarks/readingTexts'
+import { THEOLOGICAL_ESSAYS } from '@/lib/game/landmarks/theologicalEssays'
+import { IDENTITY_BOOK } from '@/lib/game/landmarks/identityBook'
 import { useConversationEnd, CONVERSATION_ENDED_PLACEHOLDER } from '@/app/components/useConversationEnd'
 import { liturgyFor, phaseAt, speechNoun, type ActivityKind, type Tradition } from '@/lib/game/population/worship'
 
@@ -49,6 +52,19 @@ type Props = {
   people?: RoomPerson[]
   /** Laufender Gottesdienst, Gebet oder Runde (aus /api/world-lab/worship). */
   occasion?: RoomOccasion
+  /** OSM-Kennung oder Spielgebäude des Ortes (für Wünsche und Gebete). */
+  placeRef?: string
+}
+
+/** Wie das Anliegen hier heißt (29.10.2026: Wünsche und Gebete, die die Welt erhört). */
+const PLEA: Partial<Record<LandmarkRoomKind, { title: string; hint: string; button: string }>> = {
+  worship: { title: 'Fürbitte', hint: 'Am Eingang liegt ein Buch für Fürbitten. Was möchtest du hineinschreiben?', button: 'Ins Buch schreiben' },
+  mosque: { title: 'Bittgebet (Dua)', hint: 'Ein persönliches Bittgebet, in eigenen Worten.', button: 'Bitten' },
+  synagogue: { title: 'Gebet', hint: 'Ein Gebet oder ein Anliegen, in eigenen Worten.', button: 'Beten' },
+  hindu_temple: { title: 'Gebet', hint: 'Ein Gebet oder ein Anliegen vor dem Schrein.', button: 'Beten' },
+  buddhist_temple: { title: 'Wunsch für alle Wesen', hint: 'Ein guter Wunsch – für dich, für andere, für die Welt.', button: 'Widmen' },
+  resonance_place: { title: 'Anliegen an die Runde', hint: 'Was soll werden? Ein Wunsch, eine Frage, eine Hoffnung.', button: 'An die Pinnwand' },
+  community_hall: { title: 'Anliegen', hint: 'Was fehlt im Ort, was wäre schön?', button: 'An die Pinnwand' },
 }
 /** Ein laufender Termin am Ort: Art, Titel, echte Zeiten und wer ihn trägt. */
 export type RoomOccasion = { kind: ActivityKind; label: string; group: string; startedAt: string; endsAt: string; attendees: number; tradition: Tradition; host: { id: string; name: string; role: string } }
@@ -101,7 +117,7 @@ export default function LandmarkWalkableInterior(props: Props) {
   return <LandmarkRoom key={floor.level} {...props} level={floor.level} byStairs={floor.byStairs} onLevel={level => setFloor({ level, byStairs: true })}/>
 }
 
-function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, realName, people = [], occasion, level, byStairs, onLevel }: Props & { level: number; byStairs: boolean; onLevel: (level: number) => void }) {
+function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, realName, people = [], occasion, placeRef, level, byStairs, onLevel }: Props & { level: number; byStairs: boolean; onLevel: (level: number) => void }) {
   const layout = useMemo(() => { const base = landmarkRoomLayout(kind, level, byStairs); return staffRole && base.staff ? { ...base, staff: { ...base.staff, role: staffRole } } : base }, [kind, staffRole])
   const isLibrary = kind === 'library'
   const staffName = useMemo(() => landmarkStaffName(name), [name])
@@ -111,6 +127,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const [candles, setCandles] = useState(3)
   const [seated, setSeated] = useState(false)
   const [bookId, setBookId] = useState('')
+  const [readingPart, setReadingPart] = useState<number | null>(null)
   const [talking, setTalking] = useState(false)
   const [history, setHistory] = useState<ChatEntry[]>([])
   const [message, setMessage] = useState('')
@@ -123,6 +140,27 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const minute = occasion ? Math.floor((nowMs - Date.parse(occasion.startedAt)) / 60000) : -1
   const phase = occasion ? phaseAt(phases, minute) : null
   const [sermon, setSermon] = useState<{ text: string; by: string } | null>(null)
+  const plea = PLEA[kind] ?? null
+  const [pleaText, setPleaText] = useState('')
+  const [pleaNote, setPleaNote] = useState<{ text: string; help?: string } | null>(null)
+  const [pleaBusy, setPleaBusy] = useState(false)
+  async function sendPlea() {
+    const text = pleaText.trim()
+    if (!plea || text.length < 3 || pleaBusy) return
+    setPleaBusy(true)
+    try {
+      const { token } = await getSessionInfo()
+      const response = await fetch('/api/game/wishes', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, channel: kind === 'resonance_place' ? 'resonanz' : 'fuerbitte', placeRef: placeRef ?? null, placeName: name, tradition: kind, location: 'earth' }),
+      })
+      const data = await response.json().catch(() => ({}))
+      // Die Welt erklärt nichts: kein „wird erfüllt“, nur dass es angekommen ist.
+      setPleaNote(response.ok ? { text: data.message ?? 'Aufgeschrieben. Es bleibt hier.', help: data.help } : { text: data.error ?? 'Gerade nicht möglich.' })
+      if (response.ok) setPleaText('')
+    } finally { setPleaBusy(false) }
+  }
   const [hearing, setHearing] = useState(false)
   const [tip, setTip] = useState<LibraryBook | null>(null)
   const tipSeed = useRef(0)
@@ -153,7 +191,10 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   useEffect(() => { staffPosRef.current = staffPos }, [staffPos])
   useEffect(() => { readerPosRef.current = readerPos }, [readerPos])
   useEffect(() => { staffTaskRef.current = staffTask }, [staffTask])
-  const book = LIBRARY_BOOKS.find(entry => entry.id === bookId) ?? null
+  const isResonanceReading = kind === 'resonance_place'
+  const resonanceBooks = [...LIBRARY_BOOKS.filter(entry => (RESONANCE_READING_IDS as readonly string[]).includes(entry.id)), IDENTITY_BOOK, ...THEOLOGICAL_ESSAYS]
+  const book = [...LIBRARY_BOOKS, IDENTITY_BOOK, ...THEOLOGICAL_ESSAYS].find(entry => entry.id === bookId && (!isResonanceReading || resonanceBooks.some(item => item.id === entry.id))) ?? null
+  const readingText = isResonanceReading && book ? READING_TEXTS[book.id] : undefined
   const staff = layout.staff
   // Personen der Simulation: Träger(in) des Ortes vorne, die anderen auf freien Plätzen.
   const placed = useMemo(() => {
@@ -285,6 +326,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
   const nearStaff = Boolean(staff && Math.hypot(pos.x - staffPos.x, pos.y - staffPos.y) <= STAFF_REACH)
   const atCounter = Boolean(staff && Math.hypot(pos.x - staff.x, pos.y - staff.y) <= STAFF_REACH)
   const shown = !shelf && active && near?.id === active.id ? active : null
+  const resonanceShelfOpen = isResonanceReading && shown?.action === 'books'
   // Zu weit weg: das Gespräch endet, die Person bleibt am Tresen.
   const nearPartner = Boolean(partner && Math.hypot(pos.x - partner.at.x, pos.y - partner.at.y) <= STAFF_REACH * 1.4)
   const talkingNow = partner ? talking && nearPartner : talking && (nearStaff || staffTask?.kind === 'bring')
@@ -372,7 +414,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
     if (talkEnded) return
     if (partner) { await talkWithPerson(partner.person); return }
     if (!staff || !message.trim() || sending) return
-    const text = message.trim().slice(0, 80)
+    const text = message.trim().slice(0, 500)
     setSending(true)
     try {
       const { token } = await getSessionInfo()
@@ -428,7 +470,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
 
   async function talkWithPerson(person: RoomPerson) {
     if (!message.trim() || sending) return
-    const text = message.trim().slice(0, 80)
+    const text = message.trim().slice(0, 500)
     setSending(true)
     try {
       const { token } = await getSessionInfo()
@@ -486,6 +528,14 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         {talkingNow && (staff || partner)
           ? <div className="portrait"><NpcPortrait id={talkFigureId} name={talkName} role={talkRole}/></div>
           : <h3>{shelf ? 'Regal' : shown ? shown.label.charAt(0) + shown.label.slice(1).toLowerCase() : name}</h3>}
+        {!talkingNow && plea && <div className="plea">
+          <small>{plea.title.toUpperCase()}</small>
+          <span>{plea.hint}</span>
+          <textarea value={pleaText} maxLength={280} rows={3} data-noxia-private onChange={event => setPleaText(event.target.value)} placeholder="In eigenen Worten …"/>
+          <div className="row"><button className="act" disabled={pleaBusy || pleaText.trim().length < 3} onClick={() => void sendPlea()}>{pleaBusy ? '…' : plea.button}</button></div>
+          {pleaNote && <p>{pleaNote.text}</p>}
+          {pleaNote?.help && <p className="help">{pleaNote.help}</p>}
+        </div>}
         {!talkingNow && occasion && phase && <div className="occasion">
           <small>JETZT · {occasion.group.toUpperCase()}</small>
           <b>{occasion.label}</b>
@@ -509,17 +559,31 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           </button>}
           {!partner && services.length > 0 && <div className="services">{services.map(service => <button key={service.id} className={'act' + (service.available ? '' : ' quiet')} onClick={() => setStatus(service.available ? `${service.label}: ${service.note}.` : `${staffName}: „${service.label} – das geht hier noch nicht. ${service.note}.“`)}>{service.label}{!service.available && <small> · bald</small>}</button>)}</div>}
           <div className="row">{isLibrary && !partner && <button className="act" onClick={giveTip}>Buchtipp erbitten</button>}<button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
-          <div className="chat"><input value={message} maxLength={80} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') void talk() }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Kurze Frage …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
+          <div className="chat"><textarea value={message} rows={3} maxLength={500} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void talk() } }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Deine Nachricht …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
         </>}
+        {!talkingNow && resonanceShelfOpen && !book && <div className="book">
+          <b>Philosophie · Lesen & denken</b>
+          <p>Alle philosophischen Werke sind frei lesbar. Volltexte sind dort verfügbar, wo eine überprüfte Manuskriptfassung hinterlegt ist.</p>
+          <div className="books"><section>{resonanceBooks.map((entry, index) => <div key={entry.id}>{index === 0 && <p><strong>Philosophie und Bewusstsein</strong></p>}{index === resonanceBooks.length - THEOLOGICAL_ESSAYS.length && <p><strong>Theologie und Bibelauslegung</strong></p>}<button onClick={() => { setBookId(entry.id); setReadingPart(null) }}><b>{entry.title}</b><span>{entry.genre}{READING_TEXTS[entry.id] ? ' · Volltext frei lesbar' : ' · Einführung'}</span></button></div>)}</section></div>
+        </div>}
         {!talkingNow && shelf && !book && <><p>{shelfLabel}. Zieh einen Band heraus, um Titel und Klappentext zu lesen.</p><div className="books"><section>
           {shelfBooks.map(entry => <button key={entry.id} onClick={() => setBookId(entry.id)}><b>{entry.title}</b><span>{entry.genre}</span></button>)}
         </section></div></>}
-        {!talkingNow && book && (shelf || !shown) && <div className="book">
+        {!talkingNow && book && (shelf || !shown || resonanceShelfOpen) && <div className="book">
           <span>{book.author}</span>
           <b>{book.title}</b>
           <i>{book.genre}</i>
           <p>{book.teaser}</p>
-          <button className="act" onClick={() => setBookId('')}>← Zurück</button>
+          {isResonanceReading && (readingText ? <>
+            <p className="muted">Freie Lesefassung · {readingText.version} · ohne Credits oder Kauf</p>
+            {readingPart === null ? <div className="books"><section>{readingText.sections.map((part, index) => <button key={index} onClick={() => setReadingPart(index)}>{part.heading}</button>)}</section></div> : <>
+              <div className="row"><button className="act quiet" onClick={() => setReadingPart(null)}>← Inhaltsverzeichnis</button><span>{readingPart + 1} / {readingText.sections.length}</span></div>
+              <article style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',lineHeight:1.65,maxHeight:'55vh',overflowY:'auto',padding:'12px 0'}}>{readingText.sections[readingPart]?.text}</article>
+              <div className="row"><button className="act quiet" disabled={readingPart === 0} onClick={() => setReadingPart(n => Math.max(0, (n ?? 0)-1))}>← Vorheriger Teil</button><button className="act" disabled={readingPart + 1 >= readingText.sections.length} onClick={() => setReadingPart(n => Math.min(readingText.sections.length-1,(n ?? 0)+1))}>Nächster Teil →</button></div>
+            </>}
+            {readingText.source && <a href={readingText.source} target="_blank" rel="noopener noreferrer">Originalquelle ansehen</a>}
+          </> : <p className="muted">Einführungstext · vollständige Manuskriptfassung noch nicht zugeordnet</p>)}
+          <button className="act" onClick={() => { setBookId(''); setReadingPart(null) }}>← Zurück zum Regal</button>
         </div>}
         {status && <div className="status">{status}</div>}
         {!talkingNow && held && !book && <div className="book held-card">
@@ -643,6 +707,12 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .npc{position:absolute;z-index:2}
       .npc .carry{position:absolute;left:18px;top:14px;width:9px;height:12px;background:#b24a3d;border:1px solid #3b1a14;border-radius:1px;box-shadow:inset 2px 0 0 #e8d9b5}
       .player .held{position:absolute;left:16px;top:10px;width:8px;height:11px;background:#2f5d6b;border:1px solid #1a3038;border-radius:1px;box-shadow:inset 2px 0 0 #e8d9b5}
+      .plea{display:grid;gap:5px;padding:9px 10px;border:1px solid #6b8793;border-radius:7px;background:#0f2230;color:#dfe9ee}
+      .plea small{font:800 8px monospace;letter-spacing:.12em;color:#9fd3c0}
+      .plea span{font-size:10px;color:#a9bfc6}
+      .plea textarea{resize:vertical;min-height:52px;font:inherit;font-size:11px;padding:6px;border-radius:5px;border:1px solid #40595a;background:#0b1a24;color:#eef2ed}
+      .plea p{margin:0;font-size:11px}
+      .plea .help{padding:6px 8px;border-left:3px solid #e9c46a;background:#1d160b;color:#fff3d6}
       .occasion{display:grid;gap:5px;padding:9px 10px;border:1px solid #c9a447;border-radius:7px;background:#2a2010;color:#f6ead0}
       .occasion small{font:800 8px monospace;letter-spacing:.12em;color:#e9c46a}
       .occasion b{font-size:13px}
@@ -678,7 +748,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       .act{border:1px solid #6e7d55;border-radius:5px;background:#273d24;color:#edf3dd;padding:7px 9px;font:800 9px monospace;cursor:pointer}
       .act.quiet{border-color:#476476;background:#102b3c;color:#dce9ee}
       .chat{display:flex;gap:6px}
-      .chat input{flex:1;min-width:0;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}
+      .chat textarea{flex:1;min-width:0;min-height:72px;resize:vertical;font:inherit;border:1px solid #476476;border-radius:6px;background:#061019;color:#eef5f7;padding:7px 8px}
       .chat button{border:1px solid #476476;border-radius:6px;background:#102b3c;color:#dce9ee;padding:6px 9px;cursor:pointer}
       .tipcard{display:grid;gap:2px;text-align:left;border:1px solid #c9a24a;border-radius:6px;background:#efe6d2;color:#2b2118;padding:8px 10px;cursor:pointer}
       .tipcard span{font:800 8px monospace;letter-spacing:.1em;color:#7a5a36}

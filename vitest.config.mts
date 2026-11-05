@@ -15,6 +15,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: [
+      'lib/worldlab/placeStories.test.ts',
+      'lib/ai/chatProvider.test.ts',
       'lib/game/population/personSceneLabel.test.ts',
       'lib/game/population/spiritualRoles.test.ts',
       'lib/game/population/worldviewVoices.test.ts',
@@ -23,6 +25,7 @@ export default defineConfig({
       'lib/worldlab/meetingPlaces.test.ts',
       'lib/game/population/worship.test.ts',
       'lib/game/gameClock.test.ts',
+      'lib/game/wishes/rules.test.ts',
       'lib/game/buildings/technicalProvenance.test.ts',
       'lib/game/spatial/localSurfaceScene.test.ts',
       'lib/game/spatial/localSceneRuntime.test.ts',
@@ -31,6 +34,9 @@ export default defineConfig({
       'lib/worldlab/viewOptions.test.ts',
       'lib/worldlab/landPlot.test.ts',
       'lib/worldlab/worldPlaceQueue.test.ts',
+      'lib/game/spatial/stationLayouts.test.ts',
+      'lib/worldlab/buildingChronicle.test.ts',
+      'lib/worldlab/buildingChronicleText.test.ts',
       'lib/worldlab/tileFormat.test.ts',
       'lib/worldlab/viewTiles.test.ts',
       'lib/worldlab/frameStats.test.ts',
