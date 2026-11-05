@@ -42,7 +42,8 @@ function validReceipt(value: unknown): value is CommittedWorldReceipt {
   const r = value as Record<string, unknown>
   return nonempty(r.eventId) && nonempty(r.settlementId) &&
     nonempty(r.domainEventRef) && nonempty(r.actorRef) &&
-    Number.isInteger(r.worldYear) && Number.isInteger(r.sequence) &&
+    Number.isSafeInteger(r.worldYear) && Number.isSafeInteger(r.sequence) &&
+    (r.sequence as number) >= 0 &&
     (r.domain === 'buildings' || r.domain === 'infrastructure' ||
      r.domain === 'institutions' || r.domain === 'services') &&
     validChange(r.change, r.worldYear as number) &&
