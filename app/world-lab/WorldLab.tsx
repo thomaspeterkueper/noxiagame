@@ -108,6 +108,16 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   function changeView(next: ViewOptions) { viewRef.current = next; setViewState(next); saveView(next); engine.current?.setView(next) }
   const [helpOpen, setHelpOpen] = useState(() => { try { return typeof window !== 'undefined' && window.localStorage.getItem('noxia-world-help-v1') !== 'seen' } catch { return false } })
   function closeHelp() { setHelpOpen(false); try { window.localStorage.setItem('noxia-world-help-v1', 'seen') } catch { /* ohne Speicher */ } }
+  // Erster Start (05.11.2026, nach Forge of Empires): ein Pfeil zum ersten Ziel, ein Satz dazu.
+  // Für neue Spieler (Hilfe noch nicht gesehen) oder mit ?guide=1 zum Ausprobieren.
+  const [guideOn, setGuideOn] = useState(() => {
+    if (typeof window === 'undefined') return false
+    try {
+      if (new URLSearchParams(window.location.search).get('guide') === '1') return true
+      return window.localStorage.getItem('noxia-world-guide-v1') !== 'done' && window.localStorage.getItem('noxia-world-help-v1') !== 'seen'
+    } catch { return false }
+  })
+  function finishGuide() { setGuideOn(false); try { window.localStorage.setItem('noxia-world-guide-v1', 'done') } catch { /* ohne Speicher */ } }
   /** Kurzer Satz für Spieler (Einzelheiten gehen in die Konsole). */
   const [playerNote, setPlayerNote] = useState('')
   // Reise auf der Erde (Reisebüro, 27.10.2026): während der Fahrt ist die Karte gesperrt, bei Ankunft springt die Figur.
@@ -610,6 +620,37 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   }, [builds])
   useEffect(() => { engineReady?.setSites(sites) }, [engineReady, sites])
 
+  // Erster Start: nächste Agentur für Arbeit bis 3 km
+  const guideTarget = useMemo(() => {
+    void tick
+    if (!guideOn || !engineReady) return null
+    let best: NoxiaBuilding | null = null, bestD = 3000
+    for (const building of noxia) {
+      if (building.typeId !== 'job_agency') continue
+      const d = engineReady.distanceTo({ lat: building.lat, lon: building.lon })
+      if (d < bestD) { bestD = d; best = building }
+    }
+    return best ? { building: best, distanceM: bestD } : null
+  }, [guideOn, engineReady, noxia, tick])
+  const guideShown = Boolean(guideTarget && !helpOpen && panel.kind !== 'inside' && !trip)
+  const guideKey = guideShown && guideTarget ? guideTarget.building.id : ''
+  useEffect(() => {
+    if (!engineReady) return
+    const building = guideKey ? noxia.find(item => item.id === guideKey) : undefined
+    engineReady.setGuideArrow(building ? { lat: building.lat, lon: building.lon } : null)
+  }, [engineReady, guideKey, noxia])
+  // Angekommen oder hineingegangen: der Pfeil hat seinen Zweck erfüllt.
+  useEffect(() => {
+    if (!guideOn || !guideTarget) return
+    const inside = panel.kind === 'inside' && panel.request.entityId === guideTarget.building.id
+    if (!inside && guideTarget.distanceM >= 30) return
+    const timer = setTimeout(() => {
+      finishGuide()
+      if (!inside) setPlayerNote('Du bist an der Agentur für Arbeit – klick auf das Haus und geh hinein.')
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [guideOn, guideTarget, panel])
+
   // Weg zum Ort der offenen Tafel zeigen, sobald er mehr als 25 m entfernt ist.
   const routeTarget = panelLocation(panel, sites, plots)
   const routeKey = routeTarget ? routeTarget.lat.toFixed(6) + ',' + routeTarget.lon.toFixed(6) : ''
@@ -810,6 +851,15 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       {error && <p className="error">{error}</p>}
       {onLeave ? <button className="leave" onClick={onLeave}>← Bisherige Erdszene</button> : <a href="/dashboard">← zurück ins Spiel</a>}
     </div>}
+    {guideShown && guideTarget && !overheard && <div className="guide" role="status">
+      <small>ERSTER SCHRITT</small>
+      <b>Arbeit finden</b>
+      <span>In der Agentur für Arbeit bekommst du eine Stelle – davon bezahlst du Essen und Wohnung. Folge dem goldenen Pfeil ({kmText(guideTarget.distanceM)}).</span>
+      <div className="guide-actions">
+        <button onClick={() => choosePanel({ kind: 'building', at: { lat: guideTarget.building.lat, lon: guideTarget.building.lon }, title: guideTarget.building.name, noxiaId: guideTarget.building.id })}>Weg zeigen</button>
+        <button className="quiet" onClick={finishGuide}>Nicht nötig</button>
+      </div>
+    </div>}
     {overheard && <div className={helpOpen ? 'overheard raised' : 'overheard'}>
       <small>GESPRÄCH IN HÖRWEITE · {overheard.conversation.item.kind === 'colony' ? 'NOXIA' : 'HEUTE'}</small>
       <b>{personSceneLabel(overheard.first)} + {personSceneLabel(overheard.second)}</b>
@@ -914,6 +964,12 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .target select{width:100%;min-width:0;border:1px solid #40595a;background:#08151a;color:#fff;border-radius:5px;padding:5px 6px;font-size:11px}
       .overheard{position:absolute;left:14px;bottom:24px;width:min(360px,calc(100% - 28px));display:grid;gap:3px;padding:10px 12px;background:#0d1c22ee;border:1px solid #40595a;border-radius:8px;font-size:11.5px;z-index:4}
       .overheard.raised{bottom:200px}
+      .guide{position:absolute;left:14px;bottom:24px;width:min(320px,calc(100% - 28px));display:grid;gap:4px;padding:10px 12px;background:#0d1c22ee;border:1px solid #d9a62a;border-radius:8px;font-size:11.5px;z-index:5}
+      .guide small{color:#f2c94c;letter-spacing:.06em;font-size:10px}
+      .guide span{color:#d4e2de;line-height:1.4}
+      .guide-actions{display:flex;gap:6px;margin-top:4px}
+      .guide-actions button{border:1px solid #d9a62a;background:#3a2f12;color:#fff3cf;border-radius:5px;padding:4px 10px;font-size:11px;cursor:pointer}
+      .guide-actions button.quiet{border-color:#40595a;background:transparent;color:#9fb3ad}
       .overheard small{font:800 8px monospace;letter-spacing:.12em;color:#d9bb6a}
       .overheard p{margin:0;line-height:1.4}
       .overheard span{color:#9fb5b0;font-size:10px}
