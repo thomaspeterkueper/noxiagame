@@ -58,7 +58,7 @@ export type Panel =
   /** Reise buchen fern von Sundern (Heim- und Weiterreise, 27.10.2026) */
   | { kind: 'travel'; at: GeoPoint }
   /** Baum oder Strauch (05.11.2026) */
-  | { kind: 'plant'; at: GeoPoint; species: PlantId; source: 'osm' | 'estimate'; region: PlantRegion }
+  | { kind: 'plant'; at: GeoPoint; species: PlantId; source: 'osm-species' | 'osm' | 'estimate'; region: PlantRegion; hint?: string }
 
 const TALK_RANGE_M = 8
 const ENTER_RANGE_M = 8
@@ -78,7 +78,7 @@ export function panelForPick(pick: WorldPick, noxia: NoxiaBuilding[]): Panel {
   if (pick.type === 'site') return { kind: 'site', id: pick.id }
   if (pick.type === 'plot') return { kind: 'plot', source: pick.source }
   if (pick.type === 'parcel') return { kind: 'parcel', id: pick.id, at: pick.at }
-  if (pick.type === 'plant') return { kind: 'plant', at: pick.at, species: pick.species, source: pick.source, region: pick.region }
+  if (pick.type === 'plant') return { kind: 'plant', at: pick.at, species: pick.species, source: pick.source, region: pick.region, hint: pick.hint }
   // Ein Wahrzeichen-Gebäude (Kirche, Bibliothek) öffnet das Wahrzeichen, außer es ist ein NOXIA-Gebäude.
   if (pick.type === 'building' && pick.landmark && !pick.noxiaId) return { kind: 'landmark', landmark: pick.landmark, source: pick.source }
   const own = pick.noxiaId ? noxia.find(building => building.id === pick.noxiaId) : undefined
@@ -814,11 +814,14 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       const known = species.id === 'laubbaum' || species.id === 'nadelbaum'
       const day = plantDay(Date.now(), panel.at.lat)
       return <>
-        <div className="head"><div><small>{species.form === 'bush' || species.form === 'hedge' ? 'STRAUCH' : 'BAUM'}</small><b>{known ? species.name : (panel.source === 'osm' ? '' : 'wahrscheinlich ') + species.name}</b>{species.latin && <span><i>{species.latin}</i></span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
+        <div className="head"><div><small>{species.form === 'bush' || species.form === 'hedge' ? 'STRAUCH' : 'BAUM'}</small><b>{known || panel.source === 'osm-species' ? species.name : 'wahrscheinlich ' + species.name}</b>{species.latin && <span><i>{species.latin}</i></span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
         <dl>
           <dt>Heute</dt><dd>{foliageText(species, day, panel.region)}</dd>
           <dt>Höhe</dt><dd>ausgewachsen bis etwa {species.heightM} m</dd>
-          <dt>Woher bekannt</dt><dd>{panel.source === 'osm' ? 'Standort aus OpenStreetMap, Art geschätzt' : known ? 'geschätzt; die Art ist für diese Gegend nicht hinterlegt' : 'geschätzt nach Lage (Wald, Park, Garten …) und den Bäumen der Gegend'}</dd>
+          <dt>Woher bekannt</dt><dd>{panel.source === 'osm-species' ? (known ? 'aus OpenStreetMap; die genaue Art fehlt in unserem Verzeichnis' : 'Standort und Art aus OpenStreetMap')
+            : panel.source === 'osm' ? `Standort aus OpenStreetMap${panel.hint ? ` (${panel.hint})` : ''}, Art geschätzt`
+            : known ? 'geschätzt; die Art ist für diese Gegend nicht hinterlegt'
+            : panel.hint ? `geschätzt – laut OpenStreetMap ${panel.hint}` : 'geschätzt nach Lage (Wald, Park, Garten …) und den Bäumen der Gegend'}</dd>
         </dl>
         <p>{species.note}</p>
       </>

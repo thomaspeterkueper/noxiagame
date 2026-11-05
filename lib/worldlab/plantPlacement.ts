@@ -10,7 +10,7 @@
 
 import { ROAD_STYLES } from './blocks'
 import { seeded } from './ambient'
-import { plantRegion, type PlantId, type PlantRegion } from './plants'
+import { plantRegion, PLANTS, type PlantId, type PlantRegion } from './plants'
 import type { SimplifiedTile } from './simplify'
 import { insidePolygon } from './walking'
 
@@ -21,13 +21,15 @@ export interface PlantSpot {
   species: PlantId
   /** Größe gegenüber der typischen Höhe der Art (0,5 … 1,15) */
   scale: number
-  /** osm: Standort aus OpenStreetMap (Art geschätzt); estimate: Standort und Art geschätzt */
-  source: 'osm' | 'estimate'
+  /** osm-species: Standort und Art aus OpenStreetMap; osm: Standort aus OSM (Art geschätzt); estimate: geschätzt */
+  source: 'osm-species' | 'osm' | 'estimate'
+  /** Was OSM über die Fläche weiß, auf der die geschätzte Pflanze steht */
+  hint?: 'Laubwald' | 'Nadelwald' | 'Mischwald' | 'Gebüsch' | 'Laubbaum' | 'Nadelbaum'
 }
 
 type Mix = ReadonlyArray<readonly [PlantId, number]>
 
-const MIX: Record<'forest' | 'park' | 'garden' | 'cemetery' | 'street' | 'orchard' | 'bush' | 'water', Mix> = {
+const MIX = {
   // Sauerland: viel Fichte (trotz Käferflächen), Buche, Eiche, Birke auf Freiflächen
   forest: [['fichte', 34], ['buche', 24], ['eiche', 12], ['birke', 10], ['kiefer', 6], ['laerche', 6], ['ahorn', 6], ['erle', 2]],
   park: [['linde', 22], ['ahorn', 20], ['kastanie', 14], ['eiche', 12], ['buche', 10], ['birke', 12], ['kirsche', 6], ['pappel', 4]],
@@ -37,7 +39,13 @@ const MIX: Record<'forest' | 'park' | 'garden' | 'cemetery' | 'street' | 'orchar
   orchard: [['apfel', 55], ['kirsche', 45]],
   bush: [['hasel', 35], ['holunder', 30], ['liguster', 35]],
   water: [['weide', 55], ['erle', 45]],
-}
+  broadleaf: [['buche', 40], ['eiche', 24], ['ahorn', 12], ['birke', 12], ['linde', 6], ['esche', 4], ['erle', 2]],
+  needle: [['fichte', 60], ['kiefer', 22], ['laerche', 18]],
+  scrub: [['hasel', 40], ['holunder', 35], ['birke', 15], ['kirsche', 10]],
+  streetNeedle: [['kiefer', 55], ['fichte', 45]],
+} satisfies Record<string, Mix>
+const FOREST_MIX = { b: 'broadleaf', n: 'needle', m: 'forest', s: 'scrub' } as const
+const FOREST_HINT = { b: 'Laubwald', n: 'Nadelwald', m: 'Mischwald', s: 'Gebüsch' } as const
 
 function pick(mix: Mix, r: number): PlantId {
   const total = mix.reduce((sum, [, w]) => sum + w, 0)
@@ -47,9 +55,10 @@ function pick(mix: Mix, r: number): PlantId {
 }
 
 /** Art für die Gegend: in warmen und unbekannten Breiten nur „Laub-“ oder „Nadelbaum“, nichts Erfundenes. */
-function regional(id: PlantId, region: PlantRegion): PlantId {
+function regional(id: PlantId, region: PlantRegion, needleKnown = false): PlantId {
   if (region === 'central') return id
-  if (region === 'warm') return 'laubbaum'
+  // Warme Breiten: Nadelbaum nur, wenn OSM es sagt
+  if (region === 'warm' && !needleKnown) return 'laubbaum'
   return id === 'fichte' || id === 'kiefer' || id === 'laerche' ? 'nadelbaum' : 'laubbaum'
 }
 
@@ -72,7 +81,7 @@ function segmentDistance(p: P, a: P, b: P) {
 /**
  * Pflanzen einer Kachel. `origin`: Lage der Kachel in absoluten Metern; `at`: Mitte der Kachel (Grad).
  */
-export function plantSpots(data: Pick<SimplifiedTile, 'size' | 'areas' | 'roads' | 'rivers' | 'blocks' | 'trees'> & { rw?: number[] }, origin: P, at: { lat: number; lon: number }): PlantSpot[] {
+export function plantSpots(data: Pick<SimplifiedTile, 'size' | 'areas' | 'roads' | 'rivers' | 'blocks' | 'trees'> & { rw?: number[]; ts?: string[] }, origin: P, at: { lat: number; lon: number }): PlantSpot[] {
   const region = plantRegion(at.lat, at.lon)
   const out: PlantSpot[] = []
   const size = data.size
@@ -94,8 +103,13 @@ export function plantSpots(data: Pick<SimplifiedTile, 'size' | 'areas' | 'roads'
   const trees = data.trees ?? []
   for (let i = 0; i + 1 < trees.length; i += 2) {
     const p = { x: trees[i], y: trees[i + 1] }, key = (origin.x + p.x).toFixed(1) + ',' + (origin.y + p.y).toFixed(1)
-    const mix = waterSide(p) ? MIX.water : MIX.street
-    out.push({ ...p, species: regional(pick(mix, seeded('osm-tree:' + key)), region), scale: 0.75 + seeded('size:' + key) * 0.35, source: 'osm' })
+    const code = data.ts?.[i / 2] ?? ''
+    const scale = 0.75 + seeded('size:' + key) * 0.35
+    // Art aus OSM: steht so im Verzeichnis (auch „Laubbaum“, wenn OSM eine unbekannte Art nennt)
+    if (code && !code.startsWith('~')) { out.push({ ...p, species: code as PlantId, scale, source: 'osm-species' }); continue }
+    const mix = code === '~n' ? MIX.streetNeedle : waterSide(p) ? MIX.water : MIX.street
+    const hint = code === '~n' ? 'Nadelbaum' as const : code === '~b' ? 'Laubbaum' as const : undefined
+    out.push({ ...p, species: regional(pick(mix, seeded('osm-tree:' + key)), region, code === '~n'), scale, source: 'osm', ...(hint ? { hint } : {}) })
   }
 
   for (const area of data.areas) {
@@ -106,7 +120,11 @@ export function plantSpots(data: Pick<SimplifiedTile, 'size' | 'areas' | 'roads'
     if (ring.length < 3) continue
     const xs = ring.map(p => p.x), ys = ring.map(p => p.y)
     const minX = Math.max(0, Math.min(...xs)), maxX = Math.min(size, Math.max(...xs)), minY = Math.max(0, Math.min(...ys)), maxY = Math.min(size, Math.max(...ys))
-    const layers: Array<{ step: number; keep: number; bush: boolean }> = [{ step: fill.step, keep: fill.keep, bush: false }]
+    const leaf = area.k === 'forest' ? area.l : undefined
+    const layers: Array<{ step: number; keep: number; bush: boolean }> = leaf === 's'
+      // Gebüsch: dichte Sträucher, dazwischen wenige Bäume
+      ? [{ step: 6, keep: 0.5, bush: false }]
+      : [{ step: fill.step, keep: fill.keep, bush: false }]
     if (fill.bushes && region === 'central') layers.push({ ...fill.bushes, bush: true })
     for (const layer of layers) {
       const { step } = layer
@@ -123,11 +141,13 @@ export function plantSpots(data: Pick<SimplifiedTile, 'size' | 'areas' | 'roads'
         if (layer.bush) species = pick(MIX.bush, seeded('sp:' + key))
         else if (waterSide(p) && seeded('w:' + key) < 0.6) species = pick(MIX.water, seeded('sp:' + key))
         else if (area.k === 'forest') {
-          // Bestände: In einer Zelle von 50 m herrscht eine Art vor
-          const stand = pick(MIX.forest, seeded('stand:' + Math.floor(gx * step / 50) + ':' + Math.floor(gy * step / 50)))
-          species = seeded('mix:' + key) < 0.72 ? stand : pick(MIX.forest, seeded('sp:' + key))
+          // Waldart aus OSM, wenn bekannt; Bestände: In einer Zelle von 50 m herrscht eine Art vor
+          const mix = MIX[leaf ? FOREST_MIX[leaf] : 'forest']
+          const stand = pick(mix, seeded('stand:' + Math.floor(gx * step / 50) + ':' + Math.floor(gy * step / 50)))
+          species = leaf === 's' ? pick(mix, seeded('sp:' + key)) : seeded('mix:' + key) < 0.72 ? stand : pick(mix, seeded('sp:' + key))
         } else species = pick(MIX[fill.mix], seeded('sp:' + key))
-        out.push({ x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, species: regional(species, region), scale: (layer.bush ? 0.7 : 0.6) + seeded('size:' + key) * (layer.bush ? 0.5 : 0.55), source: 'estimate' })
+        const bushy = layer.bush || PLANTS[species].form === 'bush' || PLANTS[species].form === 'hedge'
+        out.push({ x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10, species: regional(species, region, leaf === 'n'), scale: (bushy ? 0.7 : 0.6) + seeded('size:' + key) * (bushy ? 0.5 : 0.55), source: 'estimate', ...(leaf ? { hint: FOREST_HINT[leaf] } : {}) })
       }
     }
   }

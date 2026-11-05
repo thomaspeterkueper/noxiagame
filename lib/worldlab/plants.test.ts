@@ -70,3 +70,37 @@ describe('Verteilung', () => {
     expect(a).toEqual(b)
   })
 })
+
+import { forestLeaf, osmTreeCode } from './plantTags'
+
+describe('OSM-Merkmale', () => {
+  it('Baumart aus species, species:de, genus, leaf_type', () => {
+    expect(osmTreeCode({ species: 'Quercus robur' })).toBe('eiche')
+    expect(osmTreeCode({ 'species:de': 'Winter-Linde' })).toBe('linde')
+    expect(osmTreeCode({ genus: 'Betula' })).toBe('birke')
+    expect(osmTreeCode({ 'species:de': 'Rosskastanie', genus: 'Aesculus' })).toBe('kastanie')
+    expect(osmTreeCode({ 'species:de': 'Hainbuche' })).toBe('hainbuche')
+    expect(osmTreeCode({ species: 'Prunus avium' })).toBe('kirsche')
+    expect(osmTreeCode({ species: 'Prunus spinosa' })).toBe('laubbaum')
+    expect(osmTreeCode({ species: 'Castanea sativa' })).toBe('laubbaum')
+    expect(osmTreeCode({ genus: 'Ginkgo' })).toBe('laubbaum')
+    expect(osmTreeCode({ leaf_type: 'needleleaved' })).toBe('~n')
+    expect(osmTreeCode({})).toBe('')
+  })
+  it('Waldart', () => {
+    expect(forestLeaf('forest', { leaf_type: 'needleleaved' })).toBe('n')
+    expect(forestLeaf('forest', { leaf_type: 'broadleaved' })).toBe('b')
+    expect(forestLeaf('vegetation', { natural: 'scrub' })).toBe('s')
+    expect(forestLeaf('forest', {})).toBeUndefined()
+  })
+  it('Kachel trägt Art und Waldart in die Verteilung', () => {
+    const needle = plantSpots(tile([{ k: 'forest', p: square(190), l: 'n' }]), { x: 0, y: 0 }, { lat: 51.3, lon: 8 })
+    expect(needle.every(s => ['fichte', 'kiefer', 'laerche'].includes(s.species) && s.hint === 'Nadelwald')).toBe(true)
+    const scrub = plantSpots(tile([{ k: 'forest', p: square(190), l: 's' }]), { x: 0, y: 0 }, { lat: 51.3, lon: 8 })
+    expect(scrub.filter(s => PLANTS[s.species].form === 'bush').length).toBeGreaterThan(scrub.length / 2)
+    const osm = plantSpots(tile([], { trees: [10, 20, 30, 40], ts: ['eiche', '~n'] }), { x: 0, y: 0 }, { lat: 51.3, lon: 8 })
+    expect(osm[0]).toMatchObject({ species: 'eiche', source: 'osm-species' })
+    expect(osm[1]).toMatchObject({ source: 'osm', hint: 'Nadelbaum' })
+    expect(['kiefer', 'fichte']).toContain(osm[1].species)
+  })
+})

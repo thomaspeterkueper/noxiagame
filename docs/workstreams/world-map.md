@@ -810,4 +810,11 @@ Schritt 1: Aussehen (Thomas: „zu unserem Stil passen, zu liebevoll braucht es 
 - Klick oder Mauszeiger auf einen Baum: Tafel „BAUM“/„STRAUCH“ mit Namen („wahrscheinlich Rotbuche“ bei geschätzten), lateinischem Namen, Zustand heute, Höhe, woher bekannt, ein Satz zur Art.
 - Gräber halten Abstand zu den neuen Bäumen.
 
-Offen (Schritt 2 ff.): Arten aus OSM-Merkmalen (`species`, `genus`, `leaf_type`) in die Kacheln übernehmen (braucht neues `TILE_FORMAT`); Waldart aus `leaf_type` bzw. Baumartenkarte (Lizenz prüfen); Hecken aus `barrier=hedge`; Blumen; Wissen und Ernte (andere Teilprojekte).
+Schritt 2 (06.11.2026), `TILE_FORMAT` 2026-11-06.1:
+- `lib/worldlab/plantTags.ts` (getestet, Teil des Kachel-Fingerabdrucks): Baumart aus `species`, `species:de`, `genus`, `taxon`, `leaf_type` → Kachelfeld `ts` (parallel zu `trees`); Waldart aus `leaf_type` → `TileArea.l` (b Laub-, n Nadel-, m Mischwald); Gebüsch und Heide (`natural=scrub|heath`) → `l: 's'`.
+- Befund Sauerland: 96 Gebüschflächen galten bisher als Wald; 142 der 477 Wälder kennen ihre Art (93 Nadel-, 47 Laub-, 2 Mischwald).
+- Verteilung: Nadelwald Fichte/Kiefer/Lärche, Laubwald Buche/Eiche/Ahorn/Birke/Linde/Esche/Erle, Gebüsch dichte Hasel und Holunder mit wenigen Birken und Kirschen. OSM-Bäume mit Art stehen genau so da (Tafel: „Standort und Art aus OpenStreetMap“); nennt OSM eine Art, die das Verzeichnis nicht kennt, steht „Laubbaum“/„Nadelbaum“. Esskastanie und Schlehe werden nicht zur Rosskastanie bzw. Kirsche.
+- Vier neue Arten für Städte: Platane, Gemeine Esche, Hainbuche, Robinie.
+- Warme Breiten: Nadelbaum nur, wenn OSM es sagt.
+
+Offen: Hecken (`barrier=hedge` wird bisher nicht importiert – Import erweitern); Waldart dort, wo OSM sie nicht kennt (Baumartenkarte, Lizenz prüfen); Blumen; Wissen und Ernte (andere Teilprojekte).

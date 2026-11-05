@@ -85,7 +85,7 @@ export type WorldPick =
   | { type: 'parcel'; id: string; at: GeoPoint }
   | { type: 'ground'; at: GeoPoint }
   /** Baum oder Strauch (05.11.2026): Art, und woher wir sie kennen */
-  | { type: 'plant'; at: GeoPoint; species: PlantId; source: 'osm' | 'estimate'; region: PlantRegion }
+  | { type: 'plant'; at: GeoPoint; species: PlantId; source: 'osm-species' | 'osm' | 'estimate'; region: PlantRegion; hint?: string }
 
 /** Plakette einer Begegnungsstätte: in jeder Zoomstufe sichtbar, ein Klick öffnet den Ort. */
 export interface WorldBeacon { at: GeoPoint; label?: string; pick: WorldPick; /** resonance: Begegnungsstätte (grün), worship: laufender Gottesdienst (gold) */ tone?: 'resonance' | 'worship' }
@@ -2166,7 +2166,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         if (!best || plant.x + plant.y > best.x + best.y) best = plant
       }
     }
-    return best ? { type: 'plant', at: toGeo({ x: best.x, y: best.y }), species: best.spot.species, source: best.spot.source, region: best.region } : null
+    return best ? { type: 'plant', at: toGeo({ x: best.x, y: best.y }), species: best.spot.species, source: best.spot.source, region: best.region, hint: best.spot.hint } : null
   }
   const pointerLeave = () => { light(null); if (hovering) { hovering = false; options.onHover?.(null) } }
   const pointerUp = (event: PointerEvent) => {

@@ -821,7 +821,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   function describeHover(pick: WorldPick): { title: string; detail: string; at: GeoPoint | null } | null {
     if (pick.type === 'person') { const resident = residents.find(item => item.id === pick.id); return resident ? { title: personSceneLabel(resident), detail: 'Person', at: engineReady?.personAt(pick.id) ?? null } : null }
     if (pick.type === 'landmark') return { title: pick.landmark.name, detail: landmarkLabel(pick.landmark.kind, pick.landmark.tags), at: pick.landmark.at }
-    if (pick.type === 'plant') { const species = PLANTS[pick.species]; return { title: species.name, detail: species.id === 'laubbaum' || species.id === 'nadelbaum' ? 'Art nicht bekannt' : pick.source === 'osm' ? 'Baum aus OSM · Art geschätzt' : 'geschätzt', at: pick.at } }
+    if (pick.type === 'plant') { const species = PLANTS[pick.species]; return { title: species.name, detail: species.id === 'laubbaum' || species.id === 'nadelbaum' ? 'Art nicht bekannt' : pick.source === 'osm-species' ? 'laut OpenStreetMap' : pick.source === 'osm' ? 'Baum aus OSM · Art geschätzt' : pick.hint ? `geschätzt · ${pick.hint}` : 'geschätzt', at: pick.at } }
     if (pick.type === 'site') { const site = sites.find(item => item.id === pick.id); return site ? { title: site.name, detail: `im Bau · ${site.phase}${site.progress !== null ? ` · ${Math.round(site.progress * 100)} %` : ''}`, at: site.at } : null }
     if (pick.type === 'noxia' || (pick.type === 'building' && pick.noxiaId)) {
       const building = noxia.find(item => item.id === pick.noxiaId)

@@ -10,7 +10,7 @@
 
 export type PlantId =
   | 'fichte' | 'kiefer' | 'laerche' | 'buche' | 'eiche' | 'birke' | 'ahorn' | 'linde' | 'kastanie'
-  | 'weide' | 'erle' | 'kirsche' | 'apfel' | 'pappel' | 'laubbaum' | 'nadelbaum'
+  | 'weide' | 'erle' | 'kirsche' | 'apfel' | 'pappel' | 'platane' | 'esche' | 'hainbuche' | 'robinie' | 'laubbaum' | 'nadelbaum'
   | 'hasel' | 'holunder' | 'liguster'
 
 export type PlantForm = 'dome' | 'broad' | 'slender' | 'cone' | 'larch' | 'pine' | 'column' | 'weeping' | 'small' | 'bush' | 'hedge'
@@ -54,6 +54,10 @@ export const PLANTS: Record<PlantId, PlantSpecies> = {
   kirsche:  { id: 'kirsche', name: 'Vogelkirsche', latin: 'Prunus avium', form: 'small', heightM: 12, leafOut: 108, colorStart: 265, colorPeak: 285, leafFall: 305, summer: '#5f9046', autumn: '#d2552e', bark: '#6e4a3e', blossom: { from: 100, to: 120, color: '#f7f2f4' }, fruit: { from: 165, to: 185, color: '#8e1f2a' }, note: 'Blüht im April weiß, noch vor dem Austrieb; im Herbst färbt sie sich rot.' },
   apfel:    { id: 'apfel', name: 'Apfelbaum', latin: 'Malus domestica', form: 'small', heightM: 8, leafOut: 115, colorStart: 285, colorPeak: 300, leafFall: 320, summer: '#5f8f46', autumn: '#c9a23a', bark: '#6a5240', blossom: { from: 112, to: 135, color: '#f6dbe4' }, fruit: { from: 232, to: 290, color: '#c8352c' }, note: 'Auf Streuobstwiesen und in Gärten; Äpfel reifen von August bis Oktober.' },
   pappel:   { id: 'pappel', name: 'Pyramidenpappel', latin: "Populus nigra 'Italica'", form: 'column', heightM: 28, leafOut: 110, colorStart: 280, colorPeak: 295, leafFall: 310, summer: '#5f8c42', autumn: '#e6c93a', bark: '#6f675c', note: 'Schmal wie eine Säule; oft in Reihen an Wegen und Feldrändern gepflanzt.' },
+  platane:  { id: 'platane', name: 'Ahornblättrige Platane', latin: 'Platanus × hispanica', form: 'dome', heightM: 28, leafOut: 120, colorStart: 285, colorPeak: 305, leafFall: 325, summer: '#5f8f46', autumn: '#b89a4a', bark: '#a9a48a', note: 'Rinde blättert in Platten ab und wird fleckig; ein häufiger Stadt- und Alleebaum.' },
+  esche:    { id: 'esche', name: 'Gemeine Esche', latin: 'Fraxinus excelsior', form: 'dome', heightM: 30, leafOut: 130, colorStart: 285, colorPeak: 298, leafFall: 312, summer: '#6a9447', autumn: '#c9c26a', bark: '#7d786c', note: 'Treibt spät aus; viele Eschen sind am Eschentriebsterben erkrankt.' },
+  hainbuche:{ id: 'hainbuche', name: 'Hainbuche', latin: 'Carpinus betulus', form: 'dome', heightM: 20, leafOut: 112, colorStart: 285, colorPeak: 300, leafFall: 322, summer: '#5f8f46', autumn: '#d0a540', keepBrown: 0.15, bark: '#8d8c84', note: 'Trotz des Namens keine Buche, sondern ein Birkengewächs; beliebt als Hecke.' },
+  robinie:  { id: 'robinie', name: 'Robinie', latin: 'Robinia pseudoacacia', form: 'broad', heightM: 22, leafOut: 130, colorStart: 285, colorPeak: 300, leafFall: 315, summer: '#7fa356', autumn: '#d8c45a', bark: '#6a5a48', blossom: { from: 145, to: 160, color: '#f5f1e2' }, note: 'Aus Nordamerika eingeführt, duftende weiße Blütentrauben im Juni.' },
   laubbaum: { id: 'laubbaum', name: 'Laubbaum', form: 'dome', heightM: 18, ...D, summer: '#5c8c44', autumn: '#c08a36', bark: '#6a4a34', note: 'Art hier nicht bekannt.' },
   nadelbaum:{ id: 'nadelbaum', name: 'Nadelbaum', form: 'cone', heightM: 22, evergreen: true, ...D, summer: '#33593c', autumn: '#33593c', bark: '#5a4030', note: 'Art hier nicht bekannt.' },
   hasel:    { id: 'hasel', name: 'Haselstrauch', latin: 'Corylus avellana', form: 'bush', heightM: 4, leafOut: 100, colorStart: 280, colorPeak: 295, leafFall: 315, summer: '#6a9447', autumn: '#d2b043', bark: '#6a5240', note: 'Blüht schon im Februar mit gelben Kätzchen; Haselnüsse reifen im September.' },
