@@ -40,3 +40,11 @@ Der Spieler hat einen eigenen Ort, das Schiff auch. Sie sind nur „zusammen“,
 - Oberfläche: Ticketschalter zeigt Linienflüge auch mit Schiff, „Dein Schiff liegt hier / in X“ und „An Bord gehen“.
 - Navigation: Ohne Schiff an Bord zeigt sie den Linienflug mit Preis und „dein Schiff liegt in X“; am Schiffsort gibt es dort „An Bord deines Schiffs gehen“.
 - Offen: mehrere Schiffe und angeheuerte Piloten (nächster Schritt).
+
+## Stand 06.11.2026 – Schiff mit Pilot losschicken (umgesetzt)
+
+- Migration `20261106010000_dispatch_ship_with_pilot.sql` ist angewendet. `noxia_dispatch_ship` schickt ein eigenes, angedocktes Schiff am Ort des Spielers los, ohne dass er an Bord ist. Energie, Landegebühr, Landeplatz und Pilotenhonorar laufen über `noxia_start_transit_with_pilot`; `noxia_aboard_ship_id` kennt dafür die transaktionslokale Einstellung `noxia.dispatch_ship`.
+- Mit Rücknahmetest geprüft: Start mit Honorar, Spieler bleibt am Ort und ohne Schiff an Bord, Ankunft setzt nur das Schiff, zweiter Start (`NOXIA_SHIP_IN_TRANSIT`), Einsteigen am falschen Ort (`NOXIA_SHIP_NOT_HERE`), Start als Mitflieger (`NOXIA_DISPATCH_PLAYER_ABOARD`).
+- Server: Aktion `dispatch` in `/api/game/transit`; `settleDueParkedShips` lässt fällige Schiffe ohne Spieler landen (beim Abfragen des Reisezustands).
+- Oberfläche: in den Kolonie-Details „Schiff mit Pilot nach X schicken · Honorar Y Cr“, wenn das Schiff am eigenen Ort liegt.
+- Offen: Schiffsauswahl bei mehreren Schiffen (API nimmt `shipId` schon an), Piloten als NPCs mit eigenem Honorar, Ladung für unbemannte Flüge.

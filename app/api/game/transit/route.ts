@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { boardPlayerShip, completePlayerTransit, getPassengerOffers, getPlayerTransitState, startPlayerPassengerTransit, startPlayerTransit } from '@/lib/game/core/transit'
+import { boardPlayerShip, dispatchParkedShip, completePlayerTransit, getPassengerOffers, getPlayerTransitState, startPlayerPassengerTransit, startPlayerTransit } from '@/lib/game/core/transit'
 
 async function getUserFromRequest(req: NextRequest) {
   const authHeader = req.headers.get('authorization')
@@ -31,6 +31,7 @@ function transitError(error: unknown) {
   }
   const notHere = message.match(/NOXIA_SHIP_NOT_HERE:(\S+)/)
   if (notHere) return NextResponse.json({ error: `Dein Schiff liegt in ${notHere[1]} – flieg dorthin, um an Bord zu gehen.`, code: 'SHIP_NOT_HERE', shipLocation: notHere[1] }, { status: 409 })
+  if (message.includes('NOXIA_DISPATCH_PLAYER_ABOARD')) return NextResponse.json({ error: 'Du bist an Bord – steig aus (Linienflug) oder fliege selbst.', code: 'PLAYER_ABOARD' }, { status: 409 })
   if (message.includes('NOXIA_SHIP_IN_TRANSIT')) return NextResponse.json({ error: 'Dein Schiff ist gerade unterwegs.', code: 'SHIP_IN_TRANSIT' }, { status: 409 })
   if (message.includes('NOXIA_TRANSIT_ROUTE_UNKNOWN')) return NextResponse.json({ error: 'Für diese Route liegt noch kein Transfermodell vor.', code: 'ROUTE_UNKNOWN' }, { status: 400 })
   if (message.includes('NOXIA_TRANSIT_OUT_OF_RANGE')) return NextResponse.json({ error: 'Ziel liegt außerhalb der aktuellen Schiffsreichweite.', code: 'OUT_OF_RANGE' }, { status: 400 })
@@ -145,6 +146,24 @@ export async function POST(req: NextRequest) {
         ticketPrice: result.ticket_price ?? 0,
         credits: result.credits,
         idempotent: result.idempotent,
+      })
+    }
+
+    // Schiff mit angeheuertem Piloten losschicken; der Spieler bleibt am Ort.
+    if (action === 'dispatch') {
+      const destination = typeof body?.destination === 'string' ? body.destination.trim() : ''
+      if (!destination) return NextResponse.json({ error: 'Ziel fehlt' }, { status: 400 })
+      const result = await dispatchParkedShip(user.id, destination, typeof body?.shipId === 'string' ? body.shipId : undefined)
+      return NextResponse.json({
+        ok: true,
+        shipId: result.ship_id,
+        destination: result.destination,
+        arrivesAt: result.arrives_at,
+        totalSeconds: result.duration_seconds,
+        energyUsed: result.energy_used,
+        landingFee: result.landing_fee,
+        pilotFee: result.pilot_fee ?? 0,
+        credits: result.credits,
       })
     }
 
