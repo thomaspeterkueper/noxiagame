@@ -13,7 +13,7 @@ export type KieselBuild = 'schmal' | 'mittel' | 'kraeftig'
 export type KieselHair = 'kurz' | 'lang' | 'locken' | 'zopf' | 'dutt' | 'glatze'
 export type KieselBeard = 'ohne' | 'stoppeln' | 'vollbart' | 'schnurrbart'
 export type KieselFace = 'freundlich' | 'neutral' | 'traurig' | 'erstaunt' | 'wuetend'
-export type KieselClothes = 'alltag' | 'schuerze' | 'bar' | 'druckanzug' | 'fest' | 'kleid' | 'overall' | 'kittel'
+export type KieselClothes = 'alltag' | 'schuerze' | 'bar' | 'druckanzug' | 'fest' | 'kleid' | 'overall' | 'kittel' | 'polizei' | 'feuerwehr' | 'rettung'
 export type KieselDir = 'sw' | 'se' | 'nw' | 'ne'
 export type KieselPose =
   | 'stehen' | 'gehen' | 'sitzen'
@@ -95,7 +95,7 @@ const AGES: Record<KieselAge, { scale: number; head: number; stoop: number; line
 const BUILD: Record<KieselBuild, number> = { schmal: .84, mittel: 1, kraeftig: 1.22 }
 const GREY = '#a7a39c'
 
-type Clothing = { top: string; bottom: string; shoes: string; apron?: string; vest?: string; suit?: string; tie?: string; straps?: string; dress?: boolean; coat?: boolean }
+type Clothing = { top: string; bottom: string; shoes: string; apron?: string; vest?: string; suit?: string; tie?: string; straps?: string; dress?: boolean; coat?: boolean; stripes?: string; cap?: string }
 export const KIESEL_CLOTHES: Readonly<Record<KieselClothes, Clothing & { label: string }>> = {
   alltag: { label: 'Alltag', top: '#4f7fa8', bottom: '#3a4659', shoes: '#2b2622' },
   schuerze: { label: 'Café-Schürze', top: '#e9e2d2', bottom: '#2f3540', shoes: '#2b2622', apron: '#7a4a2a' },
@@ -105,6 +105,10 @@ export const KIESEL_CLOTHES: Readonly<Record<KieselClothes, Clothing & { label: 
   kleid: { label: 'Kleid', top: '#8f3e6b', bottom: '#8f3e6b', shoes: '#3a2a2a', dress: true },
   overall: { label: 'Overall', top: '#3f6fa8', bottom: '#3f6fa8', shoes: '#3b2f25', straps: '#2c4f7a' },
   kittel: { label: 'Kittel', top: '#f4f6f6', bottom: '#4b5563', shoes: '#2b2622', coat: true },
+  // Öffentliche Dienste (05.11.2026)
+  polizei: { label: 'Polizei', top: '#2c4a7c', bottom: '#1f2b45', shoes: '#141414', stripes: '#c9d6e8', cap: '#22385e' },
+  feuerwehr: { label: 'Feuerwehr', top: '#1f2a3a', bottom: '#1f2a3a', shoes: '#141414', stripes: '#e8d23a' },
+  rettung: { label: 'Rettungsdienst', top: '#e8512b', bottom: '#2a3140', shoes: '#141414', stripes: '#f2f2e6' },
 }
 const ROBOT = { metal: '#c9d3d6', dark: '#4f6a63', glow: '#4fd8c5' }
 
@@ -244,6 +248,7 @@ export function kieselSVG(a: KieselLook, dir: KieselDir = 'se', pose: KieselPose
     if (c.suit) rect(cx - torsoW * .38, torsoTop + torsoH * .25, torsoW * .76, 4, c.suit)
     if (c.coat) rect(cx - 1, torsoTop + 2, 2, torsoH + 3 * S, shade(c.top, .12))
   }
+  if (c?.stripes) { rect(cx - torsoW / 2 + .5, torsoTop + torsoH * .45, torsoW - 1, 2.6 * S, c.stripes, .95); rect(cx - torsoW / 2 + .5, torsoTop + torsoH * .72, torsoW - 1, 2.6 * S, c.stripes, .95) }
   if (c && back && c.suit) rect(cx - torsoW * .42, torsoTop + 3, torsoW * .84, torsoH * .6, '#b9c0c4')
   if (a.robot && !back) rect(cx - torsoW * .3, torsoTop + torsoH * .3, torsoW * .6, torsoH * .3, '#f1d57a')
   out.push(`<rect x="${r1(cx)}" y="${r1(torsoTop)}" width="${r1(torsoW / 2)}" height="${r1(torsoH)}" rx="${r1(torsoW / 4)}" fill="#000" opacity=".08"/>`)
@@ -293,6 +298,7 @@ export function kieselSVG(a: KieselLook, dir: KieselDir = 'se', pose: KieselPose
       if (a.hair === 'zopf' && !back) ell(hx - hr * 1.05, hy + hr * .15, hr * .26, hr * .42, hairC)
       if (a.hair === 'lang' && !back) out.push(`<rect x="${r1(hx - hr * 1.06)}" y="${r1(hy - hr * .4)}" width="${r1(hr * .38)}" height="${r1(hr * 1.45)}" rx="2" fill="${hairC}"/>`)
     } else if (age.lines >= 1) rect(hx - hr * 1.04, hy - hr * .15, hr * .3, hr * .55, hairC)
+    if (c?.cap) { out.push(`<path d="M${r1(hx - hr * 1.05)} ${r1(hy - hr * .35)} Q${r1(hx)} ${r1(hy - hr * 1.5)} ${r1(hx + hr * 1.05)} ${r1(hy - hr * .35)}Z" fill="${c.cap}"/>`); rect(hx - hr * (back ? 1.1 : .2), hy - hr * .45, hr * 1.3, 2.4, shade(c.cap, .25)) }
     if (a.verletzt) out.push(`<g transform="rotate(-24 ${r1(hx + hr * .35)} ${r1(hy - hr * .55)})"><rect x="${r1(hx + hr * .35 - 4.5)}" y="${r1(hy - hr * .55 - 1.6)}" width="9" height="3.2" rx="1" fill="#efd9b4"/><rect x="${r1(hx + hr * .35 - 4.5)}" y="${r1(hy - hr * .55 - .3)}" width="9" height=".6" fill="#c8a77a"/></g>`)
     if (c?.suit) out.push(`<ellipse cx="${r1(hx)}" cy="${r1(hy - .5)}" rx="${r1(hr * 1.32)}" ry="${r1(hr * 1.35)}" fill="#bfe4f2" opacity=".32" stroke="#e7e9ea" stroke-width="2"/>`)
   }
@@ -344,7 +350,10 @@ export function kieselLookFor(p: KieselSource, work?: string | null): KieselLook
   const profile = (ap.clothingProfile ?? {}) as { work?: unknown; style?: unknown; occasion?: unknown }
   const workKey = String(profile.work ?? work ?? '')
   const clothes: KieselClothes =
-    /bar|nightclub|pub/.test(workKey) ? 'bar'
+    /police|polizei/.test(workKey) ? 'polizei'
+      : /fire|feuerwehr/.test(workKey) ? 'feuerwehr'
+      : /paramedic|ambulance|rettung/.test(workKey) ? 'rettung'
+      : /bar|nightclub|pub/.test(workKey) ? 'bar'
       : /cafe|restaurant|hotel|kitchen|service/.test(workKey) ? 'schuerze'
         : /space|eva|mars|pressure/.test(workKey) ? 'druckanzug'
           : /science|lab|clinic|health|research/.test(workKey) ? 'kittel'

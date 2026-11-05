@@ -29,6 +29,8 @@ export interface VenuePoint { x: number; y: number }
 
 export type VenueFurnitureKind =
   | 'table' | 'high-table' | 'counter' | 'chair' | 'stool' | 'shelf' | 'desk' | 'wall' | 'pass' | 'kitchen' | 'stairs' | 'lectern' | 'board' | 'dj-booth' | 'sofa'
+  // Öffentliche Dienste (05.11.2026): Löschfahrzeug, Krankenbett, Spinde.
+  | 'vehicle' | 'bed' | 'locker'
 
 export interface VenueFurniture {
   id: string
