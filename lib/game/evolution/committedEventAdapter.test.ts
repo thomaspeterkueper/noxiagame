@@ -242,4 +242,20 @@ for (const input of [sharedLegacySequence, [...sharedLegacySequence].reverse()])
 // This adapter only sorts a display/replay projection; the server reader must
 // independently verify both receipts and their authoritative commit ordering.
 
+
+// A source reference is scoped by settlement AND owning domain. Different
+// domains may use the same external reference string without authorizing the
+// same transition twice; neither receipt may be discarded by deduplication.
+const sharedRefAcrossDomains = adaptCommittedWorldEvents([
+  { ...receipt('building-ref', 2091, true, { action: 'rename', assetId: 'hall', name: 'Haus' }),
+    domainEventRef: 'core:shared-ref' },
+  { ...receipt('service-ref', 2091, true, { action: 'establish', asset: {
+    id: 'tour-guide', kind: 'service', name: 'Stadtführung',
+    districtId: 'center', introducedYear: 2091,
+  } }), domain: 'services', domainEventRef: 'core:shared-ref' },
+])
+assert(sharedRefAcrossDomains.events.length === 2 &&
+  sharedRefAcrossDomains.rejected.length === 0,
+  'source reference identity must include owning Core domain')
+
 console.log('Committed city event adapter: tests passed')
