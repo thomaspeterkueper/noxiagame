@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({error:'Ungültiger Zeitpunkt'},{status:400})
 
   let query=db.from('npc_conversation_log')
-    .select('id,created_at,player_profile_id,npc_person_id,npc_name,npc_role,location_name,player_text,npc_reply,topic,outcome,world_action,wish_kind,wish_object,wish_npc_denied,headline,turn_index,opening')
+    .select('id,created_at,player_profile_id,npc_person_id,correlation_id,npc_name,npc_role,location_name,player_text,npc_reply,topic,outcome,world_action,wish_kind,wish_object,wish_npc_denied,headline,turn_index,opening')
     .gte('created_at',start).order('created_at',{ascending:false}).limit(50)
   if(npcId)query=query.eq('npc_person_id',npcId)
   if(cursor)query=query.lt('created_at',cursor)
@@ -50,8 +50,24 @@ export async function GET(req: NextRequest) {
     })))
     if(auditError) return NextResponse.json({error:'Zugriffsprotokoll konnte nicht geschrieben werden'},{status:503})
   }
+  const ids = rows.map(row=>row.id)
+  const {data:traces,error:traceError} = ids.length
+    ? await db.from('npc_conversation_causal_traces')
+      .select('conversation_log_id,correlation_id,stage,status,detail,created_at')
+      .in('conversation_log_id',ids).order('created_at',{ascending:true}).limit(1000)
+    : {data:[],error:null}
+  if(traceError) return NextResponse.json({error:'Kausalspuren nicht verfügbar'},{status:503})
+  const traceByLog = new Map<number, Array<{
+    correlation_id:string;stage:string;status:string;detail:unknown;created_at:string
+  }>>()
+  for(const event of traces??[]){
+    const key=Number(event.conversation_log_id)
+    const list=traceByLog.get(key)??[]
+    list.push({correlation_id:event.correlation_id,stage:event.stage,status:event.status,detail:event.detail,created_at:event.created_at})
+    traceByLog.set(key,list)
+  }
   return NextResponse.json({
-    rows,
+    rows: rows.map(row=>({...row,causal_trace:traceByLog.get(row.id)??[]})),
     enabled:true,
     note:'Offen angekündigte Testdiagnostik, nur ab dem Freischaltungsstichtag; Weltaktion ist noch kein nachgewiesener persistierter Effekt.',
   },{headers})
