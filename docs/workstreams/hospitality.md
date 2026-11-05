@@ -222,6 +222,13 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
     - Bestellen und Raum-Chat sind für ihn auch auf dem Server gesperrt; nach höchstens 30 Sekunden greift es auch drinnen.
   - Im Browser geprüft. Damit sind alle sechs Teile der Second-Life-Mechaniken gebaut.
 
+- **05.11.2026 – In den Arm nehmen, Hand in Hand:**
+  - Thomas: „in den Arm nehmen fehlt oder Hand in Hand laufen“.
+  - Zwei weitere gemeinsame Bewegungen, bei denen man zusammen weitergeht: Wer angenommen hat, läuft neben dem anderen mit, mit der Hand auf der richtigen Seite. Lässt einer los („Loslassen“ oder weggehen), ist es für beide vorbei.
+  - Auch per Chat: „/hand in hand“, „/in den Arm“.
+  - Bewohner machen es nur mit ihrer Begleitung, in den Arm nehmen auch Trauernde nach dem Beileid, nie Kinder.
+  - Tests; im Browser geprüft.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.

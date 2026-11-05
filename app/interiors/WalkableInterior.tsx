@@ -29,7 +29,7 @@ import { cleanPlayerLook, lookAtWork } from '@/lib/figures/playerLook'
 import { kieselDirFrom, kieselLookFor, type KieselDir, type KieselPose } from '@/lib/figures/kiesel'
 import { useRoomChat } from '@/lib/multiplayer/useRoomChat'
 import { WHISPER_RANGE_PX, heardAt, type ChatRange } from '@/lib/multiplayer/roomChat'
-import { GESTURES, JOINTS, acceptedBy, besidePartner, faceTowards, gestureState, invitesFor, jointState, npcJointDecision, parseGestureCommand, poseNow, type GestureName, type InviteState, type JointName, type NpcJointContext, type PoseState } from '@/lib/multiplayer/gestures'
+import { FOLLOW_JOINTS, GESTURES, JOINTS, acceptedBy, sidePose, besidePartner, faceTowards, gestureState, invitesFor, jointState, npcJointDecision, parseGestureCommand, poseNow, type GestureName, type InviteState, type JointName, type NpcJointContext, type PoseState } from '@/lib/multiplayer/gestures'
 import {
   VENUE_PLAYER_RADIUS,
   isVenueBlocked,
@@ -439,7 +439,19 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
   const peer=peerId?peers.find(p=>p.profileId===peerId)??null:null
   function setMyPose(next:PoseState|null){setMyPoseRaw(next);poseFrom.current=next?{...posRef.current}:null;presence.setPose(next)}
   // Wer sich wegbewegt, beendet seine Geste (außer auf dem Weg zum Partner).
-  useEffect(()=>{const from=poseFrom.current;if(myPose&&from&&Math.hypot(pos.x-from.x,pos.y-from.y)>8)setMyPose(null)},[pos.x,pos.y])
+  useEffect(()=>{const from=poseFrom.current;if(myPose&&from&&!FOLLOW_JOINTS.has(myPose.name)&&Math.hypot(pos.x-from.x,pos.y-from.y)>8)setMyPose(null)},[pos.x,pos.y])
+  // Zusammen gehen (Arm, Hand in Hand): Wer angenommen hat, läuft neben dem anderen mit; lässt einer los, ist es vorbei.
+  const following=useRef(false)
+  useEffect(()=>{
+    if(!myPose||!FOLLOW_JOINTS.has(myPose.name)||!myPose.with)return
+    const w=myPose.with
+    if(w===npcJoint?.id)return // mit einer Figur: Die Begleitung folgt dem Spieler
+    const partner=peers.find(p=>p.profileId===w)
+    if(!partner||partner.pose?.with!==me?.profileId||partner.pose?.name!==myPose.name){setMyPose(null);following.current=false;setStatus('Ihr lasst los.');return}
+    if(!following.current)return
+    const target=besidePartner(posRef.current,partner)
+    if(Math.hypot(target.x-posRef.current.x,target.y-posRef.current.y)>20&&!walk.current)walkTo(target)
+  },[nowMs,peers])
   useEffect(()=>{if(myPose&&!poseNow(myPose,nowMs)){setMyPose(null)}if(npcJoint&&!poseNow(npcJoint.state,nowMs))setNpcJoint(null)},[nowMs])
   function doGesture(name:GestureName){
     const g=GESTURES[name]
@@ -463,14 +475,14 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
   useEffect(()=>{
     if(!myInvite||!me)return
     const partner=acceptedBy(peers,myInvite,me.profileId)
-    if(partner){setMyPose(jointState(myInvite.action,partner.profileId,Date.now()));setMyInvite(null);presence.invite(null);setStatus(partner.name+' '+({paartanz:'tanzt mit dir',anstossen:'stößt mit dir an',handschlag:'gibt dir die Hand',umarmen:'umarmt dich',troesten:'lässt sich trösten'} as Record<JointName,string>)[myInvite.action]+'.')}
+    if(partner){setMyPose(jointState(myInvite.action,partner.profileId,Date.now()));setMyInvite(null);presence.invite(null);setStatus(partner.name+' '+({paartanz:'tanzt mit dir',anstossen:'stößt mit dir an',handschlag:'gibt dir die Hand',umarmen:'umarmt dich',troesten:'lässt sich trösten',armnehmen:'lässt sich in den Arm nehmen',handinhand:'nimmt deine Hand'} satisfies Record<JointName,string>)[myInvite.action]+'.')}
     else if(Date.now()-myInvite.at>30_000){setMyInvite(null);presence.invite(null);setStatus('Keine Antwort.')}
   },[peers,myInvite,nowMs])
   const incoming=me?invitesFor(peers,me.profileId,nowMs).filter(p=>!declined.includes(p.profileId+':'+p.invite.at)):[]
   function answerInvite(from:PeerState&{invite:InviteState},yes:boolean){
     if(!yes){setDeclined(d=>[...d,from.profileId+':'+from.invite.at].slice(-20));presence.gesture('lehnt ab');roomChat.logGesture('lehnt ab: '+from.name);return}
     const action=from.invite.action
-    walkTo(besidePartner(posRef.current,from),()=>{setMyPose(jointState(action,from.profileId,Date.now()));roomChat.logGesture(JOINTS[action].verb+' '+from.name)})
+    walkTo(besidePartner(posRef.current,from),()=>{setMyPose(jointState(action,from.profileId,Date.now()));following.current=FOLLOW_JOINTS.has(action);roomChat.logGesture(JOINTS[action].verb+' '+from.name)})
   }
   // Mit einer Figur: Sie entscheidet nach dem, was im Raum sichtbar und bekannt ist.
   function jointWithNpc(target:ColonyResident,action:JointName){
@@ -502,7 +514,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
       setNpcJoint({id:target.id,state:jointState(action,'me',now)})
       lastJoint.current={personId:target.id,action,at:now}
       if(peers.length)roomChat.logGesture(JOINTS[action].verb+' '+name)
-      void converse(target,false,'('+({paartanz:'tanzt mit dir',anstossen:'stößt mit dir an',handschlag:'gibt dir die Hand',umarmen:'umarmt dich',troesten:'legt dir tröstend die Hand auf die Schulter'} as Record<JointName,string>)[action]+')')
+      void converse(target,false,'('+({paartanz:'tanzt mit dir',anstossen:'stößt mit dir an',handschlag:'gibt dir die Hand',umarmen:'umarmt dich',troesten:'legt dir tröstend die Hand auf die Schulter',armnehmen:'nimmt dich in den Arm',handinhand:'nimmt deine Hand'} satisfies Record<JointName,string>)[action]+')')
     })
   }
   // Befehle im Chat: „/winken“, „/tanzen mit“ …
@@ -683,13 +695,13 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
           const near=Math.hypot(figure.spot.x-pos.x,figure.spot.y-pos.y)<70
           return <div key={resident.id} className={'npc'+(figure.spot.id.startsWith('dance-')&&!closed?' dancing':'')+(figure.roomRole==='companion'?' with-player':'')} style={{left:figure.spot.x-19,top:figure.spot.y-50}}>
             {isRobot(resident)?<RobotFigure name={resident.displayName} selected={selected?.id===resident.id} showLabel={selected?.id===resident.id||near} onClick={()=>select(resident)}/>:(()=>{const m=motion(resident.id,figure.spot.x,figure.spot.y);const walking=m.moving||moment?.phase==='to-seat'||moment?.phase==='leaving';const label=personSceneLabel(resident);const sitting=figure.spot.posture==='sitting';const roleText=resident.assignments.find(a=>a.type==='work')?.roleCode??'';const forced=fitting.poseFor?.(resident.id)??null;const joint=npcJoint&&npcJoint.id===resident.id?poseNow(npcJoint.state,nowMs):null;const pose:KieselPose=forced?forced.pose:joint?joint:figure.spot.id.startsWith('dance-')&&!closed&&!walking?'tanzen':sitting?'sitzen':(worksHere(resident)&&!closed?workPose(roleText,resident.id,walking):null)??(walking?'gehen':'stehen');return <button className={'kiesel'+(selected?.id===resident.id?' selected':'')} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();select(resident)}} title={label}>
-              <KieselFigure look={{...kieselLookFor(resident as any,worksHere(resident)?workKey:null),...(forced?.verletzt?{verletzt:true}:{})}} dir={joint?faceTowards(figure.spot,pos):walking||sitting?m.dir:'se'} pose={pose} moving={walking} title={label}/>
+              <KieselFigure look={{...kieselLookFor(resident as any,worksHere(resident)?workKey:null),...(forced?.verletzt?{verletzt:true}:{})}} dir={joint?(FOLLOW_JOINTS.has(joint)?(walking?m.dir:'se'):faceTowards(figure.spot,pos)):walking||sitting?m.dir:'se'} pose={joint?sidePose(pose,walking?m.dir:'se',figure.spot,pos):pose} moving={walking} title={label}/>
               {(selected?.id===resident.id||near)&&<span>{label}</span>}
             </button>})()}
           </div>
         })}
         {peers.map(p=>{const waving=p.emote&&Date.now()-p.emote.at<6000;return <button key={'peer:'+p.profileId} className={'peer'+(p.seated?' sitting':'')+(peerId===p.profileId?' selected':'')} style={{left:p.x-19,top:p.y-50}} onClick={e=>{e.stopPropagation();select(null);setPeerId(p.profileId)}} onPointerDown={e=>e.stopPropagation()} title={p.name+' (Spieler)'}>
-          {(()=>{const m=motion('peer:'+p.profileId,p.x,p.y);const pp=poseNow(p.pose,nowMs);const partner=p.pose?.with?(p.pose.with===me?.profileId?pos:peers.find(o=>o.profileId===p.pose!.with)??null):null;return <KieselFigure look={p.look?lookAtWork(p.look,p.profileId,p.role?workKey:null):kieselLookFor({id:p.profileId},p.role?workKey:null)} dir={pp&&partner?faceTowards(p,partner):m.dir} pose={m.moving?'gehen':pp??(p.seated?'sitzen':'stehen')} title={p.name}/>})()}<span>{p.name}{p.role?' · '+p.role:''}</span>{waving&&<em>{p.emote!.text}</em>}
+          {(()=>{const m=motion('peer:'+p.profileId,p.x,p.y);const pp=poseNow(p.pose,nowMs);const partner=p.pose?.with?(p.pose.with===me?.profileId?pos:peers.find(o=>o.profileId===p.pose!.with)??null):null;return <KieselFigure look={p.look?lookAtWork(p.look,p.profileId,p.role?workKey:null):kieselLookFor({id:p.profileId},p.role?workKey:null)} dir={pp&&partner?(FOLLOW_JOINTS.has(pp)?(m.moving?m.dir:'se'):faceTowards(p,partner)):m.dir} pose={pp&&FOLLOW_JOINTS.has(pp)?sidePose(pp,m.moving?m.dir:'se',p,partner):m.moving?'gehen':pp??(p.seated?'sitzen':'stehen')} moving={m.moving} title={p.name}/>})()}<span>{p.name}{p.role?' · '+p.role:''}</span>{waving&&<em>{p.emote!.text}</em>}
         </button>})}
         {shown.filter(item=>item.moment?.served).map(item=><div key={'served:'+item.resident.id} className="item" style={{left:item.figure.spot.x+9,top:item.figure.spot.y-11}} title={visits.find(visit=>visit.resident.id===item.resident.id)?.label}>🍽️</div>)}
         {closedInfo&&!fitting.furnish?.editing&&<div className="closed"><b>{closedInfo.headline}</b><span>{closedInfo.detail}</span></div>}
@@ -702,7 +714,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
         })}
         {openSeats.map(spot=><button key={spot.id} className="seat-hit" style={{left:spot.x-11,top:spot.y-11}} title={'Hier hinsetzen – '+spot.label} aria-label={'Hinsetzen '+spot.label} onClick={()=>sitAt(spot)}/>)}
         {(fitting.markers??[]).map(marker=><div key={marker.key} className="task-marker" style={{left:marker.x-9,top:marker.y-30}} title={marker.label}><b>!</b><span>{marker.label}</span></div>)}
-        {(()=>{const m=motion('me',pos.x,pos.y);return <div className={'player kiesel-player'+(seat?' sitting':'')+(dancing&&onFloor?' dancing':'')+(fitting.playerTag?' working':'')} style={{left:pos.x-19,top:pos.y-50}}><KieselFigure look={lookAtWork(myLook,me?.profileId??'player',fitting.playerTag?workKey:null)} dir={(()=>{const w=myPose?.with;if(!poseNow(myPose,nowMs)||!w)return m.dir;const q=w==='me'?null:peers.find(o=>o.profileId===w)??served.find(f=>f.id===w)?.spot;return q?faceTowards(pos,q):m.dir})()} pose={!m.moving&&poseNow(myPose,nowMs)?poseNow(myPose,nowMs)!:seat?'sitzen':dancing&&onFloor?'tanzen':(fitting.playerTag&&!closed?(m.moving?(workPose(fitting.playerTag,'me',true)==='tragen'?'tragen':null):(nearService||/putz|reinig/i.test(fitting.playerTag)?workPose(fitting.playerTag,'me-',false):null)):null)??(m.moving?'gehen':'stehen')} moving={m.moving} title="Du"/><span>{fitting.playerTag?'Du · '+fitting.playerTag:'Du'}</span></div>})()}
+        {(()=>{const m=motion('me',pos.x,pos.y);return <div className={'player kiesel-player'+(seat?' sitting':'')+(dancing&&onFloor?' dancing':'')+(fitting.playerTag?' working':'')} style={{left:pos.x-19,top:pos.y-50}}><KieselFigure look={lookAtWork(myLook,me?.profileId??'player',fitting.playerTag?workKey:null)} dir={(()=>{const w=myPose?.with;if(!poseNow(myPose,nowMs)||!w)return m.dir;if(FOLLOW_JOINTS.has(myPose!.name))return m.moving?m.dir:'se';const q=w==='me'?null:peers.find(o=>o.profileId===w)??served.find(f=>f.id===w)?.spot;return q?faceTowards(pos,q):m.dir})()} pose={myPose&&FOLLOW_JOINTS.has(myPose.name)&&poseNow(myPose,nowMs)?sidePose(myPose.name as KieselPose,m.moving?m.dir:'se',pos,peers.find(o=>o.profileId===myPose.with)??served.find(f=>f.id===myPose.with)?.spot??null):!m.moving&&poseNow(myPose,nowMs)?poseNow(myPose,nowMs)!:seat?'sitzen':dancing&&onFloor?'tanzen':(fitting.playerTag&&!closed?(m.moving?(workPose(fitting.playerTag,'me',true)==='tragen'?'tragen':null):(nearService||/putz|reinig/i.test(fitting.playerTag)?workPose(fitting.playerTag,'me-',false):null)):null)??(m.moving?'gehen':'stehen')} moving={m.moving} title="Du"/><span>{fitting.playerTag?'Du · '+fitting.playerTag:'Du'}</span></div>})()}
         {nearService&&!closed&&<div className="context hint" style={{left:layout.servicePoint.x-34,top:layout.servicePoint.y+14}}>{service==='self-service'?'AM AUTOMATEN':layout.servicePoint.label} · RECHTS</div>}
         {(nearExit||closed)&&<button className="context exit" style={{left:42,top:420}} onClick={onClose}>{fitting.noun.toUpperCase()} VERLASSEN</button>}
         {fitting.sideDoor&&!closed&&nearSide&&<button className="context exit" style={{left:fitting.sideDoor.x-40,top:398}} onClick={()=>fitting.sideDoor!.use(ctx)}>{fitting.sideDoor.useLabel}</button>}
@@ -750,7 +762,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
           {seat?<button onClick={()=>setSeat(null)}>Aufstehen</button>:nextSeat&&<button onClick={()=>sitAt(nextSeat)}>Hinsetzen</button>}
         </div>}
         <button className="give-open block" onClick={()=>setEditingFigure(true)}>Deine Figur gestalten …</button>
-        {!closed&&<div className="moves gestures"><small>GESTEN · auch im Chat: /winken, /prost, /hand …</small>{(Object.keys(GESTURES) as GestureName[]).map(g=><button key={g} className={poseNow(myPose,nowMs)===g?'on':''} onClick={()=>poseNow(myPose,nowMs)===g?setMyPose(null):doGesture(g)}>{GESTURES[g].label}</button>)}</div>}
+        {!closed&&<div className="moves gestures"><small>GESTEN · auch im Chat: /winken, /prost, /hand …</small>{myPose&&FOLLOW_JOINTS.has(myPose.name)&&<button className="on" onClick={()=>{setMyPose(null);following.current=false;setNpcJoint(null);setStatus('Ihr lasst los.')}}>Loslassen</button>}{(Object.keys(GESTURES) as GestureName[]).map(g=><button key={g} className={poseNow(myPose,nowMs)===g?'on':''} onClick={()=>poseNow(myPose,nowMs)===g?setMyPose(null):doGesture(g)}>{GESTURES[g].label}</button>)}</div>}
         {!closed&&fitting.renderOffer(ctx)}
         {fitting.renderOwner?.(ctx)}
         {!closed&&!selected&&gates.length>0&&<div className="menu learn">

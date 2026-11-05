@@ -23,6 +23,7 @@ export type KieselPose =
   | 'zuschlagen' | 'abwehren' | 'getroffen' | 'liegen'
   | 'winken' | 'jubeln' | 'klatschen' | 'verbeugen' | 'prost'
   | 'paartanz' | 'anstossen' | 'handschlag' | 'umarmen' | 'troesten'
+  | 'armnehmen' | 'handinhand' | 'handinhand_l'
 
 /**
  * Posen in Thomas' Steigerung (04.11.2026: „alles in genau dieser Steigerung, leider
@@ -58,10 +59,13 @@ export const KIESEL_POSES: Readonly<Record<KieselPose, { label: string; stufe: '
   handschlag: { label: 'Hand geben', stufe: 'gemeinsam', animated: true },
   umarmen: { label: 'Umarmen', stufe: 'gemeinsam', animated: true },
   troesten: { label: 'Trösten', stufe: 'gemeinsam', animated: true },
+  armnehmen: { label: 'In den Arm nehmen', stufe: 'gemeinsam', animated: false },
+  handinhand: { label: 'Hand in Hand', stufe: 'gemeinsam', animated: false },
+  handinhand_l: { label: 'Hand in Hand (andere Hand)', stufe: 'gemeinsam', animated: false },
 }
 
 /** Läuft die Pose in Schritten (Bild 0–3)? Tragen nur, wenn die Figur dabei geht. */
-export const kieselAnimated = (pose: KieselPose, moving = false) => KIESEL_POSES[pose]?.animated || (pose === 'tragen' && moving)
+export const kieselAnimated = (pose: KieselPose, moving = false) => KIESEL_POSES[pose]?.animated || (moving && (pose === 'tragen' || pose === 'armnehmen' || pose === 'handinhand' || pose === 'handinhand_l'))
 
 export interface KieselLook {
   age: KieselAge
@@ -144,6 +148,9 @@ function rig(pose: KieselPose, f: number, moving: boolean): Rig {
     case 'handschlag': return { back: 0, front: pick([74, 66, 74, 66]), lean: 3, legs: 'stand', bob: 0, face: 'freundlich' }
     case 'umarmen': return { back: 86, front: 86, lean: pick([7, 9, 7, 9]), legs: 'stand', bob: 0, face: 'freundlich' }
     case 'troesten': return { back: 0, front: pick([96, 100, 96, 100]), lean: 6, legs: 'stand', bob: 0, face: 'neutral' }
+    case 'armnehmen': return { back: moving ? ph * 14 : 0, front: 102, lean: 4, legs: moving ? 'walk' : 'stand', bob: moving && i % 2 ? -1 : 0, face: 'freundlich' }
+    case 'handinhand': return { back: moving ? ph * 16 : 0, front: 30, lean: 0, legs: moving ? 'walk' : 'stand', bob: moving && i % 2 ? -1 : 0, face: 'freundlich' }
+    case 'handinhand_l': return { back: 30, front: moving ? -ph * 16 : 0, lean: 0, legs: moving ? 'walk' : 'stand', bob: moving && i % 2 ? -1 : 0, face: 'freundlich' }
     case 'liegen': return { back: 170, front: 150, lean: 0, legs: 'stand', bob: 0, face: 'traurig' }
     default: return { back: 0, front: 0, lean: 0, legs: 'stand', bob: 0 }
   }

@@ -10,7 +10,7 @@
 import type { KieselPose } from '../figures/kiesel'
 
 export type GestureName = 'winken' | 'jubeln' | 'klatschen' | 'verbeugen' | 'prost' | 'tanzen'
-export type JointName = 'paartanz' | 'anstossen' | 'handschlag' | 'umarmen' | 'troesten'
+export type JointName = 'paartanz' | 'anstossen' | 'handschlag' | 'umarmen' | 'troesten' | 'armnehmen' | 'handinhand'
 
 export const GESTURES: Readonly<Record<GestureName, { label: string; verb: string; ms: number; words: readonly string[] }>> = {
   winken: { label: 'Winken', verb: 'winkt', ms: 3500, words: ['winken', 'wink', 'winke', 'hallo', 'hi'] },
@@ -27,6 +27,22 @@ export const JOINTS: Readonly<Record<JointName, { label: string; ask: string; ve
   handschlag: { label: 'Hand geben', ask: 'reicht dir die Hand', verb: 'gibt die Hand', npcFact: 'Dein Gegenüber hat dir eben die Hand gegeben', ms: 3000, words: ['hand', 'handschlag', 'handgeben', 'handschütteln'] },
   umarmen: { label: 'Umarmen', ask: 'möchte dich umarmen', verb: 'umarmt', npcFact: 'Dein Gegenüber hat dich eben umarmt', ms: 5000, words: ['umarmen', 'umarmung', 'drücken', 'hug'] },
   troesten: { label: 'Trösten', ask: 'möchte dich trösten', verb: 'tröstet', npcFact: 'Dein Gegenüber hat dich eben getröstet und dir die Hand auf die Schulter gelegt', ms: 6000, words: ['trösten', 'troesten', 'trost'] },
+  // Thomas, 05.11.2026: „in den Arm nehmen fehlt oder Hand in Hand laufen“ – man geht zusammen weiter.
+  armnehmen: { label: 'In den Arm nehmen', ask: 'möchte dich in den Arm nehmen', verb: 'nimmt in den Arm', npcFact: 'Dein Gegenüber hat dich in den Arm genommen; ihr steht oder geht eng beieinander', ms: 0, words: ['arm', 'inarm', 'arminarm', 'indenarm'] },
+  handinhand: { label: 'Hand in Hand', ask: 'möchte mit dir Hand in Hand gehen', verb: 'geht Hand in Hand mit', npcFact: 'Ihr geht Hand in Hand', ms: 0, words: ['handinhand', 'händchen', 'haendchen', 'händchenhalten'] },
+}
+
+/** Bewegungen, bei denen man zusammen weitergeht: wer angenommen hat, läuft mit. */
+export const FOLLOW_JOINTS: ReadonlySet<string> = new Set(['armnehmen', 'handinhand'])
+
+/**
+ * Hand in Hand braucht die Hand auf der Seite des Partners: Schaut die Figur nach
+ * rechts (se, ne) und steht der Partner rechts, ist es die vordere Hand, sonst die hintere.
+ */
+export function sidePose(pose: KieselPose, dir: 'se' | 'sw' | 'ne' | 'nw', me: { x: number }, partner: { x: number } | null): KieselPose {
+  if (pose !== 'handinhand' || !partner) return pose
+  const facesRight = dir === 'se' || dir === 'ne'
+  return facesRight === (partner.x >= me.x) ? 'handinhand' : 'handinhand_l'
 }
 
 export type GestureCommand = { kind: 'gesture'; name: GestureName } | { kind: 'joint'; name: JointName }
@@ -36,6 +52,8 @@ export function parseGestureCommand(text: string | null | undefined): GestureCom
   const m = /^\s*\/\s*([\p{L}]+(?:\s+mit)?)/u.exec(String(text ?? ''))
   if (!m) return null
   const word = m[1].toLocaleLowerCase('de-DE').replace(/\s+/g, '')
+  if (/^hand\s*in\s*hand/i.test(text!.replace(/^\s*\/\s*/, ''))) return { kind: 'joint', name: 'handinhand' }
+  if (/^(in\s+den\s+)?arm\b/i.test(text!.replace(/^\s*\/\s*/, ''))) return { kind: 'joint', name: 'armnehmen' }
   if (word === 'tanzenmit' || word === 'tanzmit') return { kind: 'joint', name: 'paartanz' }
   for (const [name, g] of Object.entries(JOINTS) as [JointName, typeof JOINTS[JointName]][]) if (g.words.includes(word)) return { kind: 'joint', name }
   for (const [name, g] of Object.entries(GESTURES) as [GestureName, typeof GESTURES[GestureName]][]) if (g.words.includes(word)) return { kind: 'gesture', name }
@@ -129,5 +147,15 @@ export function npcJointDecision(action: JointName, c: NpcJointContext): NpcJoin
     case 'troesten':
       if (c.mourning) return { ok: true }
       return { ok: false, reply: 'Danke, mir geht es gut.' }
+    case 'armnehmen':
+      if (c.minor) return { ok: false, reply: 'Nein.' }
+      if (c.companion) return { ok: true }
+      if (c.mourning && c.condoled) return { ok: true }
+      return { ok: false, reply: 'Wir kennen uns doch kaum.' }
+    case 'handinhand':
+      if (c.minor) return { ok: false, reply: 'Nein.' }
+      if (c.working) return { ok: false, reply: 'Ich bin bei der Arbeit.' }
+      if (c.companion) return { ok: true }
+      return { ok: false, reply: 'Hand in Hand? Wir kennen uns doch kaum.' }
   }
 }

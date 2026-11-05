@@ -39,3 +39,20 @@ describe('gestures', () => {
     expect(npcJointDecision('handschlag', { ...base, refusedTalk: true }).ok).toBe(false)
   })
 })
+
+import { FOLLOW_JOINTS, sidePose } from './gestures'
+describe('walking together', () => {
+  it('arm and hand in hand: by command, only with the companion, the right hand', () => {
+    expect(parseGestureCommand('/hand in hand')).toEqual({ kind: 'joint', name: 'handinhand' })
+    expect(parseGestureCommand('/in den Arm')).toEqual({ kind: 'joint', name: 'armnehmen' })
+    expect(parseGestureCommand('/hand')).toEqual({ kind: 'joint', name: 'handschlag' })
+    expect(FOLLOW_JOINTS.has('handinhand') && FOLLOW_JOINTS.has('armnehmen') && !FOLLOW_JOINTS.has('umarmen')).toBe(true)
+    expect(npcJointDecision('handinhand', base).ok).toBe(false)
+    expect(npcJointDecision('handinhand', { ...base, companion: true }).ok).toBe(true)
+    expect(npcJointDecision('armnehmen', { ...base, companion: true, minor: true }).ok).toBe(false)
+    expect(npcJointDecision('armnehmen', { ...base, mourning: true, condoled: true }).ok).toBe(true)
+    expect(sidePose('handinhand', 'se', { x: 0 }, { x: 30 })).toBe('handinhand')
+    expect(sidePose('handinhand', 'se', { x: 30 }, { x: 0 })).toBe('handinhand_l')
+    expect(sidePose('handinhand', 'sw', { x: 30 }, { x: 0 })).toBe('handinhand')
+  })
+})
