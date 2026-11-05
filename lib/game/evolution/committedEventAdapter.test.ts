@@ -206,6 +206,25 @@ for (const input of [[extraFields[1], extraTwin], [extraTwin, extraFields[1]]]) 
     'public history shape must not depend on duplicate input order')
 }
 
+// A failed or uncommitted attempt must not reserve a domain source reference
+// or event identity and thereby veto a later genuinely committed transition.
+// Only successfully committed, valid receipts participate in ambiguity checks.
+const failedSameSource = receipt('failed-attempt', 2090, false,
+  { action: 'rename', assetId: 'hall', name: 'Nicht genehmigt' })
+const committedSameSource = {
+  ...receipt('valid-attempt', 2090, true,
+    { action: 'rename', assetId: 'hall', name: 'Genehmigt' }),
+  domainEventRef: failedSameSource.domainEventRef,
+}
+for (const input of [[failedSameSource, committedSameSource],
+  [committedSameSource, failedSameSource]]) {
+  const result = adaptCommittedWorldEvents(input)
+  assert(result.events.length === 1 && result.events[0].id === 'valid-attempt',
+    'uncommitted attempt must not poison independently committed source')
+  assert(result.rejected.length === 1 && result.rejected[0].reason === 'not_committed',
+    'uncommitted attempt remains explicitly rejected')
+}
+
 // Legacy sequence is not yet an authenticated, uniquely scoped commit order.
 // Two distinct Core events can share it; do not silently reject either while
 // the authoritative persisted ordering contract is under review.
