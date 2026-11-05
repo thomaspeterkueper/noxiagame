@@ -4,7 +4,9 @@ import Link from 'next/link'
 import {useCallback,useEffect,useState} from 'react'
 import {getToken} from '@/lib/supabase/auth'
 
+type CausalStep = {correlation_id:string;stage:string;status:string;detail:Record<string,unknown>;created_at:string}
 type Turn = {
+ correlation_id:string|null;causal_trace:CausalStep[];
  id:number;created_at:string;player_profile_id:string;npc_person_id:string|null;
  npc_name:string|null;npc_role:string|null;location_name:string|null;
  player_text:string|null;npc_reply:string|null;topic:string|null;
@@ -70,7 +72,20 @@ export default function ConversationReviewPage(){
        <div><dt className="font-semibold">Wunsch / Signal</dt><dd>{[row.wish_kind,row.wish_object].filter(Boolean).join(' · ')||'Kein Signal'}</dd></div>
        <div><dt className="font-semibold">Protokollierte Weltaktion</dt><dd>{row.world_action??'Keine'}</dd></div>
       </dl>
-      <p className="mt-3 text-xs text-[#5d6b70]">Ein Weltaktionssignal beweist noch nicht, dass eine Weltzustandsänderung erfolgreich persistiert wurde. Hier fehlt derzeit eine durchgängige Kausal-ID.</p>
+      <section className="mt-4 rounded-lg border bg-[#f8f7f2] p-3">
+        <h3 className="text-sm font-semibold">Entscheidungs- und Wirkungskette</h3>
+        <p className="mt-1 break-all text-xs text-[#5d6b70]">Korrelations-ID: {row.correlation_id??'Älteres Gespräch – noch nicht erfasst'}</p>
+        {row.causal_trace?.length ? <ol className="mt-3 space-y-2">
+          {row.causal_trace.map((event,i)=><li className="rounded border-l-4 border-[#8ca9a0] bg-white px-3 py-2 text-xs" key={event.stage+'-'+i}>
+            <div className="flex flex-wrap justify-between gap-2">
+              <strong>{event.stage.replaceAll('_',' ')}</strong>
+              <span>{event.status==='succeeded'?'Gespeichert':event.status==='failed'?'Fehlgeschlagen':event.status==='proposed'?'Nur vorgeschlagen':event.status==='not_confirmed'?'Nicht bestätigt':'Beobachtet'}</span>
+            </div>
+            <p className="mt-1 break-words text-[#5d6b70]">{Object.entries(event.detail??{}).map(([k,v])=>k+': '+String(v)).join(' · ')}</p>
+          </li>)}
+        </ol>:<p className="mt-2 text-xs text-[#5d6b70]">Für dieses Gespräch liegt noch keine Kausalspur vor.</p>}
+        <p className="mt-3 text-xs text-[#5d6b70]">Eine an den Client gesendete Weltaktion gilt erst nach einer eigenständigen Ausführungsbestätigung als durchgeführt. Aktuell protokollieren wir Vorschläge und persistierte serverseitige Gedächtnis-/Wissensänderungen.</p>
+      </section>
     </article>)}
     </section>
    </>}
