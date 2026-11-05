@@ -70,9 +70,6 @@ export function adaptCommittedWorldEvents(receipts: readonly CommittedWorldRecei
   const sourceEventIds = new Map<string, Set<string>>()
   // The same settlement/event ID must not carry two different committed payloads.
   // Compare only semantic fields so JSON object key order cannot change identity.
-  // A committed sequence slot identifies one event within a settlement and year.
-  // Fail closed on collisions rather than letting lexical event-ID ordering decide history.
-  const sequenceSlots = new Map<string, Set<string>>()
   const eventSignatures = new Map<string, Set<string>>()
   const receiptSignature = (r: CommittedWorldReceipt): string => {
     const c = r.change
@@ -86,10 +83,6 @@ export function adaptCommittedWorldEvents(receipts: readonly CommittedWorldRecei
         (candidate as CommittedWorldReceipt).committed !== true ||
         !validReceipt(candidate)) continue
     const r = candidate
-    const slot = JSON.stringify([r.settlementId, r.worldYear, r.sequence])
-    const slotEvents = sequenceSlots.get(slot) ?? new Set<string>()
-    slotEvents.add(r.eventId)
-    sequenceSlots.set(slot, slotEvents)
     const sourceKey = JSON.stringify([r.settlementId, r.domain, r.domainEventRef])
     const ids = sourceEventIds.get(sourceKey) ?? new Set<string>()
     ids.add(r.eventId)
@@ -115,11 +108,6 @@ export function adaptCommittedWorldEvents(receipts: readonly CommittedWorldRecei
       continue
     }
     const r = candidate
-    const slot = JSON.stringify([r.settlementId, r.worldYear, r.sequence])
-    if ((sequenceSlots.get(slot)?.size ?? 0) > 1) {
-      rejected.push({ eventId: r.eventId, reason: 'ambiguous_sequence' })
-      continue
-    }
     const sourceKey = JSON.stringify([r.settlementId, r.domain, r.domainEventRef])
     if ((sourceEventIds.get(sourceKey)?.size ?? 0) > 1) {
       rejected.push({ eventId: r.eventId, reason: 'ambiguous_domain_ref' })
