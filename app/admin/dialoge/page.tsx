@@ -12,7 +12,7 @@ type Turn = {
  wish_object:string|null;wish_npc_denied:boolean|null;headline:string|null;
  turn_index:number|null;opening:boolean|null
 }
-type Response = {rows:Turn[];consenting_players:number;note:string;truncated?:boolean}
+type Response = {rows:Turn[];enabled:boolean;note:string;truncated?:boolean}
 
 export default function ConversationReviewPage(){
  const [data,setData]=useState<Response|null>(null)
@@ -42,7 +42,7 @@ export default function ConversationReviewPage(){
      Wörtliche Spieler-NPC-Dialoge erscheinen ausschließlich bei aktiver freiwilliger Einwilligung,
      nur für Gesprächseinträge nach deren Beginn. Jeder Textabruf wird protokolliert.
    </p>
-   <p className="mb-4 text-sm">Testspieler können ihre Freigabe unter <Link className="underline" href="/settings/conversation-diagnostics">Gesprächsdiagnostik</Link> selbst aktivieren und widerrufen.</p>
+   <p className="mb-4 text-sm">Informationen zur Testprotokollierung: <Link className="underline" href="/testbetrieb">Testbetrieb &amp; Datenschutz</Link>.</p>
    <form onSubmit={e=>{e.preventDefault();void load()}} className="mb-5 flex flex-wrap items-end gap-3">
     <label className="text-sm">NPC-ID (optional)
      <input className="mt-1 block w-80 max-w-full rounded border p-2" value={npcId} onChange={e=>setNpcId(e.target.value)} placeholder="Alle NPCs"/>
@@ -51,10 +51,10 @@ export default function ConversationReviewPage(){
    </form>
    {error&&<p role="alert" className="rounded border border-red-300 bg-red-50 p-3">{error}</p>}
    {data&&<>
-    <p className="mb-4 text-xs text-[#5d6b70]">{data.note} · Einwilligende Konten: {data.consenting_players}</p>
+    <p className="mb-4 text-xs text-[#5d6b70]">{data.note} · Diagnosefunktion: {data.enabled ? "freigeschaltet" : "noch gesperrt"}</p>
     {data.truncated&&<p role="status">Weitere Einträge sind vorhanden; die Anzeige ist begrenzt.</p>}
     <section aria-label="Freigegebene Gesprächseinträge" className="space-y-4">
-    {data.rows.length===0&&<p className="rounded border bg-white p-4">Keine freigegebenen neuen Gesprächsprotokolle.</p>}
+    {data.rows.length===0&&<p className="rounded border bg-white p-4">Keine aktuell verfügbaren Testgesprächsprotokolle.</p>}
     {data.rows.map(row=><article key={row.id} className="rounded-xl border bg-white p-5">
       <header className="mb-3">
        <h2 className="font-semibold">{row.npc_name??'NPC'} <span className="font-normal text-[#5d6b70]">· {row.npc_role??'Rolle unbekannt'}</span></h2>
