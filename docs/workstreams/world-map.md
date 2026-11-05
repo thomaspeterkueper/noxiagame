@@ -773,3 +773,10 @@ Thomas, 05.11.2026, nach dem Neuladen: „klappt, Friedhof ist auch da, Grabstei
    - frische Gräber mit Blumen;
    - Angehörige am Grab.
 
+
+## Stimmung und erster Schritt (05.11.2026, nach Forge of Empires)
+
+- `lib/worldlab/ambient.ts` (getestet): Solaranlagen auf etwa jedem dritten Wohnhaus und jeder zweiten Halle (Südseite des Dachs, auf Flachdächern aufgeständerte Reihen); Schornstein mit Rauch nur auf rund 6 % der Wohnhäuser, Rauch nur in der Heizzeit und nur nahe der Kamera.
+- Tageslicht nach echtem Sonnenstand am Ort der Figur: Boden, Häuser und Bäume werden in der Dämmerung wärmer, nachts gedämpft bläulich (nie dunkel). Fensterlicht ab der Dämmerung bis etwa Mitternacht, danach nur wenige Fenster.
+- Wasser glitzert: kurze helle Striche auf Flüssen und Wasserflächen, zwei Gruppen blenden im Wechsel.
+- Erster Start: goldener Pfeil über der nächsten Agentur für Arbeit (bis 3 km) und eine kleine Karte unten links; endet beim Ankommen (30 m), beim Hineingehen oder mit „Nicht nötig“. Nur für neue Spieler oder mit `?guide=1`.
