@@ -16,7 +16,7 @@ create table if not exists public.admin_conversation_read_audit (
   id bigint generated always as identity primary key,
   admin_profile_id uuid not null references auth.users(id),
   profile_id uuid not null references auth.users(id),
-  conversation_log_id uuid not null,
+  conversation_log_id bigint not null,
   accessed_at timestamptz not null default now()
 );
 create index if not exists admin_conversation_read_audit_at_idx
