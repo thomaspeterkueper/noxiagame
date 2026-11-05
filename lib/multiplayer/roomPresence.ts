@@ -12,6 +12,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { GESTURES, JOINTS, type InviteState, type PoseState } from './gestures'
+import { cleanPlayerLook } from '../figures/playerLook'
+import type { KieselLook } from '../figures/kiesel'
 
 export interface PeerState {
   profileId: string
@@ -27,6 +29,8 @@ export interface PeerState {
   pose?: PoseState | null
   /** Einladung zu einer gemeinsamen Bewegung an einen anderen Spieler. */
   invite?: InviteState | null
+  /** Selbst gestaltete Figur (player_appearance), geprüft beim Empfang. */
+  look?: KieselLook | null
   at: number
 }
 
@@ -54,7 +58,7 @@ export function peersFrom(state: Record<string, Array<Partial<PeerState>>>, me: 
     const e = entries[entries.length - 1]
     if (!e || typeof e.x !== 'number' || typeof e.y !== 'number') continue
     if (typeof e.at === 'number' && nowMs - e.at > 120_000) continue
-    out.push({ profileId: key, name: String(e.name ?? 'Spieler').slice(0, 24), x: e.x, y: e.y, seated: Boolean(e.seated), role: e.role ? String(e.role).slice(0, 24) : null, emote: e.emote && typeof e.emote.at === 'number' ? { text: String(e.emote.text ?? '').slice(0, 30), at: e.emote.at } : null, pose: cleanPose(e.pose), invite: cleanInvite(e.invite), at: Number(e.at ?? nowMs) })
+    out.push({ profileId: key, name: String(e.name ?? 'Spieler').slice(0, 24), x: e.x, y: e.y, seated: Boolean(e.seated), role: e.role ? String(e.role).slice(0, 24) : null, emote: e.emote && typeof e.emote.at === 'number' ? { text: String(e.emote.text ?? '').slice(0, 30), at: e.emote.at } : null, pose: cleanPose(e.pose), invite: cleanInvite(e.invite), look: e.look ? cleanPlayerLook(e.look, key) : null, at: Number(e.at ?? nowMs) })
   }
   return out.sort((a, b) => a.name.localeCompare(b.name)).slice(0, 12)
 }
@@ -85,7 +89,7 @@ function adapter(): PresenceAdapter {
  * Wer außer mir im Raum ist. `room` = Kennung des Hauses; `me` = eigenes Profil.
  * Die eigene Lage wird höchstens alle 400 ms gemeldet.
  */
-export function useRoomPresence(room: string | null, me: { profileId: string; name: string } | null, state: { x: number; y: number; seated: boolean; role: string | null }) {
+export function useRoomPresence(room: string | null, me: { profileId: string; name: string } | null, state: { x: number; y: number; seated: boolean; role: string | null; look?: KieselLook | null }) {
   const [peers, setPeers] = useState<PeerState[]>([])
   const handle = useRef<ReturnType<PresenceAdapter['join']> | null>(null)
   const emote = useRef<PeerState['emote']>(null)
@@ -105,7 +109,7 @@ export function useRoomPresence(room: string | null, me: { profileId: string; na
   const send = useMemo(() => () => {
     if (!me || !handle.current) return
     const s = latest.current
-    handle.current.track({ profileId: me.profileId, name: me.name, x: Math.round(s.x), y: Math.round(s.y), seated: s.seated, role: s.role, emote: emote.current, pose: pose.current, invite: invite.current, at: Date.now() })
+    handle.current.track({ profileId: me.profileId, name: me.name, x: Math.round(s.x), y: Math.round(s.y), seated: s.seated, role: s.role, emote: emote.current, pose: pose.current, invite: invite.current, look: s.look ?? null, at: Date.now() })
     last.current = Date.now()
   }, [me?.profileId, me?.name])
 
@@ -115,7 +119,7 @@ export function useRoomPresence(room: string | null, me: { profileId: string; na
     if (timer.current) clearTimeout(timer.current)
     timer.current = setTimeout(send, wait)
     return () => { if (timer.current) clearTimeout(timer.current) }
-  }, [state.x, state.y, state.seated, state.role, send])
+  }, [state.x, state.y, state.seated, state.role, state.look, send])
 
   // Alle 30 s erneuern, damit man nicht als „weg“ gilt, wenn man still steht.
   useEffect(() => { const id = setInterval(send, 30_000); return () => clearInterval(id) }, [send])

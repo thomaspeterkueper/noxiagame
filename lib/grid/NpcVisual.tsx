@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { KieselFigure } from '@/lib/figures/KieselFigure'
-import { kieselLookFor, type KieselDir, type KieselPose, type KieselSource } from '@/lib/figures/kiesel'
+import { kieselLookFor, type KieselDir, type KieselLook, type KieselPose, type KieselSource } from '@/lib/figures/kiesel'
 
 export type NpcRole='science'|'engineering'|'operations'|'habitat'|'general'
 export type NpcGenderPresentation='feminine'|'masculine'|'androgynous'
@@ -74,9 +74,9 @@ function classes(v:NpcVisualProfile,moving:boolean,selected:boolean){
  * Seit 04.11.2026 im Kiesel-Stil (Thomas: „Kiesel wirkt am angenehmsten“); Name,
  * Größe (24×38) und Aufruf bleiben, damit alle bisherigen Stellen weiterlaufen.
  */
-export function NpcFigure({id,name,role,appearance,moving=false,selected=false,showLabel=false,showRoleLabel=true,onClick,pose,dir}:{id:string;name:string;role?:string|null;appearance?:NpcAppearance;moving?:boolean;selected?:boolean;showLabel?:boolean;showRoleLabel?:boolean;onClick?:()=>void;pose?:KieselPose;dir?:KieselDir}){
+export function NpcFigure({id,name,role,appearance,moving=false,selected=false,showLabel=false,showRoleLabel=true,onClick,pose,dir,look:given}:{id:string;name:string;role?:string|null;appearance?:NpcAppearance;moving?:boolean;selected?:boolean;showLabel?:boolean;showRoleLabel?:boolean;onClick?:()=>void;pose?:KieselPose;dir?:KieselDir;look?:KieselLook}){
   const v=npcVisual(id,role,appearance)
-  const look=kieselLookFor({id,appearance:appearance as KieselSource['appearance']},role??null)
+  const look=given??kieselLookFor({id,appearance:appearance as KieselSource['appearance']},role??null)
   return <button className={classes(v,moving,selected)+' kv'} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();onClick?.()}} title={showRoleLabel?name+' · '+(role??v.role):name}><KieselFigure look={look} width={26} pose={pose??(moving?'gehen':'stehen')} moving={moving} dir={dir??'se'} title={name}/>{showLabel&&<span>{name}{showRoleLabel&&<small>{role??v.role}</small>}</span>}</button>
 }
 

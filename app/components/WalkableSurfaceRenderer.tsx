@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import type { LocalSurfacePoint } from '@/lib/game/spatial/localSurfaceScene'
-import { KieselG, useKieselMotion, useMyFigureId } from '@/lib/figures/KieselFigure'
+import { KieselG, useKieselMotion, useMyLook } from '@/lib/figures/KieselFigure'
 import { kieselLookFor, type KieselPose } from '@/lib/figures/kiesel'
 
 export type SurfaceScreenPoint={x:number;y:number}
@@ -77,13 +77,13 @@ export function WalkableRoute({points,target}:{points:LocalSurfacePoint[];target
  * und Gehen aus der Bewegung; draußen auf Mond, Phobos, Deimos im Druckanzug).
  */
 export function WalkablePlayer({point,label,suited=false,seed,pose}:{point:LocalSurfacePoint;label?:string;suited?:boolean;seed?:string;pose?:KieselPose}){
-  const myId=useMyFigureId()
+  const mine=useMyLook().look
   const p=projectSurfacePoint(point)
   const labelWidth=label?Math.max(44,Math.min(118,label.length*6.1+16)):0
   const m=useKieselMotion(p.x,p.y)
   return <g transform={`translate(${p.x} ${p.y-9})`}>
     <ellipse cy="11" rx="9" ry="3.5" fill="#e4bd4b" opacity=".35"/>
-    <g transform="translate(0 11)"><KieselG look={kieselLookFor({id:seed??myId},suited?'space':null)} dir={m.dir} pose={pose??(m.moving?'gehen':'stehen')} moving={m.moving} height={38}/></g>
+    <g transform="translate(0 11)"><KieselG look={seed?kieselLookFor({id:seed},suited?'space':null):suited?{...mine,clothes:'druckanzug'}:mine} dir={m.dir} pose={pose??(m.moving?'gehen':'stehen')} moving={m.moving} height={38}/></g>
     {label&&<g pointerEvents="none" transform="translate(0 -26)"><rect x={-labelWidth/2} y="-12" width={labelWidth} height="14" rx="4" fill="#173845ee" stroke="#e4bd4b" strokeWidth=".9"/><text x="0" y="-2.5" textAnchor="middle" fontSize="8" fontWeight="800" fill="#fff7d8">{label}</text></g>}
   </g>
 }
