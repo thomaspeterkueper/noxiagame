@@ -1,8 +1,8 @@
 # NOXIA-WORLD-0004 – Eigene Erdkarte aus mehreren Quellen
 
 **Datum:** 05.11.2026
-**Status:** Entwurf – wartet auf Entscheidung von Thomas
-**Version:** 0.1.0
+**Status:** Angenommen (Thomas, 05.11.2026) – Reihenfolge und Quellenregel entschieden
+**Version:** 0.2.0
 **Teilprojekt:** Erdkarte – eine Welt (`docs/workstreams/world-map.md`)
 
 ---
@@ -90,8 +90,22 @@ Welche Dienste je Land offen, erreichbar und lizenzrechtlich nutzbar sind, wird 
 7. Fassungen mit *gültig ab/bis* (Chronofunktion), dann Zeitregler erweitern.
 8. Karteneditor – eigenes Vorhaben nach 1–7.
 
-## Offene Fragen an Thomas
+## Entscheidungen von Thomas (05.11.2026)
 
-- Reihenfolge: Gelände (4) vor Rohimporten (2–3), damit das Sauerland bald nicht mehr flach aussieht?
-- Overture und andere Quellen mit gemischter Lizenz: nur offene Lizenzen (ODbL, CC BY, amtliche Open Data) oder Einzelfallprüfung?
-- Historische Daten: zuerst nur Deutschland/Sauerland oder gleich die Spielorte im Ausland (Dvārakā, Istanbul, Vuiteboeuf)?
+1. **Gelände zuerst.** Schritt 4 kommt vor den Rohimporten (2–3).
+2. **Jede Quelle im Einzelfall prüfen** (Lizenz, Erreichbarkeit, Nutzungsbedingungen) – keine pauschale Beschränkung auf offene Lizenzen. Ergebnis je Quelle unten in „Quellenprüfung“.
+3. **Historische Daten** für Deutschland und ausgewählte Gegenden, z. B. Istanbul/Konstantinopel und Malta.
+
+## Quellenprüfung
+
+| Quelle | Schicht | Ergebnis | Stand |
+|---|---|---|---|
+| Open-Meteo Elevation API (Copernicus DEM GLO-90) | Gelände | Daten unter Copernicus-Lizenz mit Quellenvermerk, Open-Meteo CC BY 4.0; kostenloser Zugang nur nicht-kommerziell, bis 10.000 Anfragen/Tag. Für die Alpha in Ordnung; vor kommerzieller Nutzung ablösen (Copernicus direkt oder amtliche Modelle). | 05.11.2026 |
+| DGM1 NRW (Geobasis NRW) | Gelände | als nächste Quelle für Sundern vorgesehen; Lizenz und Abrufweg (WCS/Kacheln) noch zu prüfen | offen |
+
+## Umsetzung Schritt 4, erster Teil (05.11.2026)
+
+- Höhenzellen: Kachelstufe 15 (≈ 760 m), 9 × 9 Punkte (≈ 95 m), Tabelle `earth_terrain_cells` (Rohwerte mit Quelle, Datensatz, Lizenz), Fehlversuche in `earth_terrain_misses` (frühestens nach einem Tag erneut). Migration `20261105120000_earth_terrain_cells.sql`.
+- Holen: beim ersten Besuch 3 × 3 Zellen um den Spieler (`/api/world-lab/refresh`), sonst täglich (`/api/cron/world-terrain`, 03:17 UTC): Spielerwege der letzten 14 Tage, NOXIA-Gebäude, benannte Orte; höchstens 300 Zellen je Lauf.
+- Karte: jede Kachel bekommt 9 × 9 Eckhöhen (`lib/worldlab/terrain.ts`, nicht Teil von `world_tiles`); gezeichnet als Hangschattierung (Licht aus Nordwesten, zweifach überhöht) und Höhenlinien alle 10 m, jede 50-m-Linie kräftiger. Kacheln bleiben flach.
+- Noch nicht: Gebäude auf Geländehöhe, echte Höhenverschiebung in der 2:1-Ansicht, Steigung beim Laufen.

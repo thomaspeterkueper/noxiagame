@@ -741,3 +741,10 @@ Seit 05.11.2026 gibt es Veranstaltungen in Lokalen (`venue_events`, `/api/game/h
 - Optional eine Liste „Was ist los?“ in der Nähe.
 - Die Typen sind in `lib/game/hospitality/venueEvents.ts`; `upcoming()` und `eventLine()` lassen sich direkt verwenden.
 
+
+## Gelände: Hangschattierung und Höhenlinien (05.11.2026, Thomas: „zuerst Gelände“)
+
+- Grundlage: `docs/decisions/NOXIA-WORLD-0004-eigene-erdkarte-aus-mehreren-quellen.md` (eigene Karte aus mehreren Quellen, einmal holen, danach nur eigene Daten).
+- Höhenzellen der Kachelstufe 15 (9 × 9 Punkte, ≈ 95 m) in `earth_terrain_cells`; Rechnen und Zeichnen in `lib/worldlab/terrain.ts` (Tests daneben), Lesen und Holen in `lib/worldlab/terrainSource.server.ts`.
+- Geholt beim ersten Besuch (`/api/world-lab/refresh`, 3 × 3 Zellen) und täglich (`/api/cron/world-terrain`). Quelle zunächst Open-Meteo/Copernicus GLO-90 (Einzelfallprüfung im ADR).
+- Sichtbar als Hangschattierung und Höhenlinien auf dem Boden; die Kacheln bleiben flach.

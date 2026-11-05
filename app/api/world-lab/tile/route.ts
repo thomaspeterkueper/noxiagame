@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { TILE_Z } from '@/lib/worldlab/mercator'
 import { clearTileSourceCache, loadTile } from '@/lib/worldlab/tileSource.server'
+import { clearTerrainCache } from '@/lib/worldlab/terrainSource.server'
 
 export const revalidate = 0
 
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'x und y müssen ganze Kachelnummern sein.' }, { status: 400 })
   }
   const fresh = params.get('fresh') ?? ''
-  if (fresh && fresh !== freshStamp) { freshStamp = fresh; clearTileSourceCache() }
+  if (fresh && fresh !== freshStamp) { freshStamp = fresh; clearTileSourceCache(); clearTerrainCache() }
   // bust: nur am Rand nicht zwischenspeichern (neue Flurstücke, genaue Linien) – die
   // Regionen im Speicher bleiben, sie haben sich nicht geändert.
   const bust = params.get('bust') ?? ''
