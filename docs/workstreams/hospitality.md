@@ -229,6 +229,18 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Bewohner machen es nur mit ihrer Begleitung, in den Arm nehmen auch Trauernde nach dem Beileid, nie Kinder.
   - Tests; im Browser geprüft.
 
+- **06.11.2026 – Polizei, Feuerwehr, Arztpraxis, Krankenhaus:**
+  - Thomas: „ja, mache das“. Begehbare Räume auf dem Innenraum-Motor, mit Dienstpersonal in Uniform, Wissen und Angeboten:
+    - Wache: Anzeige, Fundsache, Verlust; sie kennt gemeldete Vorfälle.
+    - Feuerwache: Löschfahrzeug, Mitmachen bei der Freiwilligen Feuerwehr.
+    - Praxis: Sprechzeiten, Termin, Wartezimmer.
+    - Krankenhaus: Information, Besuch, Station.
+  - Tabelle `service_cases`, `/api/game/services`.
+  - Öffnen von der Karte: `police`, `fire_station`, `doctors`/`dentist`, `hospital`/`clinic`.
+  - Einsatz im Lokal: Nach einer Schlägerei kommt die Streife, bei Verletzten der Rettungsdienst.
+  - Bei echten Notfällen verweist das Personal auf 110, 112 und 116 117; keine Diagnosen.
+  - Tests; im Browser geprüft. Requests R-34, W-20, P-4.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.
@@ -247,6 +259,9 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
 - **R-16** (27.10.2026): Gekaufte Häuser und Lokale als Sicherheit – `population-economy.md`. ✅ 28.10.2026.
 - **R-18** (28.10.2026): Preise und Dienstleistungen je Haus durch den Betreiber (Toilette frei als Standard) – `population-economy.md`. ✅ 28.10.2026: `services` und `canEditHouse` im Gäste-Abruf; Ändern über `POST /api/game/hospitality/order { action: 'set_price' | 'set_service' }`; Toilette als Posten `toilet`. Für euch bleibt die Einstellungstafel.
 - **R-19** (28.10.2026): Nachtclub als Lokalart – Gebäudeart, Umbau, Karte, Personal, Ausgehen bei Nacht – `population-economy.md`. ✅ 28.10.2026, Eintritt serverseitig Pflicht (`NOXIA_ENTRY_REQUIRED`).
+- **R-34** (06.11.2026): Polizei, Feuerwehr, Gesundheit – Einsätze und Folgen – `population-economy.md`.
+- **W-20** (06.11.2026): Polizei, Feuerwache, Praxis, Krankenhaus begehbar – `world-map.md`.
+- **P-4** (06.11.2026): Seelsorge im Krankenhaus und bei Einsätzen – NPC-Religion.
 - **W-19** (05.11.2026): Grabsteine auf der Weltkarte – `world-map.md`; Nachtrag zu R-23 (Gräber mit Namen vorziehen).
 - **R-33** (05.11.2026): Bewohner gehen zu Veranstaltungen – `population-economy.md`.
 - **W-18** (05.11.2026): „Was ist los?“ auf der Karte – `world-map.md`.

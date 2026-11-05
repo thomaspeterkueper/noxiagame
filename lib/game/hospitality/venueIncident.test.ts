@@ -1,4 +1,4 @@
-import { incidentAt, incidentFacts, incidentNotice, incidentPose, VENUE_INCIDENT_EVENT } from './venueIncident'
+import { incidentAt, incidentFacts, incidentNotice, incidentPose, incidentResponders, responderFacts, VENUE_INCIDENT_EVENT } from './venueIncident'
 
 let failures = 0
 function check(ok: boolean, label: string) { if (!ok) { failures++; console.error('FAIL', label) } }
@@ -19,5 +19,16 @@ check(after?.pose === 'liegen' && after.verletzt === true, 'injured in a fight: 
 check(incidentFacts(k, 'b', 101, { a: 'Ben' }).some(f => f.includes('Ben') && f.includes('angegangen')) && incidentFacts(k, 'b', 101).some(f => f.includes('verletzt')), 'involved know their part')
 check(incidentFacts(k, 'z', 101, { a: 'Ben', b: 'Anna' }).some(f => f.includes('Ben und Anna')) && incidentFacts(null, 'z', 101).length === 0, 'bystanders know what they saw, nothing without an event')
 check(incidentNotice(k, 101).includes('Schlägerei') && incidentNotice(k, 120).includes('verletzt'), 'notice')
+
+{
+  const k2 = incidentAt([row({ level: 'kampf', participants: [{ personId: 'a', role: 'angreifer', outcome: 'steht' }, { personId: 'b', role: 'verteidiger', outcome: 'verletzt' }] })], T, 101)!
+  check(incidentResponders(k2, 105).length === 0, 'nobody comes while it still runs')
+  const r = incidentResponders(k2, 115)
+  check(r.filter(x => x.roleCode === 'police').length === 2 && r.filter(x => x.roleCode === 'paramedic').length === 2, 'police and paramedics after a fight with injury')
+  check(incidentResponders(k2, 130).length === 0, 'gone when the aftermath ends')
+  const sc = incidentAt([row({})], T, 102)!
+  check(incidentResponders(sc, 115).length === 0, 'a scuffle without injury or ban: nobody is called')
+  check(responderFacts(k2, r[0]).some(f => f.includes('Schlägerei')) && incidentNotice(k2, 115).includes('Polizei') && incidentNotice(k2, 115).includes('Rettungsdienst'), 'responders know why they are here; notice says so')
+}
 
 if (failures) { console.error(failures + ' failed'); process.exit(1) } else console.log('venueIncident: all passed')

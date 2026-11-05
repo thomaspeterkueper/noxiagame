@@ -289,3 +289,12 @@ Thomas, 04.11.2026: „leider ist die Welt nicht nur nett.“ Population regelt,
 
 Das fließt in das Wissen der Figuren ein (`incidentFacts`) und später in Gespräche danach.
 
+### P-4 (Gastronomie, 06.11.2026): Seelsorge im Krankenhaus und bei Einsätzen
+
+Seit 06.11.2026 gibt es ein begehbares Krankenhaus und Einsätze von Polizei und Rettungsdienst (R-34).
+
+**Bitte:**
+- Krankenhausseelsorge: Wer sitzt bei Sterbenden, wer spricht mit Angehörigen? Je Tradition. Raum der Stille im Krankenhaus.
+- Notfallseelsorge nach schweren Einsätzen, für Betroffene und Einsatzkräfte.
+- Was Figuren nach einem Unglück glauben und hoffen; das fließt in ihr Wissen ein.
+

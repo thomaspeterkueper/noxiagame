@@ -108,5 +108,42 @@ export function incidentFacts(i: VenueIncident | null, personId: string, tick: n
 export function incidentNotice(i: VenueIncident, tick: number): string {
   if (incidentRunning(i, tick)) return i.level === 'kampf' ? 'Eine Schlägerei! Halte Abstand – oder hol den Türsteher.' : 'Eine Rangelei am Tisch – es wird laut.'
   const hurt = i.participants.some(p => p.outcome === 'verletzt')
-  return hurt ? 'Nach dem Streit: Jemand ist verletzt.' : 'Der Streit ist vorbei; die Stimmung ist angespannt.'
+  const police = i.level === 'kampf' || i.removedIds.length > 0
+  const help = [police ? 'die Polizei nimmt auf' : '', hurt ? 'der Rettungsdienst versorgt, wer verletzt ist' : ''].filter(Boolean).join(', ')
+  if (help) return `Nach dem Streit: ${help}.`
+  return 'Der Streit ist vorbei; die Stimmung ist angespannt.'
+}
+
+// ── Einsatz (06.11.2026): Nach einer Schlägerei kommt die Streife, bei Verletzten der
+// Rettungsdienst. Sie sind da, solange die Folgen sichtbar sind (endsTick … aftermathTick).
+
+export interface IncidentResponder { key: string; role: string; roleCode: 'police' | 'paramedic'; description: string; feminine: boolean }
+
+export function incidentResponders(i: VenueIncident | null, tick: number): IncidentResponder[] {
+  if (!i || tick < i.endsTick || tick >= i.aftermathTick) return []
+  const out: IncidentResponder[] = []
+  if (i.level === 'kampf' || i.removedIds.length) out.push(
+    { key: 'streife-1', role: 'Polizistin der Streife', roleCode: 'police', description: 'Polizistin in Uniform', feminine: true },
+    { key: 'streife-2', role: 'Polizist der Streife', roleCode: 'police', description: 'Polizist in Uniform', feminine: false },
+  )
+  if (i.participants.some(p => p.outcome === 'verletzt')) out.push(
+    { key: 'rettung-1', role: 'Notfallsanitäter', roleCode: 'paramedic', description: 'Sanitäter in Rettungsjacke', feminine: false },
+    { key: 'rettung-2', role: 'Notfallsanitäterin', roleCode: 'paramedic', description: 'Sanitäterin in Rettungsjacke', feminine: true },
+  )
+  return out
+}
+
+/** Was die Einsatzkräfte wissen: warum sie da sind, was sie tun – mehr nicht. */
+export function responderFacts(i: VenueIncident, r: IncidentResponder): string[] {
+  const what = i.level === 'kampf' ? 'einer Schlägerei' : 'einer Rangelei'
+  if (r.roleCode === 'police') return [
+    `Du bist ${r.role} und wegen ${what} hier gerufen worden`,
+    'Du nimmst auf, wer beteiligt war, und fragst Zeugen, was sie gesehen haben',
+    'Du bleibst ruhig und sachlich; Namen und Einzelheiten erfährst du nur von den Leuten hier',
+  ]
+  return [
+    `Du bist ${r.role} und versorgst nach ${what} eine verletzte Person`,
+    'Du sprichst ruhig, fragst nach Schmerzen und bringst die Person, wenn nötig, ins Krankenhaus',
+    'Bei echten Beschwerden deines Gegenübers verweist du freundlich auf echte Hilfe, im Notfall 112',
+  ]
 }

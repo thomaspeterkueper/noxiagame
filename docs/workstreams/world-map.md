@@ -818,3 +818,26 @@ Schritt 2 (06.11.2026), `TILE_FORMAT` 2026-11-06.1:
 - Warme Breiten: Nadelbaum nur, wenn OSM es sagt.
 
 Offen: Hecken (`barrier=hedge` wird bisher nicht importiert – Import erweitern); Waldart dort, wo OSM sie nicht kennt (Baumartenkarte, Lizenz prüfen); Blumen; Wissen und Ernte (andere Teilprojekte).
+
+### W-20 (Gastronomie, 06.11.2026): Polizei, Feuerwache, Praxis, Krankenhaus begehbar
+
+Thomas, 05.11.2026: „Brauchen wir Polizei? Feuerwehr, Krankenhaus?“ – „ja, mache das“.
+
+**Gebaut (Gastronomie, 06.11.2026):**
+- Begehbare Räume für Polizeiwache, Feuerwache, Arztpraxis und Krankenhaus (`lib/game/services/publicServices.ts`, `app/earth/PublicServiceInterior.tsx`). Das Dienstpersonal steht immer da, die Praxis hat Sprechzeiten.
+- Angebote: Anzeige, Fundsache, Verlust, Mitmachen bei der Freiwilligen Feuerwehr, Termin, Besuch. Gespeichert in `service_cases` (`place_ref`, `service`, `kind`, `text`, `profile_id`, `status` offen/bearbeitet/erledigt).
+- Nach einer Schlägerei (`venue_incident`) kommt die Streife ins Lokal, bei Verletzten der Rettungsdienst (`incidentResponders`).
+- Uniformen für Polizei, Feuerwehr und Rettungsdienst im Kiesel-Stil.
+- Bei echten Notfällen verweist das Personal auf 110, 112 und 116 117.
+
+**Schon eingehängt (Gastronomie, auf Thomas' Wunsch):**
+- `landmarkRoomKind` und `buildingRoomKind` (`lib/game/landmarks/interiors.ts`) kennen `police`, `fire_station`, `doctors` (auch `dentist`) und `hospital` (auch `clinic`).
+- `WorldPanels` öffnet dafür `PublicServiceInterior`.
+- In den Kartendaten gibt es 240 Arztpraxen, 123 Zahnärzte, 93 Krankenhausgebäude, 19 Polizei- und 15 Feuerwehrgebäude.
+
+**Bitte (Erdkarte):**
+1. Prüfen, dass „Betreten“ bei diesen Gebäuden und Punkten erscheint (Abstand, Eingang).
+2. Kennzeichen auf der Karte (Blaulicht, rotes Tor, weißes Kreuz).
+3. Einsatzfahrzeuge auf der Karte, wenn Population Einsätze meldet (R-34): Streifenwagen, Löschfahrzeug, Rettungswagen auf dem Weg zum Ort.
+4. Auf Kolonie, Mars und Raumschiff statt Wache und Feuerwehr ein Sicherheitszentrum und eine Medizinstation.
+

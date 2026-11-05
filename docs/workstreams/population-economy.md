@@ -978,3 +978,32 @@ Thomas, 04.11.2026: Mechaniken aus Second Life übernehmen, „alles nacheinande
 2. Sie erzählen vorher davon („Gehst du heute auch zum Quiz ins Metropol?“) und erinnern sich danach daran.
 3. Abgesagte Termine (`cancelled`) bitte nicht mehr berücksichtigen.
 
+### R-34 (Gastronomie, 06.11.2026): Polizei, Feuerwehr, Gesundheit – Einsätze und Folgen
+
+Thomas, 05.11.2026: „Brauchen wir Polizei? Feuerwehr, Krankenhaus?“ – „ja, mache das“.
+
+**Gebaut (Gastronomie, 06.11.2026):**
+- Begehbare Räume für Polizeiwache, Feuerwache, Arztpraxis und Krankenhaus (`lib/game/services/publicServices.ts`, `app/earth/PublicServiceInterior.tsx`). Das Dienstpersonal steht immer da, die Praxis hat Sprechzeiten.
+- Angebote: Anzeige, Fundsache, Verlust, Mitmachen bei der Freiwilligen Feuerwehr, Termin, Besuch. Gespeichert in `service_cases` (`place_ref`, `service`, `kind`, `text`, `profile_id`, `status` offen/bearbeitet/erledigt).
+- Nach einer Schlägerei (`venue_incident`) kommt die Streife ins Lokal, bei Verletzten der Rettungsdienst (`incidentResponders`).
+- Uniformen für Polizei, Feuerwehr und Rettungsdienst im Kiesel-Stil.
+- Bei echten Notfällen verweist das Personal auf 110, 112 und 116 117.
+
+**Bitte (Population):**
+1. **Personal aus der Bevölkerung:** Polizistinnen, Feuerwehrleute, Ärztinnen, Pflegekräfte und Sanitäter als echte Bewohner mit Arbeit an diesen Orten. Bis dahin stehen dort Dienstfiguren (`landmark-staff:<Ort>:<Aufgabe>`).
+2. **Einsätze:**
+   - Polizei bei Kampf, bei Hausverbots-Bruch (`venue_bans`) und bei Anzeigen;
+   - Feuerwehr bei Bränden, Unfällen und Unwetter (selten, begründet);
+   - Rettungsdienst bei Verletzten.
+
+   Bitte als Ereignis mit Ort, Zeit, Beteiligten und Ergebnis.
+3. **Folgen:** Verletzung mit Dauer, Arzt oder Krankenhaus; Polizeibericht und Ruf im Ort; Hausverbot; Erinnerung und Beziehung (wie R-32).
+4. **Gesundheit:** Krankheit, Genesung, Arzttermine, Geburten im Krankenhaus (R-24), Sterben im Krankenhaus mit Angehörigen (R-23). Die Praxis zeigt Patienten nur aus euren Daten.
+5. **Fälle der Spieler** (`service_cases`) auswerten:
+   - Anzeigen bearbeiten (Status, Ergebnis);
+   - Fundsachen zuordnen;
+   - Mitmachen bei der Feuerwehr als Mitglied mit Übungsabenden;
+   - Besuche bei Patienten.
+6. **Freiwillige Feuerwehr als Verein** (im Sauerland üblich): Mitglieder, Übungsabend, Feuerwehrfest – gern als Veranstaltung (`venue_events`).
+7. Kinder sind nie beteiligt, weder an Gewalt noch an Einsätzen.
+

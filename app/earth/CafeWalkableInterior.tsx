@@ -11,7 +11,7 @@ import { BAN_CHOICES, VenueFurnishPanel, useVenueHouse } from './VenueHouse'
 import { banLabel, banText, cleanFurnishing, tableMoveAllowed, withFurnishing, type Furnishing } from '@/lib/game/hospitality/furnishing'
 import VenueEvents, { useVenueEvents } from './VenueEvents'
 import { eventFacts } from '@/lib/game/hospitality/venueEvents'
-import { incidentAt, incidentFacts, incidentNotice, incidentPose, incidentRunning, type VenueIncident } from '@/lib/game/hospitality/venueIncident'
+import { incidentAt, incidentFacts, incidentNotice, incidentPose, incidentResponders, incidentRunning, responderFacts, type VenueIncident } from '@/lib/game/hospitality/venueIncident'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import HospitalityItemIcon from './HospitalityItemIcon'
 import WalkableInterior, { type InteriorContext, type InteriorFitting, type PlacedThing, type Visit } from '@/app/interiors/WalkableInterior'
@@ -94,6 +94,10 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
   const[incident,setIncident]=useState<{at:VenueIncident;tick:number}|null>(null)
   // Veranstaltungen (Second Life, Teil 5): Aushang, „Was ist los?“, Wissen der Figuren.
   const venueEvents=useVenueEvents(entityId)
+  // Einsatz (06.11.2026): nach einer Schlägerei die Streife, bei Verletzten der Rettungsdienst.
+  const responders=useMemo(()=>incident?incidentResponders(incident.at,incident.tick):[],[incident])
+  const responderIds=useMemo(()=>new Map(responders.map(r=>['landmark-staff:einsatz:'+entityId+':'+r.key,r] as const)),[responders,entityId])
+  const responderResidents=useMemo<ColonyResident[]>(()=>[...responderIds].map(([id,r],i)=>({id,displayName:r.role,identityState:'unknown',observableDescription:r.description,appearance:{genderPresentation:r.feminine?'feminine':'masculine',bodyFrame:'average',skinToneCode:'skin_'+(2+i%4),hairStyleCode:r.feminine?'bun':'short',hairColorCode:['dark','brown','light','grey'][i%4],facialHairCode:'none',visibleAgeBand:'adult',clothingProfile:{work:r.roleCode}},birthYear:null,activityState:'working',lastAction:null,assignments:[],needs:[],skills:[]})),[responderIds])
   const[displayName,setDisplayName]=useState<string|null>(null)
   const[placeKnowledge,setPlaceKnowledge]=useState<string[]>([])
   const[visits,setVisits]=useState<Visit[]>([])
@@ -527,7 +531,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
       giftsToSelf:orders.filter(entry=>entry.forId===self.id).map(entry=>entry.label),
       ownOrder:ctx.moments.has(self.id)?visits.find(visit=>visit.resident.id===self.id)?.label??null:null,
       hour:playerHour,hours,upper,rooms,
-      occasionFacts:[...eventFacts(venueEvents.events,self.roomRole==='staff',Date.now()),...incidentFacts(incident?.at??null,self.id,incident?.tick??0,Object.fromEntries(ctx.shown.map(e=>[e.resident.id,personSceneLabel(e.resident)]))),...familyFacts({selfIsMinor:isMinor(ctx.shown.find(e=>e.resident.id===self.id)?.resident),staff:self.roomRole==='staff',minorsPresent:ctx.shown.filter(e=>isMinor(e.resident)).length}),...(ctx.companion?companionFacts({role:ctx.companion.id===self.id?'companion':self.roomRole==='staff'?'staff':'guest',companionLabel:ctx.companion.label,plan:ctx.companion.plan,sittingTogether:Boolean(ctx.seat)}):[]),...receptionFacts(reception,reception?receptionRole(reception,self.id,self.roomRole==='staff'):'other',{playerInvited:Boolean(reception?.playerInvited),condoled:/beileid/i.test(ctx.lastPlayerText??'')})],
+      occasionFacts:[...(incident&&responderIds.get(self.id)?responderFacts(incident.at,responderIds.get(self.id)!):[]),...eventFacts(venueEvents.events,self.roomRole==='staff',Date.now()),...incidentFacts(incident?.at??null,self.id,incident?.tick??0,Object.fromEntries(ctx.shown.map(e=>[e.resident.id,personSceneLabel(e.resident)]))),...familyFacts({selfIsMinor:isMinor(ctx.shown.find(e=>e.resident.id===self.id)?.resident),staff:self.roomRole==='staff',minorsPresent:ctx.shown.filter(e=>isMinor(e.resident)).length}),...(ctx.companion?companionFacts({role:ctx.companion.id===self.id?'companion':self.roomRole==='staff'?'staff':'guest',companionLabel:ctx.companion.label,plan:ctx.companion.plan,sittingTogether:Boolean(ctx.seat)}):[]),...receptionFacts(reception,reception?receptionRole(reception,self.id,self.roomRole==='staff'):'other',{playerInvited:Boolean(reception?.playerInvited),condoled:/beileid/i.test(ctx.lastPlayerText??'')})],
       toilet:underConversion||emptyHouse?null:serviceRules.toilet,playerSaid:ctx.lastPlayerText,playerDancing:ctx.dancing,
       entry:layout.entry?{price:entryItem?.priceCredits??null,paid:entryPaid||Boolean(shift)}:null,
       playerWorkingFact:shift?workingFact(shift.role,self.roomRole==='staff'):venueReferralFacts(referral,self.roomRole==='staff',false)[0]??null,
@@ -540,7 +544,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     // Jedes Haus führt Neue auf seine Art ein – nur wer hier arbeitet.
     introduction:self=>self.roomRole==='staff'?venueIntroduction(kind,upper?.guestRooms??0):undefined,
     things,
-    extraResidents:minorsAllowed(kind)?presentPeople:presentPeople.filter(p=>!isMinor(p)),
+    extraResidents:[...(minorsAllowed(kind)?presentPeople:presentPeople.filter(p=>!isMinor(p))),...responderResidents],
     idleText:menuState==='ready'&&menu?.items.length?undefined:undefined,
     greetsAtService:true,
     goToServiceLabel:svc=>svc==='self-service'?'Zum Automaten gehen':layout.servicePoint.locative==='am Empfang'?'Zum Empfang gehen':'Zum Tresen gehen',
@@ -556,7 +560,7 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
     banChoices:BAN_CHOICES,
     renderOwner:ctx=>!underConversion&&!emptyHouse&&!bannedText?<VenueFurnishPanel house={house} draft={furnishDraft} setDraft={setFurnishDraft} center={{x:Math.round(baseLayout.width/2),y:Math.round(baseLayout.height/2)}} onStatus={ctx.setStatus}/>:null,
     jointContext:reception?(personId:string)=>({mourning:['host','mourner'].includes(receptionRole(reception,personId,false))}):undefined,
-    poseFor:incident?(personId:string)=>incidentPose(incident.at,personId,incident.tick):undefined,
+    poseFor:incident?(personId:string)=>{const r=responderIds.get(personId);if(r)return{pose:r.roleCode==='paramedic'?'troesten':'stehen',verletzt:false};return incidentPose(incident.at,personId,incident.tick)}:undefined,
     floorMood:layout.danceFloor&&(shift?.role==='dj'||music!=='House')?music.toLowerCase():null,
     gate:layout.entry?{open:entryPaid||Boolean(shift),blockedText:entryItem?'Erst Eintritt bezahlen – beim Türsteher an der Tür ('+entryItem.priceCredits+' Cr).':'Ohne Eintritt kommt hier niemand rein; bezahlen kann man ihn noch nicht.'}:null,
     sideDoor:underConversion||emptyHouse||!serviceRules.toilet.available?null:{...VENUE_WC_DOOR,label:'WC',goLabel:serviceRules.toilet.priceCredits>0?'Zur Toilette ('+serviceRules.toilet.priceCredits+' Cr)':'Zur Toilette',useLabel:serviceRules.toilet.priceCredits>0?'WC BENUTZEN · '+serviceRules.toilet.priceCredits+' CR':'WC BENUTZEN',use:ctx=>void payToilet(ctx)},

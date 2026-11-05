@@ -169,34 +169,38 @@ export function serviceOpen(kind: ServiceKind, at: Date): boolean {
  */
 export function serviceStaffFacts(kind: ServiceKind, staff: ServiceStaff, input: { incidents: string[]; ownCases: Array<{ kind: ServiceCaseKind; text: string }> }): string[] {
   const facts: string[] = [`Du bist ${staff.role}`]
-  const real = 'Fragt dein Gegenüber nach einem echten Notfall außerhalb des Spiels, sag ihm freundlich, es soll die 110 (Polizei) oder 112 (Feuerwehr, Rettungsdienst) anrufen'
+  const real = 'Bei einem echten Notfall außerhalb des Spiels verweist du freundlich auf 110 (Polizei) oder 112 (Feuerwehr, Rettung)'
   switch (kind) {
     case 'police':
-      facts.push('Du nimmst Anzeigen auf, verwahrst Fundsachen und gibst Auskunft; du bleibst ruhig, sachlich und höflich')
+      facts.push('Du nimmst Anzeigen auf, verwahrst Fundsachen und gibst Auskunft')
+      facts.push('Du bleibst ruhig, sachlich und höflich')
       facts.push('Über Ermittlungen und andere Bürger gibst du keine Auskunft')
       if (input.incidents.length) facts.push(`Gemeldet wurden zuletzt: ${input.incidents.slice(0, 3).join('; ')}`)
       else facts.push('In letzter Zeit wurde dir kein Vorfall in der Stadt gemeldet; erfinde keine')
       facts.push(real)
       break
     case 'fire_station':
-      facts.push('Die Feuerwehr hier ist überwiegend freiwillig; Übungsabend ist einmal in der Woche, im Sommer gibt es das Feuerwehrfest')
+      facts.push('Die Feuerwehr hier ist überwiegend freiwillig; Übungsabend ist einmal in der Woche')
+      facts.push('Im Sommer gibt es das Feuerwehrfest')
       facts.push('Du erklärst gern Brandschutz: Rauchmelder, Fluchtwege, was man bei Feuer tut')
       facts.push('Von Einsätzen erzählst du nur, was gemeldet wurde; erfinde keine Brände')
       facts.push(real)
       break
     case 'doctors':
       facts.push('Die Praxis hat werktags von 8 bis 12 und von 14 bis 18 Uhr Sprechstunde')
-      facts.push('Erzählt dein Gegenüber von echten eigenen Beschwerden, stellst du keine Diagnose und nennst keine Medikamente; du rätst freundlich zu einer echten Ärztin oder einem echten Arzt')
+      facts.push('Bei echten Beschwerden deines Gegenübers stellst du keine Diagnose und nennst keine Medikamente')
+      facts.push('Du rätst dann freundlich zu einer echten Ärztin oder einem echten Arzt')
       facts.push('Im echten Notfall die 112, außerhalb der Sprechzeiten der ärztliche Bereitschaftsdienst 116 117')
       break
     case 'hospital':
       facts.push('Besuchszeit ist täglich von 14 bis 19 Uhr; die Notaufnahme ist immer offen')
-      facts.push('Über Patienten gibst du nur Angehörigen und angemeldeten Besuchern Auskunft; welche Patienten hier liegen, weißt du nur aus der Bevölkerung – erfinde keine')
-      facts.push('Wenn dein Gegenüber von echten eigenen Beschwerden erzählt, stellst du keine Diagnose, sondern rätst freundlich zu echter ärztlicher Hilfe, im Notfall die 112')
+      facts.push('Über Patienten gibst du nur Angehörigen und angemeldeten Besuchern Auskunft')
+      facts.push('Welche Patienten hier liegen, weißt du nur aus der Bevölkerung – erfinde keine')
+      facts.push('Bei echten Beschwerden deines Gegenübers keine Diagnose; du rätst zu echter ärztlicher Hilfe, im Notfall 112')
       break
   }
   for (const c of input.ownCases.slice(0, 2)) facts.push(`Dein Gegenüber hat hier eben angegeben (${CASE_LABEL[c.kind]}): „${c.text.slice(0, 100)}“`)
-  return facts.map(f => f.length > 260 ? f.slice(0, 259) + '…' : f)
+  return facts.map(f => f.length > 140 ? f.slice(0, 139) + '…' : f)
 }
 
 export const CASE_LABEL: Readonly<Record<ServiceCaseKind, string>> = { anzeige: 'Anzeige', fundsache: 'Fundsache', verloren: 'Verlustmeldung', ff_mitmachen: 'Mitmachen bei der Feuerwehr', termin: 'Termin', besuch: 'Besuch' }
