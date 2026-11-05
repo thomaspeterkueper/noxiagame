@@ -8,6 +8,11 @@
 //   2. Ortsdetail (Gebäude, Wohnstraßen, Wege) für die feste Zelle um den Ort
 //      holen, falls es dort noch keins gibt.
 // Bestehende Daten bleiben stehen, wenn ein Abruf scheitert.
+//
+// 05.11.2026: Eine veraltete Region, deren Neuaufbau in den letzten sechs
+// Stunden schon versucht wurde, wird nicht bei jedem Laden erneut geholt.
+// Vorher scheiterte das Sauerland (Profil 4) bei jedem Seitenaufruf nach rund
+// 37 s; das Nachholen übernimmt der stündliche Lauf (cron/world-places).
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
@@ -22,6 +27,8 @@ export const maxDuration = 120
 const noStore = { 'Cache-Control': 'private, no-store, max-age=0' }
 /** Zeitbudget: Vercel bricht nach 120 s ab und schickt dann eine Textseite statt JSON. */
 const BUDGET_MS = 95_000
+/** Frühestens nach dieser Zeit eine veraltete Region erneut aufbauen (mit wartendem Spieler). */
+const RETRY_AFTER_MS = 6 * 60 * 60 * 1000
 const TIMED_OUT = Symbol('timeout')
 function withinBudget<T>(promise: Promise<T>, started: number): Promise<T | typeof TIMED_OUT> {
   const left = Math.max(1000, BUDGET_MS - (Date.now() - started))
@@ -44,10 +51,12 @@ export async function POST(req: NextRequest) {
 
   // 1. Veraltete Regionen mit eigener Geographie, die den Ort umfassen.
   const { data: rows, error } = await supabase.from('celestial_regions')
-    .select('slug,label,center_lat,center_lon,radius_km,geography_import_version,source')
+    .select('slug,label,center_lat,center_lon,radius_km,geography_import_version,source,source_checked_at')
     .eq('body', 'earth').gte('geography_import_version', 1).lt('geography_import_version', EARTH_GEOGRAPHY_IMPORT_VERSION)
   if (error) return NextResponse.json({ error: error.message }, { status: 500, headers: noStore })
+  const recent = Date.now() - RETRY_AFTER_MS
   const outdated = (rows ?? []).filter(row => row.source !== EARTH_LOCAL_DETAIL_SOURCE
+    && !(row.source_checked_at && new Date(String(row.source_checked_at)).getTime() > recent)
     && groundDistanceM(point, { lat: Number(row.center_lat), lon: Number(row.center_lon) }) <= Number(row.radius_km ?? 0) * 1000)
 
   const cell = detailCell(point)

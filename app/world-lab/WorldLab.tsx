@@ -818,7 +818,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         </div>}
         <b>{placeName || 'Erde'}</b>
         {street && <span className="street">{street}</span>}
-        {playerNote && <span className="player-note">{playerNote}</span>}
+        {refresh.busy && <LoadingBar label="Kartendaten für diese Gegend werden geholt"/>}
+        {playerNote && !refresh.busy && <span className="player-note">{playerNote}</span>}
         {/* Mit offener Tafel nur Ort und Straße – die Tafel darunter ist dann das Wichtige. */}
         {panel.kind === 'none' && <>
         {engineReady && metresBetween(engineReady.position(), START_PLACE.at) > 30000 && <button className="home" onClick={() => choosePanel({ kind: 'travel', at: engineReady.position() })}>✈ Weiterreisen …</button>}
@@ -858,6 +859,10 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .home.worship{border-color:#c9a447;background:#4a3412;color:#fff3d6}
       .home.meeting{border-color:#5f9c8c;background:#1f4f54;color:#e8f4ee}
       .player-note{font-size:10.5px;color:#f0d9a0}
+      .loading-bar{display:grid;gap:3px;margin-top:4px;font-size:10.5px;color:#f0d9a0}
+      .loading-bar span{display:flex;justify-content:space-between;gap:8px}
+      .loading-bar i{position:relative;display:block;height:4px;border-radius:2px;background:#17383a;overflow:hidden}
+      .loading-bar i::after{content:'';position:absolute;inset:0 auto 0 0;width:var(--p);background:#d9bb6a;transition:width .9s linear}
       .panel .leave{border:0;background:none;padding:0;text-align:left;font-size:11px;color:#d9bb6a;cursor:pointer;margin-top:4px}
       .stage{position:absolute;inset:0}
       .panel{position:absolute;left:14px;bottom:24px;max-height:calc(100% - 48px);overflow:auto;width:270px;box-sizing:border-box;padding:12px 14px;background:#0d1c22e6;border:1px solid #40595a;border-radius:8px;display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
@@ -899,5 +904,26 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         .tip{display:none}
       }
     `}</style>
+  </div>
+}
+
+/**
+ * Ladebalken für das Nachholen von Kartendaten (05.11.2026). Erst nach einer
+ * Sekunde sichtbar, damit schnelle Antworten nicht flackern. Der Balken läuft
+ * gegen die übliche Dauer (~40 s) und wird zum Ende hin langsamer – er zeigt
+ * also eine Schätzung, keine echte Fortschrittsmeldung des Servers.
+ */
+function LoadingBar({ label }: { label: string }) {
+  const [seconds, setSeconds] = useState(0)
+  useEffect(() => {
+    const begin = Date.now()
+    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - begin) / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  if (seconds < 1) return null
+  const share = Math.min(95, Math.round(100 * (1 - Math.exp(-seconds / 18))))
+  return <div className="loading-bar" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={share}>
+    <span><span>{label} …</span><span>{seconds} s</span></span>
+    <i style={{ ['--p' as string]: share + '%' }}/>
   </div>
 }
