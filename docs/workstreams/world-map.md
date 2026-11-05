@@ -755,3 +755,21 @@ Seit 05.11.2026 gibt es Veranstaltungen in Lokalen (`venue_events`, `/api/game/h
 - Höhenzellen der Kachelstufe 15 (9 × 9 Punkte, ≈ 95 m) in `earth_terrain_cells`; Rechnen und Zeichnen in `lib/worldlab/terrain.ts` (Tests daneben), Lesen und Holen in `lib/worldlab/terrainSource.server.ts`.
 - Geholt beim ersten Besuch (`/api/world-lab/refresh`, 3 × 3 Zellen) und täglich (`/api/cron/world-terrain`). Quelle zunächst Open-Meteo/Copernicus GLO-90 (Einzelfallprüfung im ADR).
 - Sichtbar als Hangschattierung und Höhenlinien auf dem Boden; die Kacheln bleiben flach.
+
+### W-19 (Gastronomie, 05.11.2026): Grabsteine auf der Weltkarte
+
+Thomas, 05.11.2026, nach dem Neuladen: „klappt, Friedhof ist auch da, Grabsteine fehlen noch.“
+
+**Befund:**
+- Im begehbaren Friedhof (`cemetery` in `lib/game/landmarks/interiors.ts`) stehen Grabfelder mit Steinen ohne Namen.
+- Auf der Weltkarte ist der Friedhof nur eine Fläche (`place_area`, `k = 'cemetery'`), ohne Steine.
+
+**Bitte:**
+1. Auf Friedhofsflächen der Karte Reihen von Grabsteinen zeichnen, im Winkel der Karte, mit Wegen dazwischen und ein paar Bäumen.
+2. Die Steine sollen dem Anblick im Inneren entsprechen; Kreuz und Stein je nach Ort, gern zurückhaltend.
+3. Ohne Namen, solange es keine Gräber aus der Simulation gibt (R-23, `person_graves`). Erfunden wird nichts.
+4. Später, mit R-23:
+   - Gräber mit Namen und Lebensjahren an ihrer Stelle;
+   - frische Gräber mit Blumen;
+   - Angehörige am Grab.
+

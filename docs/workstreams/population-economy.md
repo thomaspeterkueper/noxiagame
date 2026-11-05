@@ -716,6 +716,11 @@ Den Beerdigungskaffee baut die Gastronomie.
    - Das Lokal zeigt „Beerdigungskaffee“. Personal und Trauergäste wissen, für wen er ist. Der Spieler kann der Familie sein Beileid aussprechen.
    - Ob der Spieler eingeladen ist (z. B. wenn er die Verstorbene kannte), könnt ihr als `playerProfileIds` mitgeben. Ohne Einladung ist er normaler Gast im Lokal.
 
+**Nachtrag 05.11.2026 (Gastronomie):**
+- Thomas: „Friedhof ist auch da, Grabsteine fehlen noch.“ Der begehbare Friedhof und die Karte sind fertig (W-13); es fehlen die Gräber selbst.
+- Bitte Punkt 2 (`person_graves`) vorziehen: Wer gestorben ist, bekommt ein Grab mit Namen, Lebensjahren, Friedhof (OSM-Kennung) und Grabfeld.
+- Die Erdkarte zeigt die Steine (W-19).
+
 ### R-24 (Gastronomie, 03.11.2026): Kinder, Lebensläufe und gemeinsame Unternehmungen
 
 Thomas, 03.11.2026: „Es wird Zeit für Kinder und ganze Lebensläufe, Schule, Kindergarten, Spielplatz. Aktuell sind die Charaktere noch nicht sehr authentisch, vor allem bei gemeinsamen Aktionen.“
