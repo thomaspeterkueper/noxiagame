@@ -12,7 +12,9 @@
 // lässt sich deshalb nicht sicher einem Ereignis zuordnen (Request an Core in
 // docs/workstreams/world-map.md).
 
-export type ChronicleKind = 'built' | 'changed' | 'owner_changed' | 'demolished'
+import { compareChronicleInstants } from './buildingChronicleReadGuard.ts'
+
+export type ChronicleKind = 'built' | 'changed' | 'remodeled' | 'repurposed' | 'owner_changed' | 'demolished'
 export type ChronicleAuthority = 'event' | 'tombstone'
 
 export type ChronicleEventRow = {
@@ -43,7 +45,7 @@ export type ChronicleEntry = {
   sourceRef: string | null
   /** Gehört der Beleg dem Betrachter? null, wenn unbekannt. */
   own: boolean | null
-  /** Beleg mit geprüfter Berechtigung (Grabstein, Abriss mit Akteur); sonst nur protokolliert. */
+  /** True only when a trusted Core-side verifier explicitly attests this receipt. */
   authorized: boolean
   detail: Record<string, unknown>
 }
@@ -56,6 +58,11 @@ export type Chronicle = {
   gaps: ChronicleGap[]
   summary: { events: number; tombstones: number; gaps: number }
 }
+
+// These categories describe observed persisted field changes, not construction permits.
+// An update remains an update; only an authorized Core receipt can change the world.
+const REMODEL_FIELDS = new Set(['building_levels', 'roof_levels', 'height', 'building:levels', 'building:roof:levels', 'geometry', 'footprint', 'floor_area'])
+const USE_FIELDS = new Set(['building_use', 'usage', 'use_type', 'land_use', 'entity_subtype'])
 
 const EVENT_TYPES = new Set(['entity.created', 'entity.updated', 'entity.deleted'])
 
@@ -73,8 +80,11 @@ function changedFields(effects: unknown): { owner: boolean; fields: string[] } {
   for (const raw of asArray(effects)) {
     const effect = asRecord(raw)
     const from = asRecord(effect.from), to = asRecord(effect.to)
-    for (const key of Object.keys(to)) {
-      if (JSON.stringify(from[key] ?? null) === JSON.stringify(to[key] ?? null)) continue
+    // Removed fields are changes too: a missing `to` key must not hide
+    // an ownership, use or geometry change from the historical evidence.
+    for (const key of new Set([...Object.keys(from), ...Object.keys(to)])) {
+      if (Object.hasOwn(from, key) === Object.hasOwn(to, key) &&
+          JSON.stringify(from[key]) === JSON.stringify(to[key])) continue
       fields.add(key)
       if (key === 'profile_id' || key === 'owner_id' || key === 'owner_class') owner = true
     }
@@ -88,6 +98,10 @@ export function buildChronicle(input: {
   /** Gebäude-IDs, die in tile_entities noch existieren. */
   existingEntityIds: ReadonlySet<string>
   viewerProfileId: string | null
+  /** Core-verified receipt IDs, supplied by a trusted server-side verifier only. */
+  verifiedReceiptIds?: ReadonlySet<string>
+  /** Core-verified tombstone source refs, never supplied by an untrusted caller. */
+  verifiedTombstoneRefs?: ReadonlySet<string>
 }): Chronicle {
   const entries: ChronicleEntry[] = []
   const demolishedSubjects = new Set<string>()
@@ -97,7 +111,8 @@ export function buildChronicle(input: {
     if (!EVENT_TYPES.has(event.event_type) || !event.subject_id) continue
     const metadata = asRecord(event.metadata)
     let kind: ChronicleKind
-    let authorized = true
+    // Actor IDs, metadata and persistence alone do not prove authorization.
+    let authorized = input.verifiedReceiptIds?.has(event.id) === true
     const detail: Record<string, unknown> = {}
     if (event.event_type === 'entity.created') {
       kind = 'built'
@@ -110,11 +125,15 @@ export function buildChronicle(input: {
       const deletionKind = typeof metadata.deletion_kind === 'string' ? metadata.deletion_kind : 'unspecified'
       detail.deletionKind = deletionKind
       // Eine allgemeine Löschung beweist weder Eigentum noch Abrissrecht (PR #555).
-      authorized = deletionKind !== 'unspecified' && Boolean(event.actor_id)
+      authorized = authorized && deletionKind !== 'unspecified' && Boolean(event.actor_id)
     } else {
       const change = changedFields(event.effects)
-      kind = change.owner ? 'owner_changed' : 'changed'
+      kind = change.owner ? 'owner_changed' : change.fields.some(field => REMODEL_FIELDS.has(field)) ? 'remodeled' : change.fields.some(field => USE_FIELDS.has(field)) ? 'repurposed' : 'changed'
       detail.fields = change.fields
+      // Both categories can apply to the same receipt; keep the secondary
+      // dimension visible without manufacturing a second Core event.
+      detail.remodeled = change.fields.some(field => REMODEL_FIELDS.has(field))
+      detail.repurposed = change.fields.some(field => USE_FIELDS.has(field))
     }
     entries.push({
       id: 'event:' + event.id, kind, at: event.occurred_at, authority: 'event', sourceId: event.id,
@@ -129,12 +148,12 @@ export function buildChronicle(input: {
       id: 'tombstone:' + stone.source_ref, kind: 'demolished', at: stone.cleared_at, authority: 'tombstone', sourceId: stone.source_ref,
       subjectId: null, sourceRef: stone.source_ref,
       own: stone.profile_id && input.viewerProfileId ? stone.profile_id === input.viewerProfileId : null,
-      authorized: true,
+      authorized: input.verifiedTombstoneRefs?.has(stone.source_ref) === true,
       detail: stone.display_name ? { name: stone.display_name } : {},
     })
   }
 
-  entries.sort((a, b) => a.at.localeCompare(b.at) || a.id.localeCompare(b.id))
+  entries.sort((a, b) => compareChronicleInstants(a.at, b.at) || a.id.localeCompare(b.id))
 
   const gaps: ChronicleGap[] = []
   for (const subjectId of builtSubjects) {
@@ -152,12 +171,75 @@ export type BuildingStateAt = 'standing' | 'demolished' | 'unknown'
 
 /** Zustand eines Gebäudes zu einem Zeitpunkt (Wiedergabe). Schlüssel: Gebäude-ID oder source_ref. */
 export function buildingStateAt(chronicle: Chronicle, key: { subjectId?: string | null; sourceRef?: string | null }, at: string): BuildingStateAt {
+  // Historical evidence must not combine unrelated building identity namespaces.
+  if (Boolean(key.subjectId) === Boolean(key.sourceRef)) return 'unknown'
   let state: BuildingStateAt = 'unknown'
   for (const entry of chronicle.entries) {
-    if (entry.at > at) break
+    if (compareChronicleInstants(entry.at, at) > 0) break
     const match = (key.subjectId && entry.subjectId === key.subjectId) || (key.sourceRef && entry.sourceRef === key.sourceRef)
     if (!match) continue
-    state = entry.kind === 'demolished' ? 'demolished' : 'standing'
+    if (entry.kind === 'demolished') state = 'demolished'
+    else if (entry.kind === 'built') state = 'standing'
+    else if (state !== 'standing') state = 'unknown'
+  }
+  return state
+}
+
+/**
+ * Only independently verified Core receipts may drive a world-state overlay.
+ * The regular buildingStateAt() remains a historical evidence viewer, including
+ * unverified tombstones; never use it to authorize a map or parcel mutation.
+ * An unverified receipt after the last verified one makes the result unknown:
+ * silently ignoring it would claim a state we cannot establish.
+ */
+export function verifiedBuildingStateAt(
+  chronicle: Chronicle,
+  key: { subjectId?: string | null; sourceRef?: string | null },
+  at: string,
+): BuildingStateAt {
+  // A caller must identify exactly one building identity namespace.
+  // Combining a parcel/source reference with an unrelated entity ID could
+  // otherwise project another building's verified state onto this one.
+  if (Boolean(key.subjectId) === Boolean(key.sourceRef)) return 'unknown'
+  let state: BuildingStateAt = 'unknown'
+  let previousInstant: string | null = null
+  let seenCreationAtInstant = false
+  let seenDemolitionAtInstant = false
+  let conflictedInstant = false
+  for (const entry of chronicle.entries) {
+    if (compareChronicleInstants(entry.at, at) > 0) break
+    if (!((key.subjectId && entry.subjectId === key.subjectId) ||
+          (key.sourceRef && entry.sourceRef === key.sourceRef))) continue
+    // Inspect the entire equal-time group, including intervening updates.
+    // A lexical event-ID order is not a committed Core execution sequence.
+    if (previousInstant === null || compareChronicleInstants(previousInstant, entry.at) !== 0) {
+      seenCreationAtInstant = false
+      seenDemolitionAtInstant = false
+      conflictedInstant = false
+    }
+    previousInstant = entry.at
+    if (entry.kind === 'built') seenCreationAtInstant = true
+    if (entry.kind === 'demolished') seenDemolitionAtInstant = true
+    if (seenCreationAtInstant && seenDemolitionAtInstant) conflictedInstant = true
+    if (conflictedInstant) {
+      // Later timestamps may contain a new, independently verified creation.
+      // No event inside this ambiguous instant may establish a final state.
+      state = 'unknown'
+      continue
+    }
+    if (!entry.authorized) {
+      state = 'unknown'
+      continue
+    }
+    if (entry.kind === 'demolished') {
+      state = 'demolished'
+    } else if (entry.kind === 'built') {
+      state = 'standing'
+    } else if (state !== 'standing') {
+      // A remodel, change of use or ownership transfer is not proof that a
+      // demolished building was rebuilt. Require a verified creation receipt.
+      state = 'unknown'
+    }
   }
   return state
 }
