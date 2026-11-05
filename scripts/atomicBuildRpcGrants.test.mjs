@@ -22,3 +22,19 @@ test('build completion RPC is revoked from browser roles and granted to service_
   assert.match(migration, revoke);
   assert.match(migration, grant);
 });
+
+test('build completion RPC is not re-granted to browser roles in this migration', () => {
+  const signature = 'public.noxia_complete_build\\(uuid,boolean\\)';
+  const grants = [...migration.matchAll(
+    new RegExp('grant\\\\s+execute\\\\s+on\\\\s+function\\\\s+' + signature +
+      '\\\\s+to\\\\s+([^;]+);', 'g'),
+  )];
+  assert.ok(grants.length > 0, 'expected an explicit EXECUTE grant');
+  for (const [, recipients] of grants) {
+    const roles = recipients.split(',').map((role) => role.trim().replace(/"/g, ''));
+    assert.ok(
+      roles.every((role) => role === 'service_role'),
+      'noxia_complete_build must not grant EXECUTE to browser roles or PUBLIC',
+    );
+  }
+});
