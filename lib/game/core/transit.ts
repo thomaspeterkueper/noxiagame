@@ -212,15 +212,8 @@ export async function getPassengerOffers(profileId: string): Promise<{ from: str
   return { from, hasShip: Boolean(ship), parkedAt: parked?.location ?? null, inTransit, credits: Number(wallet?.credits ?? 0), offers }
 }
 
-export async function startPlayerTransit(profileId: string, destination: string): Promise<AtomicTransitStartResult> {
+async function quoteForShip(profileId: string, ship: ActiveShip, destination: string) {
   const supabase = createServiceClient()
-  const ship = await activeShipForProfile(profileId)
-  if (!ship) return startPlayerPassengerTransit(profileId, destination)
-
-  if (ship.status === 'transit' && ship.dest_location !== destination) {
-    throw new Error(`NOXIA_TRANSIT_ALREADY_ACTIVE:${ship.dest_location ?? '<unknown>'}`)
-  }
-
   await registerKnownLocationBodies(supabase)
   if (!hasOrbit(ship.location) || !hasOrbit(destination)) {
     throw new Error(`NOXIA_TRANSIT_ROUTE_UNKNOWN:${ship.location}:${destination}`)
@@ -265,6 +258,19 @@ export async function startPlayerTransit(profileId: string, destination: string)
     throw new Error(`NOXIA_TRANSIT_OUT_OF_RANGE:${quote.distance}:${rangeDistance}`)
   }
 
+  return { quote, tick }
+}
+
+export async function startPlayerTransit(profileId: string, destination: string): Promise<AtomicTransitStartResult> {
+  const supabase = createServiceClient()
+  const ship = await activeShipForProfile(profileId)
+  if (!ship) return startPlayerPassengerTransit(profileId, destination)
+
+  if (ship.status === 'transit' && ship.dest_location !== destination) {
+    throw new Error(`NOXIA_TRANSIT_ALREADY_ACTIVE:${ship.dest_location ?? '<unknown>'}`)
+  }
+  const { quote, tick } = await quoteForShip(profileId, ship, destination)
+
   // Ohne eigene Flugausbildung fliegt ein angeheuerter Pilot. Abgeleitet aus
   // dem Lernjournal; schlägt die Abfrage fehl, gilt der Spieler als ungeschult.
   const { data: completedModules } = await supabase
@@ -296,6 +302,7 @@ export async function completePlayerTransit(profileId: string): Promise<AtomicTr
 }
 
 export async function settleDuePlayerTransit(profileId: string): Promise<AtomicTransitCompletionResult | null> {
+  await settleDueParkedShips(profileId).catch(() => 0)
   const ship = await activeShipForProfile(profileId)
   if (!ship) {
     const profile = await passengerProfile(profileId)
@@ -384,4 +391,58 @@ export async function getPlayerTransitState(profileId: string): Promise<PlayerTr
     remainingSeconds,
     arrival: null,
   }
+}
+
+/**
+ * Schiff mit angeheuertem Piloten losschicken, ohne selbst an Bord zu sein
+ * (Migration 20261106010000). Das Schiff muss am Ort des Spielers liegen; das
+ * Honorar fällt immer an, weil nicht der Spieler fliegt.
+ */
+export async function dispatchParkedShip(profileId: string, destination: string, shipId?: string): Promise<AtomicTransitStartResult> {
+  const supabase = createServiceClient()
+  const { data: profile } = await supabase.from('profiles').select('aboard_ship_id, current_location').eq('id', profileId).maybeSingle()
+  if (!profile) throw new Error('NOXIA_PROFILE_NOT_FOUND')
+  const aboard = (profile as { aboard_ship_id?: string | null }).aboard_ship_id
+  let query = supabase
+    .from('ships')
+    .select('id, profile_id, location, status, dest_location, arrives_at, transit_started_at, ship_type_id, cargo_max, is_active, created_at')
+    .eq('profile_id', profileId)
+    .eq('location', (profile as { current_location: string }).current_location)
+    .eq('status', 'docked')
+  if (shipId) query = query.eq('id', shipId)
+  if (aboard) query = query.neq('id', aboard)
+  const { data: ships, error } = await query.order('created_at', { ascending: true }).limit(1)
+  if (error) throw new Error(`dispatch ship lookup failed: ${error.message}`)
+  const ship = (ships?.[0] as unknown as ActiveShip | undefined)
+  if (!ship) throw new Error(aboard && (!shipId || shipId === aboard) ? 'NOXIA_DISPATCH_PLAYER_ABOARD' : 'NOXIA_SHIP_NOT_FOUND')
+
+  const { quote, tick } = await quoteForShip(profileId, ship, destination)
+  const { data, error: rpcError } = await supabase.rpc('noxia_dispatch_ship', {
+    p_profile_id: profileId,
+    p_ship_id: ship.id,
+    p_destination_slug: destination,
+    p_duration_seconds: quote.durationSeconds,
+    p_energy_needed: quote.energy,
+    p_docking_idle_hours: DOCKING_IDLE_EXPIRE_HOURS,
+    p_pilot_fee: pilotFee(quote, false, tick),
+  })
+  if (rpcError) throw new Error(rpcError.message)
+  return data as AtomicTransitStartResult
+}
+
+/** Schiffe ohne Spieler an Bord, deren Flug fällig ist, landen lassen. */
+export async function settleDueParkedShips(profileId: string): Promise<number> {
+  const supabase = createServiceClient()
+  const { data } = await supabase
+    .from('ships')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('status', 'transit')
+    .lte('arrives_at', new Date().toISOString())
+  let landed = 0
+  for (const row of data ?? []) {
+    await completeTransitCommand(String((row as { id: string }).id))
+    landed++
+  }
+  return landed
 }

@@ -166,6 +166,16 @@ export default function ColonyDetail({
                 if (!response.ok || !json.ok) { alert(String(json.error ?? 'Das Einsteigen ist nicht möglich.')); return }
                 await useGameStore.getState().loadFromServer()
               }}>An Bord deines Schiffs gehen</button>}
+            {!hasShip && parkedAt && parkedAt === location && <button
+              style={{ marginTop: '6px', width: '100%', padding: '7px 0', fontSize: '0.78rem', borderRadius: '8px', border: '1px solid #4a6a99', background: '#122033', color: '#a9c4ee', cursor: 'pointer' }}
+              onClick={async () => {
+                const token = await getToken()
+                const response = await fetch('/api/game/transit', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'dispatch', destination: colony.slug }) })
+                const json = await response.json().catch(() => ({}))
+                if (!response.ok || !json.ok) { alert(String(json.error ?? 'Das Schiff kann nicht losgeschickt werden.')); return }
+                await useGameStore.getState().loadFromServer()
+                onClose()
+              }}>Schiff mit Pilot nach {colony.name} schicken{quote ? ` · Honorar ${pilotFee(quote, false, currentTick).toLocaleString('de')} Cr` : ''}</button>}
           </div>
         ) : (
           <div title="Ziel außerhalb der Reichweite deines Schiffs" style={{ width: '100%', padding: '12px 0', fontSize: '0.9rem', borderRadius: '9px', border: '1px solid #3a4759', background: '#0f1722', color: '#7d93b0', textAlign: 'center', fontWeight: 600 }}>
