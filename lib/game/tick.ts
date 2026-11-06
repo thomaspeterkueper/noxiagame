@@ -1,5 +1,6 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
+// Aktualisiert: 06.11.2026 — Förderabgabe je Ort; Förderanlagen brauchen Bedienung (Mensch oder Roboter), run_facility_operation
 // Aktualisiert: 29.10.2026 — Zuzug in die Kolonien mit der Fracht (run_colony_immigration)
 // Aktualisiert: 29.10.2026 — Mitflug: wer angeheuert hat, geht an Bord, wenn eine Fracht ausläuft (noxia_crew_board_due)
 // Aktualisiert: 28.10.2026 — Bankzinsen einmal am Tag in der Datenbank (run_bank_daily), Bank zahlt aus eigenem Konto
@@ -11,7 +12,7 @@
 //               zählt nicht mehr als Firmenbestand (wurde ein zweites Mal verkauft); Bau wird nur
 //               gebucht, wenn das Gebäude auf einer freien Kachel wirklich entsteht
 // Vorher:       09.10.2026 — Lagergrenzen (lib/game/storageCapacity.ts)
-// Version:      3.11.0
+// Version:      3.12.0
 
 import { gateProduction } from './production/inputGate'
 import {
@@ -40,6 +41,7 @@ import { runInteroceptionTick } from './population/interoceptionRuntime'
 import { runHousingShadowTick } from './population/housingShadowRuntime'
 import { projectSurfacePresence } from './population/surfacePresence'
 import { runWishTick } from './wishes/service.server'
+import { extractionTax, FACILITIES_PER_OPERATOR, operatedBuildings } from './economy/facilityOperation'
 import { runNpcConsumptionTick, runNpcPayrollTick, runNpcPropertyMarketTick, runNpcSelfBuildTick, runVenueStaffingTick } from './npcEconomy'
 
 /** Nur für einen bewussten Rückfall: NOXIA_LEGACY_BUILDING_PAYOUT=true. Standard: aus. */
@@ -468,6 +470,34 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
     }
   }).filter((p) => p.location)
   let trades = 0, produces = 0, sells = 0, builds = 0, shipments = 0
+  // Förderabgabe je Ort und öffentliche Kasse (NOXIA-FIN-0002 A1, 06.11.2026)
+  const extractionRate = new Map<string, number>()
+  const publicActorOf = new Map<string, string>()
+  {
+    const { data: rates, error: rateErr } = await supabase.from('colony_settings').select('location_id, extraction_tax_rate')
+    if (!rateErr) for (const r of (rates ?? []) as any[]) extractionRate.set(r.location_id, Number(r.extraction_tax_rate ?? 0))
+    const { data: pubs } = await supabase.from('location_public_actors').select('location_id, actor_id')
+    for (const r of (pubs ?? []) as any[]) publicActorOf.set(r.location_id, r.actor_id)
+  }
+  // Bedienung der Förderanlagen je Firma (Menschen an den Anlagen + Roboter), NOXIA-FIN-0002 B
+  const operatorsOf = new Map<string, Map<string, number>>()
+  {
+    const kinds = Object.keys(FACILITIES_PER_OPERATOR)
+    const add = (actorId: string, key: string, n = 1) => {
+      const m = operatorsOf.get(actorId) ?? new Map<string, number>()
+      m.set(key, (m.get(key) ?? 0) + n)
+      operatorsOf.set(actorId, m)
+    }
+    const { data: staff } = await supabase.from('person_assignments')
+      .select('tile_entities!inner(actor_id, location_id, entity_id)')
+      .eq('assignment_type', 'work').eq('is_active', true).in('tile_entities.entity_id', kinds)
+    for (const r of (staff ?? []) as any[]) {
+      const t = r.tile_entities
+      if (t?.actor_id) add(t.actor_id, `${t.location_id}|${t.entity_id}`)
+    }
+    const { data: robots, error: robotErr } = await supabase.from('facility_robots').select('actor_id, location_id, facility_kind').eq('active', true)
+    if (!robotErr) for (const r of (robots ?? []) as any[]) add(r.actor_id, `${r.location_id}|${r.facility_kind}`)
+  }
   for (const actor of actors as any[]) {
     // Eigener Warenbestand der Firma = Käufe − Verkäufe, je Standort. Produzierte
     // Ware zählt nicht dazu: sie wird im selben Tick an den Markt des Standorts
@@ -490,7 +520,9 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
     const { data: ledSum } = await supabase.from('npc_ledger').select('credit_delta').eq('actor_id', actor.id)
     const treasury = (ledSum ?? []).reduce((s: number, r: any) => s + Number(r.credit_delta ?? 0), 0)
     const { data: gebRows } = await supabase.from('tile_entities').select('entity_id, location_id, tile_col').eq('actor_id', actor.id).eq('entity_type', 'building')
-    const gebaeude = ((gebRows ?? []) as any[]).map(g => ({ entity_id: g.entity_id, location_id: g.location_id, location: locIdToSlug.get(g.location_id) ?? '', tile_col: Number(g.tile_col ?? 0) })).filter(g => g.location)
+    const alleGebaeude = ((gebRows ?? []) as any[]).map(g => ({ entity_id: g.entity_id, location_id: g.location_id, location: locIdToSlug.get(g.location_id) ?? '', tile_col: Number(g.tile_col ?? 0) })).filter(g => g.location)
+    // Unbediente Förderanlagen stehen (ab OPERATION_REQUIRED_FROM_TICK)
+    const gebaeude = operatedBuildings(alleGebaeude, operatorsOf.get(actor.id) ?? new Map(), tickNumber)
     for (const p of preise) p.stock = stockMap.get(`${slugToId.get(p.location)}|${p.resource}`)
     const aktionen = entscheideNpc({ actor: { id: actor.id, decision_weights: actor.decision_weights }, bestand, lager, treasury, gebaeude }, { tick: tickNumber, preise })
     let kasse = treasury
@@ -509,6 +541,16 @@ export async function runNpcTick(supabase: SB, tickNumber: number, locationSnaps
         const erloes = a.menge * (sellPriceMap.get(`${locId}|${a.resource}`) ?? 0)
         const { data: ins } = await supabase.from('npc_ledger').upsert({ actor_id: actor.id, tick: tickNumber, kind: 'produce', resource: a.resource, goods_delta: a.menge, credit_delta: erloes, location_id: locId, ref: a.ref }, { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true }).select('id')
         if (!ins?.length) continue
+        // Förderabgabe: Transfer Firma → öffentliche Kasse des Ortes
+        const steuer = extractionTax(erloes, extractionRate.get(locId) ?? 0)
+        const kassenAkteur = publicActorOf.get(locId)
+        if (steuer > 0 && kassenAkteur && kassenAkteur !== actor.id) {
+          const steuerRef = `foerderabgabe:${a.ref}`
+          await supabase.from('npc_ledger').upsert([
+            { actor_id: actor.id, tick: tickNumber, kind: 'expense', resource: a.resource, goods_delta: 0, credit_delta: -steuer, location_id: locId, ref: steuerRef, note: 'Förderabgabe' },
+            { actor_id: kassenAkteur, tick: tickNumber, kind: 'income', resource: a.resource, goods_delta: 0, credit_delta: steuer, location_id: locId, ref: steuerRef, note: 'Förderabgabe' },
+          ], { onConflict: 'actor_id,tick,kind,resource,ref', ignoreDuplicates: true })
+        }
         const key = `${locId}|${a.resource}`
         const neuerStock = (stockMap.get(key) ?? 0) + a.menge
         // production zeigt die tatsächliche Erzeugung am Ort; der Kolonie-Tick hat
@@ -661,6 +703,18 @@ export async function runColonyImmigrationTick(supabase: SB, tickNumber: number)
   return data ?? { arrived: 0 }
 }
 
+// Förderanlagen: Wartung der Roboter zahlen, fehlende Bedienung mit Leuten am Ort
+// besetzen, sonst nach 7 Tagen einen Roboter kaufen (Migration 20261106020000).
+export async function runFacilityOperationTick(supabase: SB, tickNumber: number) {
+  if (tickNumber % 24 !== 0) return { skipped: true }
+  const { data, error } = await supabase.rpc('run_facility_operation', { p_tick: tickNumber })
+  if (error) {
+    console.error('runFacilityOperationTick failed', { tick: tickNumber, code: error.code })
+    return { ok: false }
+  }
+  return data ?? { ok: true }
+}
+
 export async function runCrewBoardingTick(supabase: SB, tickNumber: number) {
   const { data, error } = await supabase.rpc('noxia_crew_board_due', { p_tick: tickNumber })
   if (error) {
@@ -779,10 +833,12 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const crew = await runCrewBoardingTick(supabase, tickNumber)
   // Zuzug (29.10.2026): mit ankommender Fracht, wenn Wohnung und bezahlte Stelle frei sind
   const immigration = await runColonyImmigrationTick(supabase, tickNumber)
+  // Bedienung der Förderanlagen (06.11.2026): Wartung, Menschen am Ort, sonst nach 7 Tagen Roboter
+  const facilityOperation = await runFacilityOperationTick(supabase, tickNumber)
   const landValues = await runLandValueTick(supabase, locationSnapshot ?? [])
   // Wünsche und Gebete (29.10.2026): einordnen, Figuren wünschen sich, was fehlt
   const wishes = await runWishTick(supabase, tickNumber)
-  return { tickNumber, crew, immigration, wishes, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
+  return { tickNumber, crew, immigration, facilityOperation, wishes, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {
