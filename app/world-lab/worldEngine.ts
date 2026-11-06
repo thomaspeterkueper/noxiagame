@@ -1,6 +1,6 @@
 // app/world-lab/worldEngine.ts
-// Aktualisiert: 06.11.2026 — Echter Verkehr: Personen mit Auto fahren ihren Arbeitsweg sichtbar über die Straßen; eigene Fahrt als Fahrt (driveTo) statt Sprung; geparktes eigenes Auto (setOwnVehicle)
-// Version:      1.1.0
+// Aktualisiert: 06.11.2026 — Busse nach Fahrplan auf OSM-Buslinien (setBusLines, busAt); Echter Verkehr: Personen mit Auto fahren ihren Arbeitsweg sichtbar über die Straßen; eigene Fahrt als Fahrt (driveTo) statt Sprung; geparktes eigenes Auto (setOwnVehicle)
+// Version:      1.2.0
 // Prototyp „eine Welt“ mit PixiJS – die Zeichenmaschine ohne React.
 //
 // WorldLab.tsx stellt nur Bühne und Anzeige; Kacheln, NOXIA-Gebäude und Bilder
@@ -22,6 +22,7 @@ import { paintPattern, patternMatrix, PATTERN_PX } from '@/lib/worldlab/areaPatt
 import { streetLabels } from '@/lib/worldlab/streetLabels'
 import { boxFootprint, distanceToRing, HOUSE_DRAW_SCALE, WALK_CORE_SCALE, insidePolygon, RoadGraph, scaleRing, stepWithObstacles, type Footprint } from '@/lib/worldlab/walking'
 import { pointAlong, trainState, type TrainState } from '@/lib/worldlab/railLine'
+import { busState, type BusLine, type BusState } from '@/lib/worldlab/busLine'
 import { paintPlant, plantTextureKey, TREE_BASE_HEIGHT_M, TREE_PX, TREE_WORLD } from '@/lib/worldlab/treeSprites'
 import { foliage, plantDay, plantRegion, PLANTS, type PlantId, type PlantRegion } from '@/lib/worldlab/plants'
 import { plantSpots, type PlantSpot } from '@/lib/worldlab/plantPlacement'
@@ -163,6 +164,9 @@ export interface WorldEngine {
   setRailLines: (lines: WorldRailLine[]) => void
   /** Zug einer Strecke, deren Bahnhof so heißt (für die Tafel des Bahnhofs). */
   trainAt: (stationName: string) => TrainState | null
+  /** Buslinien mit Fahrplan (aus /api/world-lab/bus). */
+  setBusLines: (lines: BusLine[]) => void
+  busAt: (lineId: string) => BusState | null
   /** Freie Flächen nach Abriss: der OSM-Grundriss wird dort nicht mehr gezeichnet. */
   setPlots: (plots: WorldPlot[]) => void
   /** Zeitregler: zeigt den Stand der Abrisse zu diesem Zeitpunkt (null = jetzt). */
@@ -2039,6 +2043,38 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     }
   }
 
+  // ── Busse ───────────────────────────────────────────────────────────
+  // Je Linie ein Bus; Lage aus dem Fahrplan (lib/worldlab/busLine.ts), damit jeder
+  // ihn an derselben Stelle sieht. Rechtsverkehr: eine halbe Spur rechts der Straßenmitte.
+  let busLines: BusLine[] = []
+  const buses: PixiGraphics[] = []
+  const BUS_DIMS: VehicleDims = { length: 11.5, width: 2.5, height: 3.1 }
+  const BUS_COLORS = [0xd9a21b, 0x2f6fb3, 0xc8102e, 0x3f8f5a, 0xe8e2d4]
+  function setBuses(list: BusLine[]) {
+    for (const bus of buses) bus.destroy()
+    buses.length = 0
+    busLines = list
+    for (let i = 0; i < list.length; i++) { const g = new PIXI.Graphics(); g.visible = false; g.eventMode = 'none'; buses.push(g) }
+  }
+  function moveBuses() {
+    const now = Date.now()
+    for (let i = 0; i < busLines.length; i++) {
+      const line = busLines[i], bus = buses[i]
+      if (!line || !bus || line.points.length < 2) continue
+      const state = busState(line, now)
+      const { at, heading } = pointAlong(line.points, Math.max(0.5, Math.min(line.lengthM - 0.5, state.distanceM)))
+      const p = toWorld(at)
+      if (Math.hypot(p.x - player.x, p.y - player.y) > 450) { bus.visible = false; continue }
+      // Stehend am Ende zeigt der Bus in die Richtung, in die er als Nächstes fährt
+      const forward = state.direction === -1 || (state.direction === 0 && state.distanceM >= line.lengthM - 1) ? -1 : 1
+      const ux = Math.cos(heading) * forward, uy = -Math.sin(heading) * forward
+      const cx = p.x + -uy * 2.4, cy = p.y + ux * 2.4
+      drawVehicle(bus, cx, cy, ux, uy, BUS_DIMS, BUS_COLORS[hash(line.id) % BUS_COLORS.length], 0xd0ccc4, state.direction !== 0)
+      bus.visible = true
+      placeDepth(bus, cx + cy + BUS_DIMS.length / 2)
+    }
+  }
+
   // ── Freie Flächen (nach Abriss) ─────────────────────────────────────
   let plots: WorldPlot[] = []
   let allPlots: WorldPlot[] = []
@@ -2501,6 +2537,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     movePeers(logicStart, peersLastAt ? Math.min(0.25, (logicStart - peersLastAt) / 1000) : 0)
     peersLastAt = logicStart
     moveTrains()
+    moveBuses()
     drawOwnCar()
     playerSprite.visible = autoWalk?.drive !== true
     // Die Kamera gleitet hinterher statt zu springen.
@@ -2623,6 +2660,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     setSites(list) { sites = list; drawSites() },
     setBeacons(list) { beaconList = list; drawBeacons() },
     setRailLines(list) { setTrains(list) },
+    setBusLines(list) { setBuses(list) },
+    busAt(lineId) { const line = busLines.find(item => item.id === lineId); return line ? busState(line, Date.now()) : null },
     trainAt(stationName) { const line = railLines.find(item => item.station?.name === stationName); return line ? trainState(line.lengthM, Date.now()) : null },
     setParcelOwners(list) {
       parcelOwners = new Map(list.map(item => [item.id, item.own]))

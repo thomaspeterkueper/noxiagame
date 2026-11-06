@@ -1,7 +1,7 @@
 'use client'
 
 // app/world-lab/WorldLab.tsx
-// Aktualisiert: 06.11.2026 — Eigenes Auto geparkt auf der Karte (useVehicle → setOwnVehicle); Personen mit Auto fahren ihren Arbeitsweg sichtbar; 06.11.2026 — Fahrzeug: Ankunftsmeldung nach „Hinfahren“ (onNote an WorldPanels)
+// Aktualisiert: 06.11.2026 — Buslinien mit Fahrplan laden (/api/world-lab/bus); Eigenes Auto geparkt auf der Karte (useVehicle → setOwnVehicle); Personen mit Auto fahren ihren Arbeitsweg sichtbar; 06.11.2026 — Fahrzeug: Ankunftsmeldung nach „Hinfahren“ (onNote an WorldPanels)
 // Version:      1.2.0
 // Weltkarte „eine Welt“ mit PixiJS – eigene Seite /world-lab und im Spiel
 // neben der bisherigen Erdszene. Personen, Ansprechen und Betreten in
@@ -554,6 +554,19 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
       .then(response => response.ok ? response.json() : null)
       .then(json => { if (Array.isArray(json?.lines)) engineReady.setRailLines(json.lines) })
       .catch(() => {})
+  }, [hud, engineReady])
+
+  // Buslinien mit Fahrplan: wie die Bahn, neu geholt nach 3 km.
+  const busAt = useRef<GeoPoint | null>(null)
+  useEffect(() => {
+    if (!hud || !engineReady) return
+    const here = { lat: hud.lat, lon: hud.lon }
+    if (busAt.current && metresBetween(busAt.current, here) < 3000) return
+    busAt.current = here
+    void fetch(`/api/world-lab/bus?lat=${here.lat.toFixed(3)}&lon=${here.lon.toFixed(3)}`)
+      .then(response => response.ok ? response.json() : null)
+      .then(json => { if (Array.isArray(json?.lines)) engineReady.setBusLines(json.lines) })
+      .catch(() => { /* ohne Bus */ })
   }, [hud, engineReady])
 
   // Baustellen: eigene laufende Bauten (wie die bisherige Erdszene), alle 30 s neu.
