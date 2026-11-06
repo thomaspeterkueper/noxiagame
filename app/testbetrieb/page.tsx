@@ -1,7 +1,7 @@
 import Link from 'next/link'
 
 // NOXIA-PRIVACY-0004 (05.11.2026): Gespräche werden nur automatisch ausgewertet.
-// NOXIA-SAFETY-0001: Schutzfilter gegen Realwelt-Kriminalität. NOXIA-LEARN-0001: Figuren lernen.
+// NOXIA-SAFETY-0001: Schutzfilter gegen Realwelt-Kriminalität (mehrsprachig, KI-Prüfung). NOXIA-LEARN-0001: Figuren lernen.
 
 export default function TestbetriebInformation() {
   return <main className="min-h-screen bg-[#f6f4ee] px-5 py-10 text-[#1d2a30]">
@@ -17,7 +17,7 @@ export default function TestbetriebInformation() {
       <p className="mt-2">Es gibt im Adminbereich keine Ansicht, keinen Export und keine Schnittstelle, über die der Wortlaut deiner Gespräche gelesen werden kann. Die Datenbankrechte sind entsprechend gesetzt; die Zusage ist technisch umgesetzt, nicht nur versprochen.</p>
 
       <h2 className="mt-6 text-lg font-semibold">Spiel ist Spiel – reale Straftaten nicht</h2>
-      <p className="mt-2">In NOXIA darfst du frei sprechen: schmuggeln, intrigieren, streiten, Grenzen testen – das gehört zur Welt, und die Figuren reagieren darauf, ohne zu moralisieren. NOXIA darf aber nicht genutzt werden, um Straftaten in der realen Welt zu verabreden. Ein automatischer Schutzfilter achtet darauf, wenn mehrere Hinweise zusammenkommen, etwa reale Drogen oder Waffen mit Geldweg, Gewalt mit Bezug zur echten Welt oder Annäherung an Minderjährige mit Geheimhaltung. Nur dann wird der betreffende Ausschnitt gesichert und von uns geprüft. Kontaktdaten wie Telefonnummern, E-Mail-Adressen und Links werden in Nachrichten an andere Spieler ausgeblendet.</p>
+      <p className="mt-2">In NOXIA darfst du frei sprechen: schmuggeln, intrigieren, streiten, Grenzen testen – das gehört zur Welt, und die Figuren reagieren darauf, ohne zu moralisieren. NOXIA darf aber nicht genutzt werden, um Straftaten in der realen Welt zu verabreden. Ein automatischer Schutzfilter achtet darauf, wenn mehrere Hinweise zusammenkommen, etwa reale Drogen oder Waffen mit Geldweg, Gewalt mit Bezug zur echten Welt oder Annäherung an Minderjährige mit Geheimhaltung. Der Filter versteht mehrere Sprachen und achtet auch auf Muster wie Preise in echter Währung – im Spiel zahlt man nur in Credits. Auffällige Ausschnitte aus Gesprächen zwischen Spielern prüft zusätzlich eine KI im Zusammenhang, ohne eure Spielernamen; gespeichert wird dabei nur ihr Ergebnis. Nur wenn sich ein Verdacht ergibt, wird der betreffende Ausschnitt gesichert und von uns geprüft. Kontaktdaten wie Telefonnummern, E-Mail-Adressen und Links werden in Nachrichten an andere Spieler ausgeblendet.</p>
 
       <h2 className="mt-6 text-lg font-semibold">Was Figuren lernen</h2>
       <p className="mt-2">Was du Figuren über die Welt erzählst, können sie sich merken und anderen weitererzählen – als Gerücht, ohne zu sagen, von wem es stammt. Persönliches über dich oder dein Gegenüber, Fragen und Kontaktdaten übernehmen sie nicht. Was nur eine Person erzählt, bleibt unbestätigt und ist nach etwa einem Monat vergessen; was mehrere unabhängig erzählen, behalten die Figuren bis zu einem halben Jahr.</p>
@@ -37,7 +37,7 @@ export default function TestbetriebInformation() {
       <p className="mt-2">Das Team prüft Figuren mit eigenen, gekennzeichneten Testkonten. Nur deren Gespräche sind vollständig lesbar.</p>
 
       <h2 className="mt-6 text-lg font-semibold">Datenschutz</h2>
-      <p className="mt-2">Für die Antworten der Figuren werden deine Nachrichten an einen KI-Dienst übermittelt. Allgemeine Hinweise stehen in der <Link className="underline" href="/datenschutz">Datenschutzerklärung</Link>. Bitte gib keine Passwörter, Adressen, Finanzdaten oder andere vertrauliche Angaben ein. Für Auskunft, Löschung oder Widerspruch nutze die Kontaktmöglichkeit dort.</p>
+      <p className="mt-2">Für die Antworten der Figuren und für die Prüfung auffälliger Ausschnitte werden Nachrichten an einen KI-Dienst (Anthropic, USA) übermittelt. Allgemeine Hinweise stehen in der <Link className="underline" href="/datenschutz">Datenschutzerklärung</Link>. Bitte gib keine Passwörter, Adressen, Finanzdaten oder andere vertrauliche Angaben ein. Für Auskunft, Löschung oder Widerspruch nutze die Kontaktmöglichkeit dort.</p>
 
       <Link href="/dashboard" className="mt-7 inline-block rounded-lg border px-4 py-2 text-sm font-semibold">Zurück zum Spiel</Link>
     </article>

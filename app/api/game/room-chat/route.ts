@@ -8,13 +8,14 @@
 // POST { action: 'report', room, roomName, messageId, detail } → Meldung einer Nachricht
 
 import { activeBanUntil } from '@/lib/game/hospitality/houseBans'
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { prepareRoomMessage, ROOM_MESSAGES_PER_MINUTE } from '@/lib/multiplayer/roomChat'
 import { publishRoomMessage, publishWhisper } from '@/lib/ably/server'
 import { CHAT_RANGES, type ChatRange } from '@/lib/multiplayer/roomChat'
-import { assessRealWorldRisk, riskFlags } from '@/lib/game/safety/realWorldRisk'
+import { assessRealWorldRisk, needsAiReview, riskFlags } from '@/lib/game/safety/realWorldRisk'
+import { aiVerdictIsSuspect, reviewWindow } from '@/lib/game/safety/aiReview'
 import { secureSuspicion } from '@/lib/game/safety/secureSuspicion'
 
 const ROOM_RE = /^[A-Za-z0-9:_-]{3,80}$/
@@ -94,10 +95,41 @@ export async function POST(req: NextRequest) {
       const flags = [...new Set([...prepared.flags.filter(f => !f.startsWith('risk:')), ...riskFlags(risk)])]
       await supabase.from('player_room_messages').update({ flags }).eq('id', row.id)
     }
+    const excerpt = lines.map(l => ({ speaker: String(l.sender_name), text: String(l.text), at: String(l.created_at) }))
     if (risk.level === 'suspect') await secureSuspicion(supabase, {
-      subjectProfileId: profileId, source: 'room', risk, roomKey: room, locationName: roomName,
-      excerpt: lines.map(l => ({ speaker: String(l.sender_name), text: String(l.text), at: String(l.created_at) })),
+      subjectProfileId: profileId, source: 'room', risk, roomKey: room, locationName: roomName, excerpt,
     })
+    // Stufe 2 (06.11.2026): Codewörter und nicht abgedeckte Sprachen prüft eine KI im
+    // Zusammenhang – nur auffällige Fenster, im Hintergrund, Ergebnis ohne Wortlaut.
+    else if (needsAiReview(risk, { whisper: range === 'whisper' })) {
+      const whisper = range === 'whisper'
+      after(async () => {
+        try {
+          // Im offenen Raum gehört auch das Gegenüber zum Zusammenhang.
+          let context = excerpt
+          if (!whisper) {
+            const { data: around } = await supabase.from('player_room_messages').select('sender_id,sender_name,text,created_at')
+              .eq('room_key', room).neq('range', 'whisper').gte('created_at', since).order('created_at', { ascending: false }).limit(14)
+            context = (around ?? []).reverse().map(l => ({ speaker: String(l.sender_name), text: String(l.text), at: String(l.created_at) }))
+          }
+          // Für die KI ohne Spielernamen.
+          const alias = new Map<string, string>()
+          const anon = context.map(l => {
+            if (!alias.has(l.speaker)) alias.set(l.speaker, 'Person ' + String.fromCharCode(65 + alias.size))
+            return { ...l, speaker: alias.get(l.speaker)! }
+          })
+          const verdict = await reviewWindow(supabase, { subjectProfileId: profileId, roomKey: room, whisper, risk, lines: anon })
+          if (aiVerdictIsSuspect(verdict)) {
+            await secureSuspicion(supabase, {
+              subjectProfileId: profileId, source: 'room', roomKey: room, locationName: roomName, excerpt: context,
+              risk: { ...risk, level: 'suspect', reasons: [`KI-Prüfung (${verdict!.category}, ${Math.round(verdict!.confidence * 100)} %): ${verdict!.reason}`] },
+            })
+          }
+        } catch (reviewError) {
+          console.error('[safety] ai review step failed', reviewError instanceof Error ? reviewError.message : reviewError)
+        }
+      })
+    }
   } catch (safetyError) {
     console.error('[safety] room assessment failed', safetyError instanceof Error ? safetyError.message : safetyError)
   }
