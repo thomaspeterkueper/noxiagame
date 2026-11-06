@@ -162,13 +162,21 @@ Pro Eingriff ein Merker (boolesch oder Anzahl), gespeichert mit der Reise. Beim 
 4. Eingreifen und Grenzen sind entschieden (06.11.2026); Spuren in Kap. 5. Offen: Wer schreibt die Liedstrophen und Reime – Thomas selbst oder Entwurf durch Claude zur Korrektur?
 5. Kap. 1.4 ff. (die Wege der Träger nach Iberien, Ḫattuša, Himalaya, Ajanta) gehören nicht in diese Chronomap; das wären eigene Chronomaps.
 
-## Zugänge zur Chronomap (Thomas, 06.11.2026)
+## Zugänge zur Chronomap (Thomas, 06.11.2026, korrigiert)
 
-Entschieden: Eine Chronomap ist auf **zwei Wegen** betretbar.
+Entschieden: Eine Chronomap (auch „Chronotrip") ist auf **zwei Wegen** betretbar.
 
-1. **Zeit-Reisebüro**: im Reisebüro-Panel ein vierter Reiter „Zeit" mit allen Chronomaps (Dvārakā um 1600 v. Chr., Konstantinopel, weitere). Reisebüros gibt es dort, wo die Chronomap beginnt (Grabungsstätte Dvārakā, Istanbul).
+1. **Timetravel-Agency**: eigene Ortsart, getrennt vom normalen Reisebüro. In Reisebüros bucht man **nur normale Reisen**; es gibt dort **keinen** Reiter „Zeit". Chronotrips gibt es ausschließlich in Timetravel-Agencys (Grabungsstätte Dvārakā, Istanbul, weitere).
 2. **Button am Ort**: wer schon vor Ort ist, findet im Erklärtext zu einem historischen Gebäude oder Ort (Gebäudechronik, Wahrzeichen-Panel) den Button „Zeitreise: so sah es aus …", sofern für diesen Ort eine Chronomap hinterlegt ist.
 
-Folgerung für die Umsetzung: ein **Register der Chronomaps** (Kennung, Titel, Epoche, Startpunkt in Weltkoordinaten, Orte/Gebäude, die einen Button erhalten), das beide Zugänge speist. Der Button erscheint nur bei Treffern im Register, nie pauschal.
+Folgerung für die Umsetzung: ein **Register der Chronomaps** (Kennung, Titel, Epoche, Startpunkt in Weltkoordinaten, Orte/Gebäude mit Button, Timetravel-Agencys), das beide Zugänge speist. Der Button erscheint nur bei Treffern im Register.
 
-Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?), Inhaltsquelle (Buch-Repo oder Wissensgraph).
+## Inhaltsgrundsatz (Thomas, 06.11.2026)
+
+1. **Reales Wissen zuerst**, aus dem Wissensgraphen (`kueper-knowledge-graph`). Das ist die Grundschicht jeder Chronomap.
+2. **Ergänzt aus den Büchern.** Buchwelt füllt, was das reale Wissen offenlässt.
+3. **Konsequente Aufarbeitung der Buchtexte**: Die Texte werden systematisch in prüfbare Aussagen (Ort, Zeit, Personen, Dinge) zerlegt. Daraus lassen sich Unstimmigkeiten in den Geschichten erkennen (zum Beispiel Kap. 1.3 „Dach der Stadt" gegen „Fischerviertel"). Die Etiketten [R]/[S]/[F] markieren die Herkunft jeder Aussage.
+
+Folge: Requests an Wissensgraph (Schnittstelle für reale Fakten je Ort und Epoche) und Bücher (strukturierte Aussagen je Kapitel, Konsistenzprüfung). Die Karte liest nur, sie hält keine eigene Wahrheit.
+
+Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?), Format der Schnittstelle zum Wissensgraphen.
