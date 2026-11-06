@@ -461,7 +461,8 @@ export async function POST(request: NextRequest) {
   if (risk.signals.includes('abuse_material')) {
     await secureSuspicion(serviceClient, {
       subjectProfileId: user.id, source: 'npc', risk, npcPersonId: npcId, npcName, locationName: locationName || null,
-      excerpt: [{ speaker: 'Spieler', text: player, at: new Date().toISOString() }],
+      // Gesicherter Verdachtsfall: im Original (Ausnahme von der Schwärzung).
+      excerpt: [{ speaker: 'Spieler', text: playerRaw, at: new Date().toISOString() }],
     })
   }
   const endConversation = async (reply: string, outcome: 'breakoff' | 'dismissed') => {

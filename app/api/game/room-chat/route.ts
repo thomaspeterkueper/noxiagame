@@ -17,6 +17,7 @@ import { CHAT_RANGES, type ChatRange } from '@/lib/multiplayer/roomChat'
 import { assessRealWorldRisk, needsAiReview, retainUntilFor, riskFlags } from '@/lib/game/safety/realWorldRisk'
 import { aiVerdictIsSuspect, reviewWindow } from '@/lib/game/safety/aiReview'
 import { secureSuspicion } from '@/lib/game/safety/secureSuspicion'
+import { maskPersonalData } from '@/lib/game/safety/personalData'
 
 const ROOM_RE = /^[A-Za-z0-9:_-]{3,80}$/
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -73,8 +74,9 @@ export async function POST(req: NextRequest) {
   const senderName = String(profile?.username ?? 'Spieler').slice(0, 24)
   const { data: row, error } = await supabase.from('player_room_messages').insert({
     room_key: room, room_name: roomName, sender_id: profileId, sender_name: senderName,
-    // Persönliche Daten werden überall maskiert (06.11.2026) – auch im gespeicherten Text.
-    text: prepared.shown, shown_text: prepared.shown, topic: prepared.topic, flags: prepared.flags, peers,
+    // Sichtbar für andere ist nur shown_text (geschwärzt). Das Original bleibt nur für
+    // den Schutzfilter und gesicherte Verdachtsfälle (14 Tage bzw. Verwahrung).
+    text: prepared.text, shown_text: prepared.shown, topic: prepared.topic, flags: prepared.flags, peers,
     range, to_profile_id: toId, pos_x: posX, pos_y: posY,
   }).select('id,created_at').single()
   if (error || !row) return NextResponse.json({ error: 'Nicht gesendet.' }, { status: 500 })
@@ -92,7 +94,7 @@ export async function POST(req: NextRequest) {
     const { data: window } = await windowQuery
     const lines = (window ?? []).reverse()
     // Die aktuelle Nachricht im Original bewerten (nur im Speicher), frühere sind maskiert.
-    const risk = assessRealWorldRisk(lines.map(l => String(l.id) === String(row.id) ? prepared.text : String(l.text)))
+    const risk = assessRealWorldRisk(lines.map(l => String(l.text)))
     if (risk.level !== 'none') {
       const flags = [...new Set([...prepared.flags.filter(f => !f.startsWith('risk:')), ...riskFlags(risk)])]
       await supabase.from('player_room_messages').update({ flags }).eq('id', row.id)
@@ -121,7 +123,8 @@ export async function POST(req: NextRequest) {
           const alias = new Map<string, string>()
           const anon = context.map(l => {
             if (!alias.has(l.speaker)) alias.set(l.speaker, 'Person ' + String.fromCharCode(65 + alias.size))
-            return { ...l, speaker: alias.get(l.speaker)! }
+            // An den KI-Dienst nur geschwärzt; die Merkmale aus der Vorprüfung gehen mit.
+            return { ...l, speaker: alias.get(l.speaker)!, text: maskPersonalData(l.text) }
           })
           const verdict = await reviewWindow(supabase, { subjectProfileId: profileId, roomKey: room, whisper, risk, lines: anon })
           if (aiVerdictIsSuspect(verdict)) {

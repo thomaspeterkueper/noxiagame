@@ -7,8 +7,14 @@
 -- 1. mask_personal_data(text): E-Mail, Links/Domains, IBAN, Kartennummern,
 --    Telefonnummern, @-Namen → „xxx“. Gleiche Regeln wie lib/game/safety/personalData.ts
 --    (dort zusätzlich Selbstauskünfte zu Adresse, Geburtsdatum, echtem Namen, Schule, PLZ).
--- 2. Trigger auf allen frei beschreibbaren Spielerfeldern – auch dort, wo Spieler
---    direkt in die Datenbank schreiben können (z. B. Spielername).
+-- 2. Trigger auf allen Feldern, die andere Spieler sehen – auch dort, wo Spieler
+--    direkt in die Datenbank schreiben können (Spielername, Freundes-Chat).
+--    Thomas (06.11.2026, später): „Es reicht, wenn die Daten nur im sichtbaren Chat
+--    geschwärzt sind“; für gesicherte Verdachtsfälle gilt eine Ausnahme. Deshalb:
+--    Raum-Chat speichert das Original in `text` (nur Server), geschwärzt ist
+--    `shown_text`; der Freundes-Chat ist für Spieler direkt lesbar, sein Original
+--    liegt in chat_message_originals (nur Server). Beides fällt unter die
+--    14-Tage-Löschung bzw. die Verwahrung von Geldgesprächen.
 -- 3. retain_until: Gespräche mit echter Währung, Bezahldiensten oder Krypto werden
 --    von der 14-Tage-Löschung ausgenommen und ein Jahr verwahrt (nicht lesbar im
 --    Adminbereich, wie alle Spielergespräche).
@@ -68,7 +74,7 @@ begin
       ('service_cases',         array['text']),
       ('credit_transfers',      array['note']),
       ('chat_messages',         array['content']),
-      ('player_room_messages',  array['text', 'shown_text']),
+      ('player_room_messages',  array['shown_text']),
       ('npc_conversation_log',  array['player_text']),
       ('conversation_reports',  array['comment']),
       ('player_memorials',      array['name', 'place_name']),
@@ -83,6 +89,17 @@ begin
   end loop;
 end;
 $$;
+
+-- Originale des Freundes-Chats: nur Server, nur für Schutzfilter und Verdachtsfälle.
+create table if not exists public.chat_message_originals (
+  message_id uuid primary key references public.chat_messages(id) on delete cascade,
+  content text not null,
+  retain_until timestamptz,
+  created_at timestamptz not null default now()
+);
+alter table public.chat_message_originals enable row level security;
+revoke all on public.chat_message_originals from public, anon, authenticated;
+grant select, insert, update, delete on public.chat_message_originals to service_role;
 
 -- 3. Gespräche über echtes Geld verwahren ------------------------------------
 alter table public.npc_conversation_log add column if not exists retain_until timestamptz;
@@ -114,6 +131,9 @@ begin
      and (m.retain_until is null or m.retain_until < now())
      and not exists (select 1 from public.admin_profiles a where a.profile_id = m.sender_id);
   get diagnostics room_rows = row_count;
+
+  delete from public.chat_message_originals o
+   where o.created_at < cutoff and (o.retain_until is null or o.retain_until < now());
 
   delete from public.conversation_reports r where r.expires_at < now();
   get diagnostics report_rows = row_count;

@@ -20,7 +20,7 @@ async function getUserFromRequest(req: NextRequest) {
   return user
 }
 import { publishDirectMessage } from '@/lib/ably/server'
-import { assessRealWorldRisk, needsAiReview } from '@/lib/game/safety/realWorldRisk'
+import { assessRealWorldRisk, needsAiReview, retainUntilFor } from '@/lib/game/safety/realWorldRisk'
 import { maskPersonalData } from '@/lib/game/safety/personalData'
 import { secureSuspicion } from '@/lib/game/safety/secureSuspicion'
 import { aiVerdictIsSuspect, reviewWindow } from '@/lib/game/safety/aiReview'
@@ -100,8 +100,10 @@ export async function POST(req: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    // Schutzfilter wie im Raum-Chat (NOXIA-SAFETY-0001, 06.11.2026): Kontaktdaten
-    // werden ausgeblendet, gespeichert und zugestellt wird nur die gefilterte Fassung.
+    // Schutzfilter wie im Raum-Chat (NOXIA-SAFETY-0001, 06.11.2026): sichtbar ist nur
+    // die geschwärzte Fassung (chat_messages ist für Spieler direkt lesbar). Das Original
+    // liegt getrennt in chat_message_originals (nur Server) – für den Schutzfilter und
+    // gesicherte Verdachtsfälle; 14 Tage, bei Geldgesprächen ein Jahr.
     const shown = maskPersonalData(content)
     const { data: message, error } = await supabase
       .from('chat_messages')
@@ -113,24 +115,33 @@ export async function POST(req: NextRequest) {
 
     try {
       const since = new Date(Date.now() - 30 * 60_000).toISOString()
-      const { data: recent } = await supabase.from('chat_messages').select('sender_id,content,created_at')
+      const { data: recent } = await supabase.from('chat_messages').select('id,sender_id,content,created_at')
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${user.id})`)
         .gte('created_at', since).lt('created_at', message.created_at).order('created_at', { ascending: false }).limit(9)
+      const ids = (recent ?? []).map(m => String(m.id))
+      const { data: originals } = ids.length
+        ? await supabase.from('chat_message_originals').select('message_id,content').in('message_id', ids)
+        : { data: [] as Array<{ message_id: string; content: string }> }
+      const original = new Map((originals ?? []).map(o => [String(o.message_id), String(o.content)]))
       const nameOf = (id: string) => id === user.id ? (sender?.username ?? 'Absender') : (receiver.username ?? 'Empfänger')
       const lines = [
-        ...(recent ?? []).reverse().map(m => ({ speaker: nameOf(String(m.sender_id)), text: String(m.content), at: String(m.created_at) })),
-        { speaker: nameOf(user.id), text: shown, at: String(message.created_at) },
+        ...(recent ?? []).reverse().map(m => ({ speaker: nameOf(String(m.sender_id)), text: original.get(String(m.id)) ?? String(m.content), at: String(m.created_at) })),
+        { speaker: nameOf(user.id), text: content, at: String(message.created_at) },
       ]
-      // Bewertet wird die aktuelle Nachricht im Original (nur im Speicher) – gespeichert
-      // und gesichert wird überall die maskierte Fassung.
-      const risk = assessRealWorldRisk([...lines.slice(0, -1).map(l => l.text), content])
+      const risk = assessRealWorldRisk(lines.map(l => l.text))
+      const retainUntil = retainUntilFor(risk)
+      if (shown !== content || retainUntil) {
+        await supabase.from('chat_message_originals').insert({ message_id: message.id, content, retain_until: retainUntil })
+      }
+      if (retainUntil && ids.length) await supabase.from('chat_message_originals').update({ retain_until: retainUntil }).in('message_id', ids)
       const roomKey = 'direct:' + [user.id, receiverId].sort().join(':')
       if (risk.level === 'suspect') {
+        // Gesicherter Verdachtsfall: Ausschnitt im Original (Ausnahme von der Schwärzung).
         await secureSuspicion(supabase, { subjectProfileId: user.id, source: 'direct', risk, roomKey, locationName: 'Freundes-Chat', excerpt: lines })
       } else if (needsAiReview(risk, { whisper: true })) {
         after(async () => {
           try {
-            const anon = lines.map(l => ({ ...l, speaker: l.speaker === nameOf(user.id) ? 'Person A' : 'Person B' }))
+            const anon = lines.map(l => ({ ...l, speaker: l.speaker === nameOf(user.id) ? 'Person A' : 'Person B', text: maskPersonalData(l.text) }))
             const verdict = await reviewWindow(supabase, { subjectProfileId: user.id, roomKey, whisper: true, risk, lines: anon })
             if (aiVerdictIsSuspect(verdict)) await secureSuspicion(supabase, {
               subjectProfileId: user.id, source: 'direct', roomKey, locationName: 'Freundes-Chat', excerpt: lines,
