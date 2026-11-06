@@ -1,10 +1,10 @@
 # Chronomap Die Kette vom Hexenteich – Entwurf (06.11.2026)
 
-Grundlage: Master-Fassung **V11.3** (06.11.2026), Authoring-Quelle `buecherwelten/works/kette-vom-hexenteich/manuscript/die-kette-vom-hexenteich-v11-1.md`, 25 Kapitel, Menden (Sauerland), 27.10.–25.11.2024. Vollständig gelesen über das Inventar `derived/inventar/inv_01-05.md` … `inv_21-25.md` (Zeilen 61–7610, Stand vor Patch-Runde A). Alle Belegstellen in diesem Entwurf sind als **Kapitel (Stand V11.3) + wörtliches Zitat** angegeben und per grep im aktuellen Manuskript geprüft. Zeilennummern des Inventars gelten nicht mehr.
+Grundlage: Master-Fassung **V11.4** (06.11.2026; bis Abschnitt 6 auf V11.3 geprüft, Patch-Runde C danach umgesetzt), Authoring-Quelle `buecherwelten/works/kette-vom-hexenteich/manuscript/die-kette-vom-hexenteich-v11-1.md`, 25 Kapitel, Menden (Sauerland), 27.10.–25.11.2024. Vollständig gelesen über das Inventar `derived/inventar/inv_01-05.md` … `inv_21-25.md` (Zeilen 61–7610, Stand vor Patch-Runde A). Alle Belegstellen in diesem Entwurf sind als **Kapitel (Stand V11.3) + wörtliches Zitat** angegeben und per grep im aktuellen Manuskript geprüft. Zeilennummern des Inventars gelten nicht mehr.
 
-Entwurf für Thomas' Korrektur, noch nichts gebaut, nichts committet. Spurtexte: `buecherwelten/works/kette-vom-hexenteich/derived/chronomap-spuren.md` (Entwurf).
+Entwurf für Thomas' Korrektur, noch nichts gebaut. Entscheidungen von Thomas vom 06.11. stehen in Abschnitt 0a. Spurtexte: `buecherwelten/works/kette-vom-hexenteich/derived/chronomap-spuren.md` (Entwurf).
 
-Weltkanon, den dieser Entwurf **nicht lesen konnte** (Drive): OTA-TEC-0035 (Kette), OTA-TEC-0123 (Hör-Stein), OTA-TEC-0124 (Splitterlupe), OTA-BIO-0027 … 0031 (Figuren). Jede Stelle, die von ihnen abhängt, ist mit **⟨OTA⟩** markiert und erscheint in Kap. 7 als Frage.
+Weltkanon: OTA-TEC-0035 (Kette), OTA-TEC-0123 (Hör-Stein), OTA-TEC-0124 (Splitterlupe), OTA-BIO-0027 … 0031 (Figuren) wurden nachträglich gelesen (Befund: `buecherwelten/works/kette-vom-hexenteich/editorial/ota-abgleich/ota-befund-2026-11-06.md`). Für die Zeit nach 2024 legen sie nichts fest. Wo sie vom Roman abweichen, gilt der Roman (Entscheidung Thomas); die Angleichung ist als `overtime-archive.org/external-tasks/open/OTA-REQ-20261106-kette-hexenteich-romankanon.md` beauftragt. Stellen mit **⟨OTA⟩** sind damit durch Abschnitt 0a entschieden.
 
 ## 0. Kanon-Entscheidungen
 
@@ -24,6 +24,20 @@ Maßgeblich sind `editorial/kanon-entscheidungen-2026-11-06.md` und `editorial/w
 | C | Ebberg „südöstlich“, Menden vom Turm „im Nordwesten“, „zweihundertfünfzig Kilometer vom Meer“ | in der Raumprüfung bestätigt |
 
 Vorgaben Thomas für diesen Entwurf (06.11.2026): Roman gehört zum NOXIA-Universum, OTA-Dossiers sind Weltkanon; Gegenwart 2086 = lebende Stadt Menden **plus** Museum/Archiv mit den Gegenständen als OTA-Objekte; mindestens ein Gegenstand bleibt nie auffindbar; reale Orte dürfen vereinfacht werden; Zielgruppe 10–14, behutsam, keine Gewaltinszenierung.
+
+
+## 0a. Entscheidungen Thomas, zweite Runde (06.11.2026)
+
+| Frage | Entscheidung |
+| --- | --- |
+| N1–N9, N11 (Abschnitt 6) | alle nach Empfehlung, im Manuskript umgesetzt (V11.4); N5a: „Am Sonntagmorgen lehnte Mias Rad am Gartentor, das Schloss offen. Niemand im Haus wusste, wer es gebracht hatte.“ N5b bleibt offen (ob die Splitterlupe eins der sieben vollen Artefakte ist, wird nicht festgelegt) |
+| Spielerrolle | **Kind aus Mias Parallelklasse** (Abschnitt 4) |
+| Spieldauer | **zwei Folgen zu je 30 Minuten**; Beschlagnahme ist keine Station; Ende am Montag 25.11. vor Leons Haus (Abschnitt 4, Spieldauer) |
+| Nie gefundener Gegenstand | **das volle Artefakt des Hexenteichs** (G19) |
+| Figuren 2086 | **keine Begegnung**; im Museum nur Biografie-Tafeln, offen für spätere Bände |
+| Brunnen unter der Schule 2086 | **Denkmal, bei Führungen begehbar**: Treppe und Brunnenraum zugänglich, der Brunnen bleibt zugemauert; Grundlage LWL-Gutachten 1978 „potentiell denkmalwürdig“ (Kap. 20) |
+| Verbleib der Kette | Depot (passt zu OTA-TEC-0035 I „→ Depot“), im Museum eine Nachbildung |
+| Hör-Stein, Splitterlupe 2086 | OTA führt den Hör-Stein „bei Tim (durchgehend)“ und die Lupe „in Besitz“ Antons – beides nur bis Romanende. Vorschlag bis zur Entscheidung: Hör-Stein im Museum als **Leihgabe ohne Namensnennung**, Splitterlupe leere Vitrine „Verbleib unbekannt“ |
 
 ## 1. Zwei Schichten, ein Ort
 
@@ -250,21 +264,30 @@ Geprüft wurden die drei Vorschläge und zwei Randfiguren, die der Text selbst n
 
 ### Spieldauer
 
-Die Romanzeit ist ein Monat, nicht drei Tage wie bei Dvaraka. Vorschlag: **60 Minuten in neun Stationen**; zwischen den Stationen blättert ein Kalenderblatt um (kein Laufen über Tage). Das Studio verkauft Zeitreisen heute zu 30 Minuten (`lib/game/immersion.ts`), siehe Frage 9.
+Die Romanzeit ist ein Monat, nicht drei Tage wie bei Dvaraka. **Entschieden: zwei Folgen zu je 30 Minuten**, passend zum Studiopreis „Zeitreise 30 Min.“ (`lib/game/immersion.ts`). Zwischen den Stationen blättert ein Kalenderblatt um (kein Laufen über Tage). Jede Folge beginnt im Museum 2086 und endet dort.
+
+**Folge 1 – „Der Fund“ (27.10.–8.11.)**
 
 | Station | Datum, Uhrzeit | Ort | Min. | Was geschieht (Buch) |
 | --- | --- | --- | --- | --- |
-| 1 | So 27.10., Vormittag [F] | Hexenteich | 10 | Nebel, Fund der Kassette, Mann auf der Bank, Heimweg über den Ortseingang |
+| 1 | So 27.10., Vormittag [F] | Hexenteich | 8 | Nebel, Fund der Kassette, Mann auf der Bank, Heimweg über den Ortseingang |
 | 2 | Di 29.10., 14–17 Uhr | Heimatmuseum (Hauptstraße [F]) | 4 | Leon ruft um 14:43 an, niemand nimmt ab |
-| 3 | So 3.11., 9:30–11 Uhr | St. Vincenz, Pfarrfriedhof, Briefkasten | 7 | Messe, Kehrvers, Grab, Mauerstein, Lena am Briefkasten |
+| 3 | So 3.11., 9:30–11 Uhr | St. Vincenz, Pfarrfriedhof, Briefkasten | 6 | Messe, Kehrvers, Grab, Mauerstein, Lena am Briefkasten |
 | 4 | Mo 4.11., Vormittag | Aula | 6 | Antons Vortrag, vierzig Minuten, vorzeitige Pause |
-| 5 | Fr 8.11., Nachmittag | Hauptstraße, Café Lindenhof, Blumenladen | 6 | Anton und Mia im Café, Yara im Blumenladen |
-| 6 | Sa 16.11., 15:15–16:30 | Bushaltestelle beim Eiscafé; danach Stadtrand Werler Straße | 9 | Mia nach der Flucht, Leon kommt, Tim mit Yara, Abfahrt Richtung Ebberg |
+| 5 | Fr 8.11., Nachmittag | Hauptstraße, Café Lindenhof, Blumenladen | 6 | Anton und Mia im Café, Yara vor dem Blumenladen, die Einladung |
+
+Ende Folge 1: Mia fährt vom Café weg; Überblendung ins Museum an die Visitenkarte Antons.
+
+**Folge 2 – „Die sieben Orte“ (16.11.–25.11.)**
+
+| Station | Datum, Uhrzeit | Ort | Min. | Was geschieht (Buch) |
+| --- | --- | --- | --- | --- |
+| 6 | Sa 16.11., 15:45–17 Uhr | Bushaltestelle beim Eiscafé; danach Stadtrand Werler Straße | 9 | Mia nach der Flucht, Leon kommt um kurz vor vier, Tim mit Yara, Abfahrt Richtung Ebberg |
 | 7 | So 17.11., 9:20–11 Uhr | Reckenhöhle, Parkplatz, Haupteingang | 9 | Besuchergruppe, Onkel Bernd geht zum Haupteingang, Gestalt am Waldrand, Rückfahrt |
 | 8 | Di 19.11., 12–13 Uhr | Schule: Mensa, Fahrradständer | 5 | die vier kommen nass aus der Notfalltür, Leon will eine Kopie „nicht auf meinem Handy“ |
-| 9 | Do 21.11., 3. Stunde | Schule: Klassenraum, Flur, Kellertreppe mit Absperrband | 4 | „Dreiundzwanzig Augenpaare“, Polizei, Kette im Beutel |
+| 9 | Mo 25.11., Nachmittag | vor Leons Haus (Haus der Schultes, Werkstatt im Hof) | 7 | die vier gehen zu Leon, Wendels Mail, „Sieben Orte. Vier Freunde.“ – der Spieler bleibt draußen, sieht nur durchs Hoffenster die Korkwand |
 
-**Ende:** Die Kommissarin trägt den beschrifteten Beutel durch den Flur. Überblendung ins Museum 2086: dieselbe Beschriftung auf dem Schild der verwahrten Kette, daneben die Wand der sieben Orte mit dem Platz ohne Schild.
+**Ende Folge 2:** Das Hoffenster mit der Korkwand blendet über in „Leons Wand“ im Museum 2086, daneben die Wand der sieben Orte mit dem Platz ohne Schild.
 
 ### Fahrpläne (Hauptfiguren, nur Stationstage)
 
@@ -375,16 +398,16 @@ Nebenfund ohne Karte und Uhr: Der Polizist heißt „Hauptkommissar Brenner“ (
 
 ## 7. Offene Punkte für Thomas
 
-1. **N1–N11** entscheiden (Kap. 6).
-2. **Nie gefundener Gegenstand:** das volle Artefakt des Hexenteichs (Vorschlag) oder des Brunnens? Steht in OTA etwas, das einen der sechs bis 2086 auftauchen lässt? ⟨OTA⟩
-3. **Weg der Kette ins Museum** (Polizei → Gutachter → Land → Leihgabe) und ob sie verwahrt oder gezeigt wird. Was sagt OTA-TEC-0035 zu Verbleib, Eigentum, Zustand 2086? ⟨OTA⟩
+1. **N1–N11** entscheiden (Kap. 6). **→ entschieden (0a), außer N5b.**
+2. **Nie gefundener Gegenstand:** das volle Artefakt des Hexenteichs (Vorschlag) oder des Brunnens? Steht in OTA etwas, das einen der sechs bis 2086 auftauchen lässt? ⟨OTA⟩ **→ entschieden: Artefakt des Hexenteichs (0a).**
+3. **Weg der Kette ins Museum** (Polizei → Gutachter → Land → Leihgabe) und ob sie verwahrt oder gezeigt wird. Was sagt OTA-TEC-0035 zu Verbleib, Eigentum, Zustand 2086? ⟨OTA⟩ **→ entschieden: Depot, Nachbildung im Museum (0a).**
 4. **Hör-Stein und Splitterlupe 2086:** OTA-TEC-0123 nennt „Träger: Tim Bergmann“ – liegt der Stein 2086 im Museum, bei Tim oder anderswo? Splitterlupe: leere Vitrine oder bekannt verwahrt? Ist die Lupe eins der sieben vollen Artefakte (N5b)? ⟨OTA⟩
-5. **Figuren 2086:** Mia, Leon, Tim, Yara wären 76, Lena 70. Leben sie in der Gegenwartsschicht, und darf der Spieler ihnen begegnen? Was legen OTA-BIO-0027 … 0031 fest (und wer sind die fünf)? Vorschlag bis dahin: keine Begegnung, nur Biografie-Tafeln. ⟨OTA⟩
-6. **Spielerrolle** Kind aus der Parallelklasse (Kap. 4) – einverstanden? Der Mann mit Fernglas und Dackel bleibt Nebenfigur. Ist er derselbe wie der Wanderer mit Stock und Lederhandschuhen am Felsenmeer (Kap. 10)? ⟨OTA-BIO?⟩
+5. **Figuren 2086:** Mia, Leon, Tim, Yara wären 76, Lena 70. Leben sie in der Gegenwartsschicht, und darf der Spieler ihnen begegnen? Was legen OTA-BIO-0027 … 0031 fest (und wer sind die fünf)? Vorschlag bis dahin: keine Begegnung, nur Biografie-Tafeln. ⟨OTA⟩ **→ entschieden: keine Begegnung, Biografie-Tafeln (0a).**
+6. **Spielerrolle** Kind aus der Parallelklasse (Kap. 4) – einverstanden? Der Mann mit Fernglas und Dackel bleibt Nebenfigur. Ist er derselbe wie der Wanderer mit Stock und Lederhandschuhen am Felsenmeer (Kap. 10)? ⟨OTA-BIO?⟩ **→ entschieden: Parallelklasse (0a).**
 7. **Museum:** Heißt es 2086 „Heimatmuseum Menden“ wie im Buch, und hat es einen OTA-Raum? Das reale Museum in Menden trägt vermutlich einen anderen Namen (nicht geprüft).
-8. **Brunnen unter der Schule 2086:** erhalten und als Denkmal zugänglich (Gutachten LWL 1978 „potentiell denkmalwürdig“), wieder zugemauert, oder vom Heizungsbau überbaut? Der Entwurf zeigt ihn nur als Tafel im Museum.
-9. **Spieldauer:** 60 Minuten in neun Stationen passt nicht zum Studiopreis „Zeitreise 90 Cr / 30 Min.“ – zwei Folgen zu je 30 Minuten (bis Station 5 / ab Station 6) oder ein eigener Preis?
-10. **Stationen 2 und 8** (Heimatmuseum, Fahrradständer) sind die stillsten. Lieber Station 9 (Beschlagnahme) streichen, damit die Reise nicht mit der Polizei endet, und am Montag 25.11. vor Leons Haus enden?
+8. **Brunnen unter der Schule 2086:** erhalten und als Denkmal zugänglich (Gutachten LWL 1978 „potentiell denkmalwürdig“), wieder zugemauert, oder vom Heizungsbau überbaut? Der Entwurf zeigt ihn nur als Tafel im Museum. **→ entschieden: Denkmal, führungsweise begehbar (0a).**
+9. **Spieldauer:** 60 Minuten in neun Stationen passt nicht zum Studiopreis „Zeitreise 90 Cr / 30 Min.“ – zwei Folgen zu je 30 Minuten (bis Station 5 / ab Station 6) oder ein eigener Preis? **→ entschieden: zwei Folgen à 30 Min. (0a).**
+10. **Stationen 2 und 8** (Heimatmuseum, Fahrradständer) sind die stillsten. Lieber Station 9 (Beschlagnahme) streichen, damit die Reise nicht mit der Polizei endet, und am Montag 25.11. vor Leons Haus enden? **→ entschieden: Beschlagnahme keine Station, Ende vor Leons Haus (0a).**
 11. **noxiagame-Landmarks:** Der Eintrag `earth-de-menden-gesamtschule` sagt „im Roman als Mias Gesamtschule verwendet“; der Roman nennt die Schule nicht „Gesamtschule“, nur „ehemaligen Realschule“ (Gutachten). Text des Eintrags anpassen? Weitere Landmarks anlegen (St. Vincenz, Ebbergturm, Reckenhöhle, Felsenmeer, Balver Höhle, Bilsteinhöhle, Museum)?
 12. **Spurtexte:** Entwurf liegt vor; Thomas korrigiert, bevor etwas ins Spiel geht. Mishkenaz nur als Vorschlag (Prüfung gegen `mishkenaz.org`).
 13. **Zeitumstellung am 27.10.2024** als Stimmung im Einstieg nutzen oder weglassen?
