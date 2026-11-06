@@ -114,7 +114,7 @@ function MaterialLine({ item }: { item: { id: string; cost: number; footprint?: 
  */
 type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string; areaM2?: number; levels?: number; listed?: boolean; own?: boolean; entityId?: string; taxRate?: number; /** Reales Lokal (R-13): Lokalart und Ausbauwert im Preis */ venue?: string | null; fitOut?: number }
 /** Angebot für ein Flurstück (/api/game/parcel-offer) */
-type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; land?: { kind: string; label: string; potential: string[]; activity: string | null }; forest?: { stockM3: number; growthM3Year: number; harvestableM3: number; cleared: boolean; replanted: boolean; regrowsAt: string | null; replantFee: number }; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; partsOnly?: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
+type ParcelInfo = { id: string; buildingsKnown?: boolean; label: string; areaM2: number; usage: string | null; source?: string; land?: { kind: string; label: string; potential: string[]; activity: string | null }; forest?: { stockM3: number; growthM3Year: number; harvestableM3: number; cleared: boolean; replanted: boolean; regrowsAt: string | null; replantFee: number }; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; partsOnly?: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
 /** Vermessungsgebühr fürs Teilen und Zusammenlegen (wie app/api/game/parcel-offer) */
 const SURVEY_FEE = 200
 
@@ -209,6 +209,23 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     return () => { stale = true }
   }, [parcelId, parcelVersion])
   const parcel = parcelId ? parcelInfo[parcelId] : undefined
+
+  // Gebäudedaten fehlen: Ortsdetail für die angeklickte Stelle holen, danach Angebot neu lesen (höchstens einmal je Flurstück).
+  const loadedFor = useRef(new Set<string>())
+  useEffect(() => {
+    if (!parcelId || !parcel || parcel.buildingsKnown !== false || loadedFor.current.has(parcelId) || panel.kind !== 'parcel') return
+    loadedFor.current.add(parcelId)
+    const at = panel.at
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        if (!token) return
+        await fetch('/api/world-lab/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(at) })
+        engine?.reloadTiles?.()
+        setParcelVersion(value => value + 1)
+      } catch { /* bleibt gesperrt */ }
+    })()
+  }, [parcelId, parcel, panel])
 
   async function buyParcel() {
     if (!parcelId || buying) return
@@ -864,7 +881,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       {parcel && <>
         <dl>
           <dt>Eigentümer</dt><dd>{parcel.own ? 'du' : parcel.owned ? (parcel.seller ?? 'ein anderer Spieler') : (parcel.seller ?? 'Gemeinde')}</dd>
-          <dt>Gebäude</dt><dd>{parcel.buildings.length ? parcel.buildings.map(item => item.name).join(', ') : 'keine'}</dd>
+          <dt>Gebäude</dt><dd>{parcel.buildings.length ? parcel.buildings.map(item => item.name).join(', ') : parcel.buildingsKnown === false ? 'noch unbekannt (Daten werden geladen)' : 'keine'}</dd>
           {parcel.residents > 0 && <><dt>Bewohner</dt><dd>{parcel.residents} – bleiben und zahlen Miete an dich</dd></>}
           {parcel.rentPerInterval > 0 && <><dt>Miete</dt><dd>{credits(parcel.rentPerInterval)} je Abrechnung</dd></>}
           {parcel.forSale && <><dt>Preis</dt><dd><b>{credits(parcel.price ?? 0)}</b></dd></>}
