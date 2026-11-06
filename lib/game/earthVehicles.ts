@@ -1,6 +1,6 @@
 // lib/game/earthVehicles.ts
-// Aktualisiert: 06.11.2026 — Fahrzeuge auf der Erde: Modelle, Reichweite, Fahrtkosten (Thomas: „1000 km sollten pro Akku schon mindestens drin sein“)
-// Version:      1.0.0
+// Aktualisiert: 06.11.2026 — Grenze für die sichtbare Fahrt (LOCAL_DRIVE_MAX_M); 06.11.2026 — Fahrzeuge auf der Erde: Modelle, Reichweite, Fahrtkosten (Thomas: „1000 km sollten pro Akku schon mindestens drin sein“)
+// Version:      1.1.0
 //
 // Gemeinsame Zahlen für Client und Server. Die Preise stehen auch in der
 // Datenbank (vehicle_model); hier nur zur Anzeige – gebucht wird dort.
@@ -32,6 +32,8 @@ export const KM_PER_CHARGE_PCT = 10
 export const BROKEN_BELOW_PCT = 15
 /** Ab hier lohnt das Auto gegenüber dem Fußweg. */
 export const DRIVE_FROM_M = 400
+/** Bis hierhin fährt die Figur sichtbar über die Straßen; weiter weg ist es eine Fernfahrt (Sprung). */
+export const LOCAL_DRIVE_MAX_M = 6000
 /** Fahrgeschwindigkeit für die Anzeige der Dauer. */
 export const DRIVE_KMH = 70
 

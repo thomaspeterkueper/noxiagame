@@ -1,8 +1,8 @@
 'use client'
 
 // app/components/VehicleDesk.tsx
-// Aktualisiert: 06.11.2026 — Fahrzeuge auf der Erde: Kauf im Autohaus, Reparatur in der Werkstatt, Laden; „Hinfahren“ zu fernen Zielen
-// Version:      1.0.0
+// Aktualisiert: 06.11.2026 — Sichtbare Fahrt über die Straßen (localRoute/onLocalDrive) statt Sprung, Sprung nur für Fernziele ohne geladene Straßen; 06.11.2026 — Fahrzeuge auf der Erde: Kauf im Autohaus, Reparatur in der Werkstatt, Laden; „Hinfahren“ zu fernen Zielen
+// Version:      1.1.0
 //
 // Drei Teile, ein Zustand:
 //  useVehicle()  – eigenes Fahrzeug und Guthaben, von allen Tafeln geteilt (ein Speicher je Seite).
@@ -13,7 +13,7 @@
 import { useCallback, useState, useSyncExternalStore } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import type { GeoPoint } from '@/lib/game/earthTrips'
-import { canDrive, driveDistanceM, driveLabel, DRIVE_FROM_M, type Vehicle, type VehicleModel } from '@/lib/game/earthVehicles'
+import { canDrive, driveDistanceM, driveLabel, DRIVE_FROM_M, LOCAL_DRIVE_MAX_M, type Vehicle, type VehicleModel } from '@/lib/game/earthVehicles'
 
 type State = { vehicle: Vehicle | null; credits: number; models: VehicleModel[]; loaded: boolean }
 
@@ -57,7 +57,7 @@ export function vehicleServiceIds(services: Array<{ id: string; available: boole
   return services.filter(service => service.available && SERVICE_ACTION[service.id]).map(service => service.id)
 }
 
-export function VehicleDesk({ services, staffName }: { services: string[]; staffName: string }) {
+export function VehicleDesk({ services, staffName, at }: { services: string[]; staffName: string; /** Ort des Betriebs – dort steht das gekaufte Auto. */ at?: GeoPoint }) {
   const { vehicle, credits, models, loaded } = useVehicle()
   const [busy, setBusy] = useState<string | null>(null)
   const [note, setNote] = useState('')
@@ -65,14 +65,14 @@ export function VehicleDesk({ services, staffName }: { services: string[]; staff
   const run = useCallback(async (action: 'buy' | 'repair' | 'charge', modelCode?: string) => {
     setBusy(action + (modelCode ?? '')); setNote('')
     try {
-      const json = await api('POST', { action, modelCode, requestId: crypto.randomUUID() })
+      const json = await api('POST', { action, modelCode, requestId: crypto.randomUUID(), at })
       publish({ vehicle: json.vehicle ?? store.vehicle, credits: Number(json.credits ?? store.credits) })
       const price = Number(json.priceCredits ?? 0)
       setNote(action === 'buy' ? `${staffName}: „Viel Freude mit dem ${json.vehicle?.modelLabel ?? 'Wagen'}. Er steht draußen.“ (${price.toLocaleString('de-DE')} Cr)`
         : action === 'repair' ? (price > 0 ? `${staffName}: „Alles wieder in Ordnung.“ (${price} Cr)` : `${staffName}: „Da ist nichts zu machen – der Wagen ist tipptopp.“`)
         : price > 0 ? `${staffName}: „Voll geladen.“ (${price} Cr)` : `${staffName}: „Der Akku ist schon voll.“`)
     } catch (error) { setNote(String((error as Error).message)) } finally { setBusy(null) }
-  }, [staffName])
+  }, [staffName, at])
 
   if (!loaded) return <p className="vd-note">…</p>
   const repairPrice = vehicle ? (100 - vehicle.conditionPct) * 6 : 0
@@ -108,7 +108,15 @@ export function VehicleDesk({ services, staffName }: { services: string[]; staff
  * bucht der Server (Akku, Verschleiß, Standort), dann ruft onArrived die
  * Weltkarte, die die Figur ans Ziel setzt.
  */
-export function DriveButton({ from, to, onArrived }: { from: () => GeoPoint | null; to: GeoPoint; onArrived: (at: GeoPoint, note: string) => void }) {
+export function DriveButton({ from, to, onArrived, localRoute, onLocalDrive }: {
+  from: () => GeoPoint | null; to: GeoPoint
+  /** Nach der Fahrt (Sprung bei Fernzielen, sonst nach der sichtbaren Ankunft). */
+  onArrived: (at: GeoPoint, note: string) => void
+  /** Länge des Straßenwegs in den geladenen Kacheln, null wenn keiner – dann wird gesprungen. */
+  localRoute?: () => number | null
+  /** Sichtbare Fahrt starten; `done` ruft der Fahrer bei der Ankunft. */
+  onLocalDrive?: (to: GeoPoint, done: () => void) => void
+}) {
   const { vehicle } = useVehicle()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -116,17 +124,27 @@ export function DriveButton({ from, to, onArrived }: { from: () => GeoPoint | nu
   if (!vehicle || !start) return null
   const distanceM = driveDistanceM(start, to)
   if (distanceM < DRIVE_FROM_M) return null
-  const check = canDrive(vehicle, distanceM)
+  const roadM = localRoute?.() ?? null
+  const visibleDrive = Boolean(onLocalDrive) && roadM !== null && roadM <= LOCAL_DRIVE_MAX_M
+  const check = canDrive(vehicle, visibleDrive ? roadM! : distanceM)
+  const book = async (lengthM: number) => {
+    const json = await api('POST', { action: 'drive', from: start, to, distanceM: lengthM })
+    publish({ vehicle: json.vehicle ?? store.vehicle })
+    return `Angekommen – ${driveLabel(Number(json.distanceM ?? lengthM))}. Akku jetzt ${json.vehicle?.chargePct ?? '?'} %.`
+  }
   const drive = async () => {
     setBusy(true); setError('')
     try {
-      const json = await api('POST', { action: 'drive', from: start, to })
-      publish({ vehicle: json.vehicle ?? store.vehicle })
-      onArrived(to, `Angekommen – ${driveLabel(Number(json.distanceM ?? distanceM))}. Akku jetzt ${json.vehicle?.chargePct ?? '?'} %.`)
-    } catch (err) { setError(String((err as Error).message)) } finally { setBusy(false) }
+      if (visibleDrive) {
+        // Die Figur fährt wirklich über die Straßen; gebucht wird bei der Ankunft mit der gefahrenen Strecke.
+        onLocalDrive!(to, () => { void book(roadM!).then(note => onArrived(to, note)).catch(err => setError(String((err as Error).message))).finally(() => setBusy(false)) })
+        return
+      }
+      onArrived(to, await book(distanceM))
+    } catch (err) { setError(String((err as Error).message)) } finally { if (!visibleDrive) setBusy(false) }
   }
   return <div className="drive">
-    <span>{vehicle.modelLabel.replace(/ \(.*\)$/, '')}: {driveLabel(distanceM)}{!check.ok ? ` – ${check.why}` : ''}</span>
+    <span>{vehicle.modelLabel.replace(/ \(.*\)$/, '')}: {driveLabel(visibleDrive ? roadM! : distanceM)}{visibleDrive ? '' : ' · Fernfahrt'}{!check.ok ? ` – ${check.why}` : ''}</span>
     <button disabled={busy || !check.ok} onClick={() => void drive()}>{busy ? 'Fahre …' : 'Hinfahren'}</button>
     {error && <small>{error}</small>}
     <style jsx>{`

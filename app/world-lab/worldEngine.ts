@@ -1,4 +1,6 @@
 // app/world-lab/worldEngine.ts
+// Aktualisiert: 06.11.2026 — Echter Verkehr: Personen mit Auto fahren ihren Arbeitsweg sichtbar über die Straßen; eigene Fahrt als Fahrt (driveTo) statt Sprung; geparktes eigenes Auto (setOwnVehicle)
+// Version:      1.1.0
 // Prototyp „eine Welt“ mit PixiJS – die Zeichenmaschine ohne React.
 //
 // WorldLab.tsx stellt nur Bühne und Anzeige; Kacheln, NOXIA-Gebäude und Bilder
@@ -117,6 +119,8 @@ export interface WorldPerson {
   look?: KieselLook
   /** Arbeitspose vor dem Arbeitsort (`workPoseFor`), solange die Figur dort steht. */
   pose?: KieselPose | null
+  /** Besitzt ein Auto: weite Wege fährt die Person sichtbar über die Straßen statt unsichtbar. */
+  vehicle?: boolean
 }
 
 export interface WorldEngine {
@@ -135,6 +139,12 @@ export interface WorldEngine {
   /** Spielfigur geht selbst zu einem Ziel, bis sie `withinM` Meter nah ist; Tasten brechen ab. */
   walkTo: (target: () => GeoPoint | null, withinM: number, onArrive?: () => void) => void
   stopWalking: () => void
+  /** Spielfigur fährt mit dem eigenen Auto über die Straßen zum Ziel; am Ende bleibt das Auto dort stehen. */
+  driveTo: (target: () => GeoPoint | null, withinM: number, onArrive?: () => void) => void
+  /** Geparktes eigenes Auto (aus der Datenbank), null = keins. */
+  setOwnVehicle: (at: GeoPoint | null) => void
+  /** Länge des Straßenwegs vom Spieler zum Ziel in Metern, null wenn kein Straßenweg in den geladenen Kacheln. */
+  roadRouteLengthM: (to: GeoPoint) => number | null
   /** Tasten und Klicks der Karte an/aus (aus, solange ein Innenraum offen ist). */
   setInputEnabled: (enabled: boolean) => void
   /** Abstand der Spielfigur in Metern (zu einem Punkt oder zum Rand eines Grundrisses). */
@@ -219,6 +229,20 @@ const BUILD_BUDGET = 80
 const BAND_M = 32
 const WALK_M_PER_S = 16
 const RUN_FACTOR = 2.6
+/** Autos: Personen der Simulation und die Spielfigur. Die Figur geht 16 m/s, Autos fahren zügiger. */
+const NPC_DRIVE_M_PER_S = 22
+const DRIVE_M_PER_S = 34
+type VehicleDims = { length: number; width: number; height: number }
+const PRIVATE_CAR: VehicleDims = { length: 4.4, width: 1.8, height: 1.5 }
+const CAR_COLORS = [0xd8d4cc, 0x2f3a44, 0x8c1d2b, 0x2a4d7a, 0x5a6b5a, 0xb9b1a3, 0x1f1f22, 0xc9a24a, 0x6b7d8f, 0xe6e2da]
+function carColorFor(seed: number) { return CAR_COLORS[seed % CAR_COLORS.length] }
+/** Fahrtrichtung aus zwei Punkten; steht das Fahrzeug, die vorige Richtung behalten. */
+function headingOf(px: number, py: number, ax: number, ay: number, x: number, y: number) {
+  let dx = ax - x, dy = ay - y
+  if (Math.hypot(dx, dy) < 0.05) { dx = x - px; dy = y - py }
+  const length = Math.hypot(dx, dy)
+  return length < 0.001 ? { ux: 0.71, uy: 0.71 } : { ux: dx / length, uy: dy / length }
+}
 
 function shade(color: number, factor: number) {
   const r = Math.min(255, Math.round(((color >> 16) & 255) * factor))
@@ -1470,11 +1494,13 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     route: Array<{ x: number; y: number }> | null; routeLength: number
     /** Unterwegs zu einem Ort: Weg entlang der Straßen, Länge, Start, Dauer.
      *  `commute`: eigener Weg zum neuen Ort aus der Simulation; endet am Ziel von selbst. */
-    sent: { path: Array<{ x: number; y: number }>; length: number; start: number; seconds: number; commute?: boolean; /** Weg ohne Straßen oder zu weit: unterwegs unsichtbar (Bus, Auto), statt quer durch Häuser zu rennen. */ hidden?: boolean } | null
+    sent: { path: Array<{ x: number; y: number }>; length: number; start: number; seconds: number; commute?: boolean; /** Weg ohne Straßen oder zu weit: unterwegs unsichtbar (Bus, Auto), statt quer durch Häuser zu rennen. */ hidden?: boolean; /** Fährt mit dem eigenen Auto: Auto statt Figur, Tempo eines Autos. */ drive?: boolean } | null
     /** Platz vor dem Anker (0, 1, 2 …) und ob die Person drinnen ist, weil vor dem Haus schon genug stehen. */
     slot: number; slots: number; crowdInside: boolean
     /** Zurückgelegter Weg auf der eigenen Straße (m) und Zeit des letzten Schritts */
     runM: number; lastAt: number
+    /** Eigenes Auto, nur während einer Fahrt gezeichnet */
+    car?: PixiGraphics
   }
   const walkers = new Map<string, Walker>()
   const PERSON_COLORS = [0x4f7fb3, 0xa4553f, 0x5f8f4a, 0x8a6aa8, 0x3f8f8a, 0xb08a3a]
@@ -1585,7 +1611,11 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     // Häuser laufen, sondern unterwegs unsichtbar sein (Thomas, 31.10.2026: „über die Karte rennen,
     // ohne Rücksicht auf Straßen und Gebäude“).
     const offRoad = planned.length <= 1 && direct > 30
-    walker.sent = { path, length, start: performance.now(), seconds: commuteSeconds(length), commute: true, hidden: offRoad || length > VISIBLE_WALK_MAX_M }
+    // Wer ein Auto hat, fährt weite Wege sichtbar über die Straßen (Thomas, 06.11.2026: echter Verkehr, keine Kulisse).
+    const drive = Boolean(walker.spec.vehicle) && !offRoad && length > VISIBLE_WALK_MAX_M / 2
+    walker.sent = drive
+      ? { path, length, start: performance.now(), seconds: commuteSeconds(length, NPC_DRIVE_M_PER_S, 3, 240), commute: true, hidden: false, drive: true }
+      : { path, length, start: performance.now(), seconds: commuteSeconds(length), commute: true, hidden: offRoad || length > VISIBLE_WALK_MAX_M }
   }
   function along(route: Array<{ x: number; y: number }>, distance: number) {
     for (let i = 1; i < route.length; i++) {
@@ -1606,7 +1636,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   }
   function setPeople(list: WorldPerson[]) {
     const keep = new Set(list.map(person => person.id))
-    for (const [id, walker] of walkers) if (!keep.has(id)) { walker.figure.destroy({ children: true }); walker.label.destroy(); walker.bubble?.destroy(); walkers.delete(id) }
+    for (const [id, walker] of walkers) if (!keep.has(id)) { walker.figure.destroy({ children: true }); walker.label.destroy(); walker.bubble?.destroy(); walker.car?.destroy(); walkers.delete(id) }
     for (const spec of list) {
       const known = walkers.get(spec.id)
       if (known) {
@@ -1656,8 +1686,18 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         const t = Math.min(1, (now - walker.sent.start) / 1000 / walker.sent.seconds)
         const at = along(walker.sent.path, walker.sent.length * t)
         x = at.x; y = at.y
+        if (walker.sent.drive) {
+          // Auto statt Figur: Richtung aus dem Weg, eine halbe Spur rechts der Straßenmitte
+          const ahead = along(walker.sent.path, Math.min(walker.sent.length, walker.sent.length * t + 2))
+          const h = headingOf(walker.x, walker.y, ahead.x, ahead.y, x, y)
+          if (!walker.car) { walker.car = new PIXI.Graphics(); walker.car.eventMode = 'none' }
+          const cx = x + -h.uy * 1.8, cy = y + h.ux * 1.8
+          const visible = Math.hypot(cx - player.x, cy - player.y) < 420
+          walker.car.visible = visible
+          if (visible) { drawVehicle(walker.car, cx, cy, h.ux, h.uy, PRIVATE_CAR, carColorFor(walker.seed), 0xd0ccc4, true); placeDepth(walker.car, cx + cy + 2) }
+        }
         // Angekommen: ab jetzt steht die Figur wieder an ihrem Ort.
-        if (t >= 1 && walker.sent.commute) walker.sent = null
+        if (t >= 1 && walker.sent.commute) { walker.sent = null; if (walker.car) { walker.car.destroy(); walker.car = undefined } }
       } else if (walker.spec.anchor) {
         // Vor dem Haus auf der Kameraseite (Süd-Ost), nicht darin – dort sieht man sie.
         const home = toWorld(walker.spec.anchor)
@@ -1703,7 +1743,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       placeDepth(walker.figure, x + y)
       stepKiesel(walker.kiesel, foot, now)
       walker.label.position.set(foot.x, foot.y - 12)
-      const near = Math.hypot(x - player.x, y - player.y) < 200 && !(walker.spec.inside && !walker.sent) && !(walker.crowdInside && !walker.sent) && !walker.sent?.hidden
+      const near = Math.hypot(x - player.x, y - player.y) < 200 && !(walker.spec.inside && !walker.sent) && !(walker.crowdInside && !walker.sent) && !walker.sent?.hidden && !walker.sent?.drive
       walker.figure.visible = near
       walker.label.visible = near && zoom >= 2.2
       if (walker.bubble) { walker.bubble.position.set(foot.x, foot.y - 17); walker.bubble.visible = near && zoom >= 1.6 }
@@ -1826,7 +1866,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // ── Selbst gehen ────────────────────────────────────────────────────
   // Nahe Ziele (unter 30 m) gerade, weite entlang der Straßen der geladenen
   // Kacheln. Bewegt sich das Ziel weit weg (Person), wird neu geplant.
-  let autoWalk: { target: () => GeoPoint | null; withinM: number; onArrive?: () => void; path: Array<{ x: number; y: number }>; planFor: { x: number; y: number } | null; planAt: number; stuck: number } | null = null
+  let autoWalk: { target: () => GeoPoint | null; withinM: number; onArrive?: () => void; path: Array<{ x: number; y: number }>; planFor: { x: number; y: number } | null; planAt: number; stuck: number; /** Mit dem eigenen Auto: Tempo eines Autos, Auto statt Figur, am Ziel bleibt es stehen. */ drive?: boolean } | null = null
   function planRoute(to: { x: number; y: number }, from: { x: number; y: number } = player) {
     if (Math.hypot(to.x - from.x, to.y - from.y) < 30) return [to]
     const graph = new RoadGraph()
@@ -1846,7 +1886,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const target = autoWalk.target()
     if (!target) { autoWalk = null; return }
     const to = toWorld(target)
-    if (Math.hypot(to.x - player.x, to.y - player.y) <= autoWalk.withinM) { const done = autoWalk.onArrive; autoWalk = null; done?.(); return }
+    if (Math.hypot(to.x - player.x, to.y - player.y) <= autoWalk.withinM) { const done = autoWalk.onArrive; if (autoWalk.drive) parkOwnCar(); autoWalk = null; done?.(); return }
     // Neu planen, wenn das Ziel sich bewegt hat oder (bei weiten Zielen) neue Kacheln geladen sind.
     const now = performance.now()
     if (!autoWalk.planFor || Math.hypot(to.x - autoWalk.planFor.x, to.y - autoWalk.planFor.y) > 12 || (autoWalk.path.length <= 1 && now - autoWalk.planAt > 4000)) {
@@ -1857,14 +1897,53 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     if (autoWalk.path.length <= 1) next = to
     const dx = next.x - player.x, dy = next.y - player.y, distance = Math.hypot(dx, dy)
     if (distance < 0.01) return
-    const step = Math.min(distance, WALK_M_PER_S * dt)
+    const step = Math.min(distance, (autoWalk.drive ? DRIVE_M_PER_S : WALK_M_PER_S) * dt)
     const moved = movePlayer(player.x + dx / distance * step, player.y + dy / distance * step)
+    if (autoWalk.drive && moved > 0.01) ownCarHeading = headingOf(player.x - dx, player.y - dy, player.x + dx, player.y + dy, player.x, player.y)
     // Hängt die Figur an einer Wand fest, den nächsten Wegpunkt nehmen.
     autoWalk.stuck = moved < step * 0.2 ? autoWalk.stuck + dt : 0
     if (autoWalk.stuck > 0.8 && autoWalk.path.length > 1) { autoWalk.path.shift(); autoWalk.stuck = 0 }
     // Ziel liegt hinter einer Wand (Schild mitten im Haus): so nah wie möglich gilt als angekommen.
-    else if (autoWalk.stuck > 1.2) { const done = autoWalk.onArrive; autoWalk = null; done?.() }
+    else if (autoWalk.stuck > 1.2) { const done = autoWalk.onArrive; if (autoWalk.drive) parkOwnCar(); autoWalk = null; done?.() }
   }
+
+  // ── Eigenes Auto ────────────────────────────────────────────────────
+  // Geparkt steht es am Straßenrand nächst der gespeicherten Stelle; während der
+  // Fahrt sitzt die Figur darin (Auto statt Figur, Kamera folgt wie immer).
+  const ownCar = new PIXI.Graphics()
+  ownCar.visible = false
+  let ownCarAt: { x: number; y: number } | null = null
+  let ownCarHeading = { ux: 0.71, uy: 0.71 }
+  /** Nächster Punkt auf einer Straße (ohne Pfade) im Umkreis, mit Richtung; sonst der Punkt selbst. */
+  function roadsidePoint(at: { x: number; y: number }, maxM = 40) {
+    let best: { x: number; y: number; ux: number; uy: number } | null = null, bestD = maxM
+    for (const entry of loaded.values()) for (const road of entry.data.roads) {
+      if (road.c === 'path') continue
+      for (let i = 0; i + 3 < road.p.length; i += 2) {
+        const ax = entry.ox + road.p[i], ay = entry.oy + road.p[i + 1], bx = entry.ox + road.p[i + 2], by = entry.oy + road.p[i + 3]
+        const vx = bx - ax, vy = by - ay, len2 = vx * vx + vy * vy
+        if (len2 < 0.01) continue
+        const t = Math.max(0, Math.min(1, ((at.x - ax) * vx + (at.y - ay) * vy) / len2))
+        const px = ax + vx * t, py = ay + vy * t, d = Math.hypot(px - at.x, py - at.y)
+        if (d < bestD) { const len = Math.sqrt(len2); bestD = d; best = { x: px, y: py, ux: vx / len, uy: vy / len } }
+      }
+    }
+    return best
+  }
+  function drawOwnCar() {
+    const driving = autoWalk?.drive === true
+    const at = driving ? { x: player.x, y: player.y } : ownCarAt
+    if (!at) { ownCar.visible = false; return }
+    let h = ownCarHeading, cx = at.x, cy = at.y
+    if (!driving) {
+      const side = roadsidePoint(at)
+      if (side) { h = { ux: side.ux, uy: side.uy }; cx = side.x + -side.uy * 2.6; cy = side.y + side.ux * 2.6 }
+    }
+    const visible = Math.hypot(cx - player.x, cy - player.y) < 450
+    ownCar.visible = visible
+    if (visible) { drawVehicle(ownCar, cx, cy, h.ux, h.uy, PRIVATE_CAR, 0x2a4d7a, 0xd0ccc4, driving); placeDepth(ownCar, cx + cy + 2) }
+  }
+  function parkOwnCar() { ownCarAt = { x: player.x, y: player.y } }
 
   // ── Weg zum Ziel ────────────────────────────────────────────────────
   // Gestrichelte Linie vom Spieler zum Ziel, entlang der Straßen; jede Sekunde neu.
@@ -1908,8 +1987,13 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     for (let i = 0; i < list.length; i++) trainCars.push([0, 1, 2].map(() => { const g = new PIXI.Graphics(); g.visible = false; return g }))
   }
   function drawCar(g: PixiGraphics, cx: number, cy: number, ux: number, uy: number, body: number, roof: number, front: boolean) {
+    drawVehicle(g, cx, cy, ux, uy, { length: CAR_LENGTH, width: CAR_WIDTH, height: CAR_HEIGHT }, body, roof, front)
+  }
+  /** Kastenförmiges Fahrzeug in 2,5D: Zug, Auto, Lieferwagen – Maße in Metern, Fahrtrichtung (ux, uy). */
+  function drawVehicle(g: PixiGraphics, cx: number, cy: number, ux: number, uy: number, dims: VehicleDims, body: number, roof: number, front: boolean) {
     g.clear()
-    const nx = -uy, ny = ux, hl = CAR_LENGTH / 2, hw = CAR_WIDTH / 2
+    const CAR_HEIGHT = dims.height
+    const nx = -uy, ny = ux, hl = dims.length / 2, hw = dims.width / 2
     const c = [[-hl, -hw], [hl, -hw], [hl, hw], [-hl, hw]].map(([l, w]) => ({ x: cx + ux * l + nx * w, y: cy + uy * l + ny * w }))
     const base = c.map(p => iso(p.x, p.y)), top = c.map(p => iso(p.x, p.y, CAR_HEIGHT))
     // Nur die Seiten zur Kamera (Süd-Ost): Normalen mit positivem x+y
@@ -2404,6 +2488,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     if (keys.has('a')) sx -= 1
     if (keys.has('d')) sx += 1
     if (sx || sy) {
+      if (autoWalk?.drive) parkOwnCar()
       autoWalk = null
       const wx = sx + sy, wy = sy - sx
       const length = Math.hypot(wx, wy)
@@ -2416,6 +2501,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     movePeers(logicStart, peersLastAt ? Math.min(0.25, (logicStart - peersLastAt) / 1000) : 0)
     peersLastAt = logicStart
     moveTrains()
+    drawOwnCar()
+    playerSprite.visible = autoWalk?.drive !== true
     // Die Kamera gleitet hinterher statt zu springen.
     const follow = 1 - Math.exp(-dt * 9)
     camera.x += (player.x - camera.x) * follow
@@ -2517,6 +2604,21 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       if (back) startCommute(walker, back)
     },
     walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive, path: [], planFor: null, planAt: 0, stuck: 0 } },
+    driveTo(target, withinM, onArrive) {
+      // Erst zum Auto, wenn es nicht hier steht; dann fahren. Ohne geparktes Auto startet die Fahrt hier.
+      ownCarAt = null
+      autoWalk = { target, withinM, onArrive, path: [], planFor: null, planAt: 0, stuck: 0, drive: true }
+    },
+    setOwnVehicle(at) {
+      if (autoWalk?.drive) return
+      ownCarAt = at ? toWorld(at) : null
+    },
+    roadRouteLengthM(to) {
+      const target = toWorld(to)
+      const planned = planRoute(target)
+      if (planned.length <= 1 && Math.hypot(target.x - player.x, target.y - player.y) > 30) return null
+      return Math.round(pathLength([{ x: player.x, y: player.y }, ...planned]))
+    },
     setPlayerName(name) { playerName.text = name.slice(0, 40) },
     setSites(list) { sites = list; drawSites() },
     setBeacons(list) { beaconList = list; drawBeacons() },
@@ -2537,8 +2639,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       }
       return out
     },
-    stopWalking() { autoWalk = null },
-    setInputEnabled(enabled) { inputEnabled = enabled; if (!enabled) { keys.clear(); autoWalk = null } },
+    stopWalking() { if (autoWalk?.drive) parkOwnCar(); autoWalk = null },
+    setInputEnabled(enabled) { inputEnabled = enabled; if (!enabled) { keys.clear(); if (autoWalk?.drive) parkOwnCar(); autoWalk = null } },
     distanceTo(at) { const p = toWorld(at); return Math.hypot(p.x - player.x, p.y - player.y) },
     distanceToPlace(at) {
       const p = toWorld(at)

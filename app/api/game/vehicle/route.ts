@@ -1,6 +1,6 @@
 // app/api/game/vehicle/route.ts
-// Aktualisiert: 06.11.2026 — Fahrzeuge auf der Erde: Kauf, Reparatur, Laden, Fahrt (Migration 20261026220000)
-// Version:      1.0.0
+// Aktualisiert: 06.11.2026 — Fahrt mit gemessener Straßenstrecke (distanceM, begrenzt durch die Luftlinie); 06.11.2026 — Fahrzeuge auf der Erde: Kauf, Reparatur, Laden, Fahrt (Migration 20261026220000)
+// Version:      1.1.0
 //
 // GET                                             → eigenes Fahrzeug, Modelle, Credits
 // POST { action: 'buy', modelCode, requestId }    → Kauf im Autohaus (versteuerte Überweisung)
@@ -14,7 +14,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import type { GeoPoint } from '@/lib/game/earthTrips'
-import { VEHICLE_MODELS, driveDistanceM, type Vehicle } from '@/lib/game/earthVehicles'
+import { VEHICLE_MODELS, ROAD_FACTOR, driveDistanceM, type Vehicle } from '@/lib/game/earthVehicles'
 
 const noStore = { 'Cache-Control': 'no-store' }
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -78,7 +78,10 @@ export async function POST(req: NextRequest) {
     if (action === 'drive') {
       const from = point(body.from), to = point(body.to)
       if (!from || !to) return NextResponse.json({ error: 'Start oder Ziel fehlt.' }, { status: 400, headers: noStore })
-      const distanceM = driveDistanceM(from, to)
+      // Sichtbare Fahrt: der Client meldet die Länge des gefahrenen Straßenwegs; plausibel nur zwischen Luftlinie und deren Dreifachem.
+      const air = driveDistanceM(from, to) / ROAD_FACTOR
+      const reported = Number(body.distanceM)
+      const distanceM = Number.isFinite(reported) && reported >= air * 0.95 && reported <= air * 3 ? Math.round(reported) : driveDistanceM(from, to)
       const { data, error } = await supabase.rpc('vehicle_drive', { p_profile_id: profileId, p_distance_m: distanceM, p_lat: to.lat, p_lon: to.lon })
       if (error) throw error
       return NextResponse.json({ ok: true, distanceM, vehicle: toVehicle(data?.vehicle ?? null), chargeCost: Number(data?.charge_cost ?? 0), to }, { headers: noStore })
@@ -92,6 +95,12 @@ export async function POST(req: NextRequest) {
       const { data: tickRow } = await supabase.from('tick_log').select('tick_number').order('tick_number', { ascending: false }).limit(1).maybeSingle()
       const { data, error } = await supabase.rpc('vehicle_service', { p_profile_id: profileId, p_request_id: requestId, p_service_kind: action, p_model_code: modelCode, p_tick: Number(tickRow?.tick_number ?? 0) })
       if (error) throw error
+      // Beim Kauf steht das Auto vor dem Autohaus (Position vom Client, nur beim ersten Mal).
+      const at = point(body.at)
+      if (action === 'buy' && !data?.duplicate && at && data?.vehicle?.id) {
+        await supabase.from('player_vehicles').update({ latitude_deg: at.lat, longitude_deg: at.lon }).eq('id', data.vehicle.id)
+        data.vehicle = { ...data.vehicle, latitude_deg: at.lat, longitude_deg: at.lon }
+      }
       return NextResponse.json({ ok: true, duplicate: Boolean(data?.duplicate), label: data?.label ?? null, priceCredits: Number(data?.price_credits ?? 0), credits: Number(data?.credits ?? 0), vehicle: toVehicle(data?.vehicle ?? null) }, { headers: noStore })
     }
 

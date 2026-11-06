@@ -1,6 +1,6 @@
 # NOXIA-WORLD-0005 – Fahrzeuge und Betriebe auf der Erde
 
-Aktualisiert: 06.11.2026 · Version 1.0.0
+Aktualisiert: 06.11.2026 · Version 1.1.0
 
 ## Entscheidung (Thomas, 26.10.2026 und 06.11.2026)
 
@@ -29,7 +29,19 @@ Erde (Muster `order_hospitality_item`), idempotent je `request_id`.
 - Betriebe: `lib/game/business/establishments.ts` (`establishmentFor`, `establishmentFromUse`); Raumart in `lib/game/landmarks/interiors.ts` (`buildingRoomKind` → `shop` / `workshop`).
 - Oberfläche: `app/components/VehicleDesk.tsx` (Tresen im Betrieb, „Hinfahren“, geteilter Fahrzeugzustand), eingebunden in `app/world-lab/WorldPanels.tsx` und `app/components/TravelAgency.tsx`.
 
+## Verkehr ist echt, keine Kulisse (Thomas, 06.11.2026)
+
+Auf der Karte fährt nur, wer wirklich jemand ist: kein zufällig erzeugter
+Hintergrundverkehr.
+
+- Personen der Simulation mit Auto fahren ihren Arbeitsweg sichtbar über die Straßen (Auto statt Figur, rechts der Straßenmitte). Wer ein Auto hat, ist je Person fest (Platzhalter: Arbeitsplatz und Kennung, bis die Personensimulation Fahrzeuge vergibt).
+- Die eigene Fahrt ist bis 6 km eine sichtbare Fahrt über den Straßenweg (`engine.driveTo`); gebucht wird bei der Ankunft mit der gefahrenen Strecke. Weiter weg ist es eine Fernfahrt (Sprung), wie beim Reisebüro.
+- Das eigene Auto steht sichtbar geparkt am Straßenrand, wo es zuletzt abgestellt wurde (Kauf: vor dem Autohaus).
+- Busse und andere Spieler folgen, sobald es Linien mit Fahrplan (wie der Zug) und Fahrzeugpositionen anderer Spieler gibt.
+
 ## Offen
+
+- Buslinien aus OSM-Relationen mit Fahrplan; Autos anderer Spieler über die Präsenz.
 
 - Tiere (Tierbedarf, Tierarzt) als zweiter Betriebszweig.
 - Fahrzeug auf der Karte zeichnen; Fahrt als Bewegung statt Sprung.

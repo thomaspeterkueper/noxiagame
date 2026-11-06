@@ -1,8 +1,8 @@
 'use client'
 
 // app/world-lab/WorldLab.tsx
-// Aktualisiert: 06.11.2026 — Fahrzeug: Ankunftsmeldung nach „Hinfahren“ (onNote an WorldPanels)
-// Version:      1.1.0
+// Aktualisiert: 06.11.2026 — Eigenes Auto geparkt auf der Karte (useVehicle → setOwnVehicle); Personen mit Auto fahren ihren Arbeitsweg sichtbar; 06.11.2026 — Fahrzeug: Ankunftsmeldung nach „Hinfahren“ (onNote an WorldPanels)
+// Version:      1.2.0
 // Weltkarte „eine Welt“ mit PixiJS – eigene Seite /world-lab und im Spiel
 // neben der bisherigen Erdszene. Personen, Ansprechen und Betreten in
 // WorldPanels.tsx (immer nur eine Tafel offen).
@@ -14,6 +14,7 @@
 //   - Reale Orte sind stark vereinfacht: Blöcke aus einem Baukasten (lib/worldlab/blocks.ts).
 
 import { landmarkRoomKind } from '@/lib/game/landmarks/interiors'
+import { useVehicle } from '@/app/components/VehicleDesk'
 import { bubbleDurationMs, bubbleText } from '@/lib/game/rounds/bubbles'
 import type { PresenceRow } from '@/lib/game/population/placePresence'
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
@@ -78,6 +79,18 @@ const START_PLACE = PLACES.find(place => place.label === 'Café') ?? PLACES[0]
  * `embedded`: im Spiel unter der oberen Leiste statt als eigene Seite; `onLeave`
  * führt dann zurück zur bisherigen Erdszene statt zum Dashboard.
  */
+/**
+ * Wer ein Auto hat: Personen mit Arbeitsplatz, fest nach ihrer Kennung (etwa sechs von zehn).
+ * Platzhalter, bis die Personensimulation Fahrzeuge selbst vergibt – aber je Person fest,
+ * keine Kulisse: dieselbe Person fährt immer dasselbe Auto denselben Weg.
+ */
+function ownsVehicle(resident: { id: string; assignments: Array<{ type: string }> }) {
+  if (!resident.assignments.some(item => item.type === 'work')) return false
+  let h = 2166136261
+  for (let i = 0; i < resident.id.length; i++) h = Math.imul(h ^ resident.id.charCodeAt(i), 16777619)
+  return (h >>> 0) % 10 < 6
+}
+
 export default function WorldLab({ embedded = false, onLeave, onPlanning, residents: givenResidents }: { embedded?: boolean; onLeave?: () => void; onPlanning?: () => void; residents?: ColonyResident[] } = {}) {
   const host = useRef<HTMLDivElement | null>(null)
   const engine = useRef<WorldEngine | null>(null)
@@ -385,10 +398,16 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         activity, inside: inside || inRoom(surface),
         anchor: surface ? { lat: surface.lat, lon: surface.lon } : place ? { lat: place.lat, lon: place.lon } : null,
         anchorRadiusM: surface ? 3 : place ? Math.max(place.w, place.d) / 2 : undefined,
+        vehicle: ownsVehicle(resident),
       }
     })
     engineReady.setPeople(people)
   }, [engineReady, residents, noxia, surfacePeople, surfaceStates, hud?.tiles])
+
+  // Eigenes Auto: geparkt dort, wo die Datenbank es zuletzt kennt (Kauf, Ankunft).
+  const { vehicle: ownVehicle } = useVehicle()
+  const ownVehicleAt = ownVehicle?.at ?? null
+  useEffect(() => { engineReady?.setOwnVehicle(ownVehicleAt) }, [engineReady, ownVehicleAt])
 
   // Im Innenraum steuert der Innenraum: Karte hört dann nicht auf Tasten und Klicks.
   useEffect(() => { engineReady?.setInputEnabled(!trip && panel.kind !== 'inside' && panel.kind !== 'landmarkInside') }, [engineReady, panel.kind, trip])

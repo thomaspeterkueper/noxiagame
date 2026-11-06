@@ -1,8 +1,8 @@
 'use client'
 
 // app/world-lab/WorldPanels.tsx
-// Aktualisiert: 06.11.2026 — Betriebe (Laden, Werkstatt) aus realen Gewerbe-Häusern mit erfundenem Namen, Personal und Leistungen; Fahrzeugtresen im Autohaus, in der Werkstatt und an der Ladestation; „Hinfahren“ mit eigenem Fahrzeug zu fernen Zielen (onNote); 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd)
-// Version:      1.2.0
+// Aktualisiert: 06.11.2026 — Sichtbare Autofahrt zum Ziel (engine.driveTo), Fernfahrt als Sprung; 06.11.2026 — Betriebe (Laden, Werkstatt) aus realen Gewerbe-Häusern mit erfundenem Namen, Personal und Leistungen; Fahrzeugtresen im Autohaus, in der Werkstatt und an der Ladestation; „Hinfahren“ mit eigenem Fahrzeug zu fernen Zielen (onNote); 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd)
+// Version:      1.3.0
 // Tafeln der Weltkarte: Person, Gebäude, Innenraum.
 //
 // Grundsatz (Thomas, 25.10.2026 – in der alten Szene lagen Tafeln übereinander):
@@ -300,7 +300,10 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   /** „Hinfahren“ mit eigenem Fahrzeug – erscheint nur ab einigen hundert Metern (DriveButton prüft selbst). */
   function driveRow(to: { lat: number; lon: number }) {
     if (!engine) return null
-    return <div className="row drive-row"><DriveButton from={() => engine.position()} to={to} onArrived={(at, note) => { engine.jump(at); onNote?.(note) }}/></div>
+    return <div className="row drive-row"><DriveButton from={() => engine.position()} to={to}
+      localRoute={() => engine.roadRouteLengthM(to)}
+      onLocalDrive={(target, done) => engine.driveTo(() => target, ENTER_RANGE_M + 4, done)}
+      onArrived={(at, note) => { if (engine.distanceToPlace(at) > ENTER_RANGE_M + 12) engine.jump(at); onNote?.(note) }}/></div>
   }
   /** Nutzungskennung (s:bakery, c:carpenter, o:company, a:fuel, b:industrial) als OSM-Tag. */
   function codeAsTags(code: string | null | undefined): Record<string, string> {
@@ -689,7 +692,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     const staffName = landmarkStaffName(panel.landmark.name)
     return <LandmarkWalkableInterior placeRef={panel.source} kind={panel.room} name={panel.landmark.name} typeLabel={business?.function ?? (panel.room === 'shop' ? 'Laden' : 'Werkstatt')} facts={landmarkFacts(panel.landmark.tags)} onClose={close}
       knowledge={business ? establishmentKnowledge(business, placeName) : []} services={services.filter(service => !vehicleIds.includes(service.id))} staffRole={business?.staffRole} realName={business?.realName || undefined}
-      desk={vehicleIds.length > 0 ? <VehicleDesk services={vehicleIds} staffName={staffName}/> : undefined}
+      desk={vehicleIds.length > 0 ? <VehicleDesk services={vehicleIds} staffName={staffName} at={panel.landmark.at}/> : undefined}
       people={peopleAtPlace(presence, { osm: panel.source, at: panel.landmark.at, radiusM: 45 })}/>
   }
   if (panel.kind === 'landmarkInside') {
