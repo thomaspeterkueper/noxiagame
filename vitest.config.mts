@@ -19,6 +19,7 @@ export default defineConfig({
       'lib/multiplayer/roomPresence.test.ts',
       'lib/multiplayer/mapPresence.test.ts',
       'lib/figures/workPose.test.ts',
+      'lib/game/production/inputGate.test.ts',
       'lib/multiplayer/roomChat.test.ts', 'lib/multiplayer/gestures.test.ts',
       'lib/figures/kiesel.test.ts', 'lib/game/services/publicServices.test.ts', 'lib/figures/playerLook.test.ts',
       'lib/speech/browserSpeech.test.ts',

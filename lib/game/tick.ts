@@ -13,6 +13,7 @@
 // Vorher:       09.10.2026 — Lagergrenzen (lib/game/storageCapacity.ts)
 // Version:      3.11.0
 
+import { gateProduction } from './production/inputGate'
 import {
   CONSUMPTION_PER_100,
   GROWTH_RATE,
@@ -152,6 +153,14 @@ export async function runPopulationTick(
     // tick/building/resource. Fail closed: once a building is physicalized, an
     // output-credit failure must never fall back to location stock, or a retry
     // could duplicate the same goods in two stores.
+    // Produktion nur mit Eingängen (Request 0930): Gebäude ohne alle Eingänge im Ortsbestand
+    // laufen in diesem Tick nicht – sie verbrauchen und erzeugen nichts (lib/game/production/inputGate.ts).
+    // Firmenanlagen (actor_id) liefern im Firmen-Tick und bleiben hier außen vor.
+    const gate = gateProduction((buildings ?? []).filter(b => !b.actor_id), defs, stock, TICK_RESOURCES as readonly string[])
+    const runs = (b: { id: string; actor_id?: string | null }) => !b.actor_id && gate.running.has(b.id)
+    const limitedBuildings = [...gate.limitedBy].map(([id, resource]) => ({ id, resource }))
+    if (limitedBuildings.length) console.info(`runPopulationTick: ${loc.slug} – ${limitedBuildings.length} Gebäude ohne Eingang`, limitedBuildings.slice(0, 10))
+
     let nativeFacilityCredits = 0
     const facilityOutputErrors: string[] = []
     if (!facilityInventoryError) {
@@ -161,6 +170,7 @@ export async function runPopulationTick(
         // dort wird die Ware an den Markt geliefert, bezahlt und an der Lagergrenze
         // gekappt. Eine zweite Gutschrift ins Anlagenlager wäre dieselbe Ware doppelt.
         if (b.actor_id) continue
+        if (!runs(b)) continue
         const def = defs.get(b.entity_id)
         if (!def) continue
 
@@ -217,6 +227,9 @@ export async function runPopulationTick(
         const def = defs.get(b.entity_id)
         if (!def) continue
 
+        // Ohne Eingänge läuft das Gebäude nicht: keine Erzeugung, kein Verbrauch (Request 0930).
+        // Firmenanlagen behalten ihren bisherigen Verbrauch hier; ihre Erzeugung läuft im Firmen-Tick.
+        if (!b.actor_id && !runs(b)) continue
         for (const prod of def.production) {
           if (prod.resource !== res) continue
           // Firmenanlagen (actor_id) zählen hier nicht: ihre Ware kommt über den
@@ -336,6 +349,8 @@ export async function runPopulationTick(
       population: { before: pop, after: newPop, max: popMax },
       isSupplied,
       overcrowded,
+      // Gebäude, die mangels Eingang nicht liefen (Request 0930) – Kennung und fehlendes Gut
+      limitedBy: limitedBuildings,
       logistics: {
         nativeFacilities: nativeFacilityIds.size,
         facilityCredits: nativeFacilityCredits,
