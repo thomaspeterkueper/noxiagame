@@ -198,6 +198,8 @@ export function kieselSVG(a: KieselLook, dir: KieselDir = 'se', pose: KieselPose
   const headCy = torsoTop - headR * .92 + age.stoop * .5
   const c: Clothing | null = a.robot ? null : { ...(KIESEL_CLOTHES[a.clothes] ?? KIESEL_CLOTHES.alltag) }
   if (c && a.clothes === 'alltag' && a.topColor) c.top = a.topColor
+  // Das Kleid in eigener Farbe (06.11.2026: „Frauen könnten als Standard auch Kleider bekommen“).
+  if (c && a.clothes === 'kleid' && a.topColor) { c.top = a.topColor; c.bottom = a.topColor }
   let hairC = a.hairColor
   if (age.lines >= 1 && hairC.toLowerCase() !== GREY) hairC = mix(hairC, GREY, age.lines === 1 ? .35 : .7)
 
@@ -367,7 +369,7 @@ export function kieselLookFor(p: KieselSource, work?: string | null): KieselLook
           : /science|lab|clinic|health|research/.test(workKey) ? 'kittel'
             : /engineer|mine|repair|logistic|warehouse|bau/.test(workKey) ? 'overall'
               : /fest|ceremony|worship/.test(String(profile.occasion ?? '')) ? 'fest'
-                : gp === 'feminine' && (n >> 5) % 4 === 0 ? 'kleid' : 'alltag'
+                : gp === 'feminine' && (n >> 5) % 2 === 0 ? 'kleid' : 'alltag'
   const beard = gp === 'feminine' ? 'ohne' : BEARDS[ap.facialHairCode ?? ''] ?? ((n >> 9) % 4 === 0 ? 'stoppeln' : 'ohne')
   return {
     age: AGEMAP[ageBand] ?? 'erwachsen',

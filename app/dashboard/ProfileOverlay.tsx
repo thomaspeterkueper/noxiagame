@@ -14,6 +14,8 @@ import React from 'react'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import LearnLink from '@/app/academy/learn/LearnLink'
+import FigureEditor from '@/lib/figures/FigureEditor'
+import { KieselFigure, useMyLook } from '@/lib/figures/KieselFigure'
 
 const MONO = "'Courier Prime', monospace"
 const SANS = 'system-ui, sans-serif'
@@ -417,6 +419,10 @@ type Tab = 'kompetenzen' | 'wissenskarte' | 'einstellungen'
 export default function ProfileOverlay({ username, avatar, credits, onClose }: ProfileOverlayProps) {
   const [tab, setTab]       = useState<Tab>('kompetenzen')
   const [stats, setStats]   = useState<PlayerStats | null>(null)
+  // Eigene Figur gestalten – überall erreichbar, nicht nur im Innenraum (06.11.2026).
+  const [figureOpen, setFigureOpen] = useState(false)
+  const [figureNote, setFigureNote] = useState<string | null>(null)
+  const mine = useMyLook()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -482,9 +488,14 @@ export default function ProfileOverlay({ username, avatar, credits, onClose }: P
             <div style={{ fontSize: '0.65rem', color: C.gold, fontFamily: MONO, marginTop: 2 }}>
               {credits.toLocaleString('de')} Cr · {freigeschaltet}/{gesamt} Fähigkeiten
             </div>
+            <button onClick={() => { setFigureNote(null); setFigureOpen(true) }} style={{ marginTop: 6, padding: '3px 9px', borderRadius: 5, border: `1px solid ${C.gold}`, background: 'transparent', color: '#fff', fontSize: '0.7rem', cursor: 'pointer' }}>Figur gestalten …</button>
+            {figureNote && <div style={{ fontSize: '0.65rem', color: '#cfe3f2', marginTop: 3 }}>{figureNote}</div>}
           </div>
+          <button onClick={() => setFigureOpen(true)} title="Deine Figur im Spiel" style={{ background: '#e9e2d2', border: 'none', borderRadius: 8, padding: '2px 6px', cursor: 'pointer', flexShrink: 0 }}><KieselFigure look={mine.look} dir="sw" width={30} title="Deine Figur" /></button>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#8ab0d0', cursor: 'pointer', fontSize: '1.1rem' }}>✕</button>
         </div>
+
+        {figureOpen && <FigureEditor fixed onClose={text => { setFigureOpen(false); if (text) setFigureNote(text) }} />}
 
         {/* Statistiken */}
         {stats && (

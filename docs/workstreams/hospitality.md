@@ -325,6 +325,18 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
     - Nach „Registrierung abschließen“ öffnet sich der Figureneditor, vorbelegt nach dem Foto; danach geht es weiter zum Quiz.
     - „So übernehmen“ speichert die Figur zum Foto.
   - Tests: alle zwölf Fotos zugeordnet, Männer auf dem Foto ohne Frauenfrisur und Kleid, Frauen ohne Bart.
+- **06.11.2026 – Kleider und Figureneditor überall** (Thomas: „Frauen könnten als Standard auch Kleider bekommen. Wir hatten auch schon einen Figureneditor, ich denke, den sollten wir auch integrieren, aktuell gibt es ihn glaube ich nur als Artefakt“):
+  - **Kleider:**
+    - Die sechs Dienstfotos mit Frauen geben als Vorgabe ein Kleid, jedes in eigener Farbe.
+    - Bewohnerinnen tragen es zur Hälfte (vorher ein Viertel).
+    - Die Farbe des Kleids ist im Editor wählbar wie das Oberteil im Alltag.
+  - **Figureneditor überall:**
+    - Bisher nur über „Deine Figur gestalten …“ in der Seitenleiste eines Innenraums.
+    - Jetzt auch im Profil (Klick aufs Profilbild oben rechts: eigene Figur und „Figur gestalten …“) und im Onboarding, jeweils über den ganzen Bildschirm (`fixed`).
+  - **Aus der Figurenwerkstatt übernommen:**
+    - „Alle Bewegungen …“: alle Posen nach Stufen (Grundbewegungen, Gesten, Zu zweit, Tanz, Arbeit, Rangelei, Kampf), mit Blickrichtung und Hinweis, wann sie im Spiel vorkommen.
+    - Ein Klick zeigt die Pose groß an der eigenen Figur; dazu der Knopf „Zufällig“.
+    - Stilvergleich und Leistungsprobe der Werkstatt waren für die Entscheidung gedacht und bleiben im Artefakt.
   - Gilt für alle Räume des Motors: Lokale, Bank, Agentur, Reisebüro, Wache, Feuerwache, Praxis, Krankenhaus.
   - Im Browser geprüft (Metropol, Café, Wache; Laufen per Klick, Tasten, Einrichten).
   - **Später** (Thomas): eine 80er-/90er-Fassung für die Zeitreise in VR.

@@ -240,7 +240,7 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
         )}
 
         {step === 'figure' && avatar && (
-          <FigureEditor initialLook={defaultPlayerLook(profileId || 'me', avatar)} title="Deine Figur – passend zu deinem Dienstfoto. Stell sie ein, wie du magst." cancelLabel="So übernehmen" onClose={text => void figureDone(text)} />
+          <FigureEditor fixed initialLook={defaultPlayerLook(profileId || 'me', avatar)} title="Deine Figur – passend zu deinem Dienstfoto. Stell sie ein, wie du magst." cancelLabel="So übernehmen" onClose={text => void figureDone(text)} />
         )}
 
         {step === 'quiz' && (

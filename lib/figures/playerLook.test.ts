@@ -30,7 +30,13 @@ describe('Startfigur zum Dienstfoto', () => {
       expect(l.beard).not.toBe('ohne')
       expect(l.clothes).not.toBe('kleid')
     }
-    for (const id of ['pilot_02', 'pilot_05', 'pilot_11', 'pilot_12']) expect(defaultPlayerLook('y-' + id, id).beard).toBe('ohne')
+    for (const id of ['pilot_02', 'pilot_04', 'pilot_05', 'pilot_09', 'pilot_11', 'pilot_12']) {
+      const l = defaultPlayerLook('y-' + id, id)
+      expect(l.beard).toBe('ohne')
+      // Frauen bekommen als Vorgabe ein Kleid, jede in eigener Farbe
+      expect(l.clothes).toBe('kleid')
+      expect(l.topColor).toMatch(/^#[0-9a-f]{6}$/)
+    }
   })
   it('Rawdiums Foto (pilot_01): kurze dunkelbraune Haare mit Stoppeln – egal, was die Kennung sonst ergäbe', () => {
     const l = defaultPlayerLook('9d27396a-5c49-43fd-9fb9-a69ed2e3c788', 'pilot_01')
