@@ -318,6 +318,13 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
     - Im Test steht der Raum nach 0,2 s, auch wenn die Ortsdaten 4 s brauchen.
   - Räume ohne Gebäudekennung (Wache, Bibliothek, Kirche …) fragen keine eingetragenen Bewohner mehr ab.
   - Anfrage R-36 an Bevölkerung: `/api/game/population` arbeitet drei Stufen nacheinander ab, zwei davon könnten parallel laufen.
+- **06.11.2026 – Figur im Onboarding** (Thomas: „wir sollten beim Onboarding auch den Figureneditor laden, bei unserem neuen Spieler wurde ein weiblicher Avatar zugeordnet, obwohl er ein männliches Profilbild ausgewählt hat“):
+  - **Startfigur zum Dienstfoto:** Jedes der zwölf Fotos (`pilot_01`–`pilot_12`) hat eine passende Startfigur (`AVATAR_LOOKS` in `lib/figures/playerLook.ts`): Haar, Haarfarbe, Bart, Hautton, ungefähres Alter – nur was man auf dem Foto sieht.
+  - **Vorgabe nach Foto:** `/api/game/appearance` nimmt ohne eigene Einstellung die Figur zum Foto statt einer zufälligen aus der Kennung. Wer schon spielt und nichts eingestellt hat (Rawdium: `pilot_01`), sieht nach dem Neuladen von selbst richtig aus.
+  - **Onboarding:**
+    - Nach „Registrierung abschließen“ öffnet sich der Figureneditor, vorbelegt nach dem Foto; danach geht es weiter zum Quiz.
+    - „So übernehmen“ speichert die Figur zum Foto.
+  - Tests: alle zwölf Fotos zugeordnet, Männer auf dem Foto ohne Frauenfrisur und Kleid, Frauen ohne Bart.
   - Gilt für alle Räume des Motors: Lokale, Bank, Agentur, Reisebüro, Wache, Feuerwache, Praxis, Krankenhaus.
   - Im Browser geprüft (Metropol, Café, Wache; Laufen per Klick, Tasten, Einrichten).
   - **Später** (Thomas): eine 80er-/90er-Fassung für die Zeitreise in VR.

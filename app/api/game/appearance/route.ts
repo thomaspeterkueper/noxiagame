@@ -11,8 +11,14 @@ import { cleanPlayerLook, defaultPlayerLook } from '@/lib/figures/playerLook'
 export async function GET(req: NextRequest) {
   const profileId = await verifiedBearerUserId(req)
   if (!profileId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { data } = await createServiceClient().from('player_appearance').select('look').eq('profile_id', profileId).maybeSingle()
-  return NextResponse.json({ look: data?.look ? cleanPlayerLook(data.look, profileId) : defaultPlayerLook(profileId), saved: Boolean(data?.look) }, { headers: { 'Cache-Control': 'no-store' } })
+  const supabase = createServiceClient()
+  const [{ data }, { data: profile }] = await Promise.all([
+    supabase.from('player_appearance').select('look').eq('profile_id', profileId).maybeSingle(),
+    // Ohne eigene Einstellung: die Figur zum Dienstfoto aus dem Onboarding.
+    supabase.from('profiles').select('avatar').eq('id', profileId).maybeSingle(),
+  ])
+  const avatar = typeof profile?.avatar === 'string' ? profile.avatar : null
+  return NextResponse.json({ look: data?.look ? cleanPlayerLook(data.look, profileId, avatar) : defaultPlayerLook(profileId, avatar), saved: Boolean(data?.look) }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 export async function POST(req: NextRequest) {
