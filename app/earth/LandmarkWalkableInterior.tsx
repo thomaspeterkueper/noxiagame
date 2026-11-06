@@ -135,7 +135,8 @@ export default function LandmarkWalkableInterior(props: Props) {
 function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, desk, realName, people = [], occasion, placeRef, level, byStairs, onLevel }: Props & { level: number; byStairs: boolean; onLevel: (level: number) => void }) {
   const layout = useMemo(() => { const base = landmarkRoomLayout(kind, level, byStairs); return staffRole && base.staff ? { ...base, staff: { ...base.staff, role: staffRole } } : base }, [kind, staffRole, level, byStairs])
   const vlayout = useMemo(() => toVenueLayout(layout), [layout])
-  const entityId = 'landmark:' + (placeRef ?? name) + (level ? ':' + level : '')
+  // Raumkennung für Mitspieler und Raum-Chat: nur Buchstaben, Ziffern, : _ - (sonst lehnt der Raum-Chat ab).
+  const entityId = ('landmark:' + (placeRef ?? name).normalize('NFKD').replace(/[^A-Za-z0-9:_-]+/g, '-') + (level ? ':' + level : '')).slice(0, 80)
   const isLibrary = kind === 'library'
   const isCemetery = kind === 'cemetery'
   const isResonance = kind === 'resonance_place'

@@ -103,5 +103,5 @@ export default function SpaceportWalkableInterior({ entityId, buildingName, fact
     },
   }
 
-  return <WalkableInterior entityId={entityId} buildingName={buildingName} companion={companion} onClose={onClose} fitting={fitting} onContext={ctx => { ctxRef.current = ctx }} />
+  return <WalkableInterior entityId={entityId} presenceRoom="spaceport:earth" buildingName={buildingName} companion={companion} onClose={onClose} fitting={fitting} onContext={ctx => { ctxRef.current = ctx }} />
 }

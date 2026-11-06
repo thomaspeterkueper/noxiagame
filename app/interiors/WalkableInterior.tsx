@@ -224,6 +224,8 @@ export type Props = {
   learnRequest?:{gateId:string;at:number}|null
   /** Das Gespräch mit der Begleitung von draußen – es geht drinnen weiter. */
   companionHistory?:Array<{role:'user'|'assistant';content:string}>
+  /** Gemeinsamer Raum für Mitspieler und Raum-Chat, wenn ein Ort aus mehreren Gebäuden besteht (Raumhafen). */
+  presenceRoom?:string
 }
 
 const SPEED=12
@@ -245,7 +247,8 @@ function ServeRobotSVG(){
   </svg>
 }
 
-export default function WalkableInterior({entityId,buildingName,companion=null,onClose,fitting,onContext,learnRequest=null,companionHistory=[]}:Props){
+export default function WalkableInterior({entityId,buildingName,companion=null,onClose,fitting,onContext,learnRequest=null,companionHistory=[],presenceRoom}:Props){
+  const roomKey=presenceRoom??entityId
   const {layout}=fitting
   const[pos,setPos]=useState<Point>(layout.start)
   const[residents,setResidents]=useState<ColonyResident[]>([])
@@ -558,7 +561,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
   const workKey=String(fitting.kind)
   const myLook=useMyLook().look
   const[editingFigure,setEditingFigure]=useState(false)
-  const presence=useRoomPresence(entityId,me,{x:pos.x,y:pos.y,seated:Boolean(seat),role:fitting.playerTag??null,look:myLook})
+  const presence=useRoomPresence(roomKey,me,{x:pos.x,y:pos.y,seated:Boolean(seat),role:fitting.playerTag??null,look:myLook})
   const peers=presence.peers
   const peer=peerId?peers.find(p=>p.profileId===peerId)??null:null
   function setMyPose(next:PoseState|null){setMyPoseRaw(next);poseFrom.current=next?{...posRef.current}:null;presence.setPose(next)}
@@ -652,7 +655,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
     return true
   }
   // Spieler reden im Raum miteinander (04.11.2026); gespeichert und ausgewertet.
-  const roomChat=useRoomChat(me?entityId:null,buildingName,peers.length,me?.profileId??null)
+  const roomChat=useRoomChat(me?roomKey:null,buildingName,peers.length,me?.profileId??null)
   // Flüstern, Sagen, Rufen (05.11.2026): Sagen hört, wer in der Nähe steht; Rufen der ganze Raum.
   const[chatRange,setChatRange]=useState<Exclude<ChatRange,'whisper'>>('say')
   const[whisperText,setWhisperText]=useState('')

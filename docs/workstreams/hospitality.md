@@ -293,6 +293,14 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
     - Der Ausgang richtet sich nach `layout.exit`.
   - Die Grundrisse werden umgerechnet (`lib/game/landmarks/venueLayout.ts`, mit Test: Start frei, alle Sitz- und Bereichspunkte erreichbar).
   - **Nicht umgezogen:** Das Immersionsstudio (Dvārakā-Szenen) ist eine Erlebnisszene, kein begehbarer Raum; es bleibt, wie es ist.
+- **06.11.2026 – Mitspieler am richtigen Ort** (Thomas' Test mit Rawdium: „getroffen im Arbeitsamt, sehe ihn dort aber noch – inzwischen ist er am Raumhafen, dort kann ich ihn nicht sehen“):
+  - **Raumhafen:** Er besteht aus sechs Gebäuden (Kern, Service, Lager, drei Landeplätze); je nach angeklicktem Gebäude landete man in einem anderen Raum. Jetzt gibt es einen gemeinsamen Raum `spaceport:earth` für Mitspieler und Raum-Chat (neue Prop `presenceRoom` im Motor).
+  - **Wer weg ist, verschwindet:**
+    - Die Liste wird alle 10 s neu geprüft, nicht nur bei neuen Meldungen.
+    - Wer zwei Meldungen (je 30 s) verpasst, gilt nach 75 s als weg.
+    - Beim Schließen des Tabs meldet man sich ab; beim Verlassen erst abmelden, dann den Kanal schließen.
+  - **Nur der vorderste Raum ist aktiv:** Öffnet sich ein Raum über einem anderen, meldet man sich im unteren ab und beim Schließen des oberen wieder an.
+  - **Ortsräume:** Die Raumkennung enthält nur noch zulässige Zeichen, sonst hätte der Raum-Chat Orte mit Leerzeichen oder Umlauten im Namen abgelehnt.
   - Gilt für alle Räume des Motors: Lokale, Bank, Agentur, Reisebüro, Wache, Feuerwache, Praxis, Krankenhaus.
   - Im Browser geprüft (Metropol, Café, Wache; Laufen per Klick, Tasten, Einrichten).
   - **Später** (Thomas): eine 80er-/90er-Fassung für die Zeitreise in VR.

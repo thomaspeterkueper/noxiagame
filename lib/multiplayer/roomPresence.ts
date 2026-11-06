@@ -34,6 +34,8 @@ export interface PeerState {
   at: number
 }
 
+export const PEER_STALE_MS = 75_000
+
 const POSES = new Set<string>([...Object.keys(GESTURES), ...Object.keys(JOINTS)])
 function cleanPose(v: unknown): PoseState | null {
   const p = (v ?? null) as Partial<PoseState> | null
@@ -57,7 +59,8 @@ export function peersFrom(state: Record<string, Array<Partial<PeerState>>>, me: 
     if (key === me) continue
     const e = entries[entries.length - 1]
     if (!e || typeof e.x !== 'number' || typeof e.y !== 'number') continue
-    if (typeof e.at === 'number' && nowMs - e.at > 120_000) continue
+    // Jeder meldet sich alle 30 s; wer zweieinhalb Meldungen verpasst hat, ist weg.
+    if (typeof e.at === 'number' && nowMs - e.at > PEER_STALE_MS) continue
     out.push({ profileId: key, name: String(e.name ?? 'Spieler').slice(0, 24), x: e.x, y: e.y, seated: Boolean(e.seated), role: e.role ? String(e.role).slice(0, 24) : null, emote: e.emote && typeof e.emote.at === 'number' ? { text: String(e.emote.text ?? '').slice(0, 30), at: e.emote.at } : null, pose: cleanPose(e.pose), invite: cleanInvite(e.invite), look: e.look ? cleanPlayerLook(e.look, key) : null, at: Number(e.at ?? nowMs) })
   }
   return out.sort((a, b) => a.name.localeCompare(b.name)).slice(0, 12)
@@ -67,6 +70,11 @@ const supabaseAdapter: PresenceAdapter = {
   join(room, me, onPeers) {
     const channel = createClient().channel(`noxia:room:${room}`, { config: { presence: { key: me } } })
     const sync = () => onPeers(peersFrom(channel.presenceState() as any, me, Date.now()))
+    // Auch ohne neue Meldung nachsehen: Wer sich nicht mehr meldet, verschwindet (06.11.2026,
+    // Thomas: Rawdium stand noch in der Agentur, obwohl er längst am Raumhafen war).
+    const sweep = setInterval(sync, 10_000)
+    const bye = () => { void channel.untrack().catch(() => {}) }
+    if (typeof window !== 'undefined') window.addEventListener('pagehide', bye)
     let ready = false
     let pending: PeerState | null = null
     channel.on('presence', { event: 'sync' }, sync).subscribe(status => {
@@ -76,13 +84,29 @@ const supabaseAdapter: PresenceAdapter = {
     })
     return {
       track(state) { if (ready) void channel.track(state); else pending = state },
-      leave() { void channel.untrack().catch(() => {}); void createClient().removeChannel(channel) },
+      leave() {
+        clearInterval(sweep)
+        if (typeof window !== 'undefined') window.removeEventListener('pagehide', bye)
+        // Erst abmelden, dann den Kanal schließen – sonst geht die Abmeldung verloren.
+        void channel.untrack().catch(() => {}).finally(() => { void createClient().removeChannel(channel) })
+      },
     }
   },
 }
 
 function adapter(): PresenceAdapter {
   return (globalThis as any).__NOXIA_PRESENCE__ ?? supabaseAdapter
+}
+
+type ActiveRoom = { start: () => void; stop: () => void }
+const rooms: ActiveRoom[] = []
+function activate(entry: ActiveRoom) { rooms[rooms.length - 1]?.stop(); rooms.push(entry); entry.start() }
+function deactivate(entry: ActiveRoom) {
+  const index = rooms.indexOf(entry)
+  if (index < 0) return
+  const top = index === rooms.length - 1
+  rooms.splice(index, 1)
+  if (top) { entry.stop(); rooms[rooms.length - 1]?.start() }
 }
 
 /**
@@ -102,8 +126,15 @@ export function useRoomPresence(room: string | null, me: { profileId: string; na
 
   useEffect(() => {
     if (!room || !me) return
-    try { handle.current = adapter().join(room, me.profileId, setPeers) } catch { handle.current = null }
-    return () => { handle.current?.leave(); handle.current = null; setPeers([]) }
+    // Nur der vorderste Raum ist aktiv: Öffnet sich ein Raum über einem anderen (Agentur → Raumhafen),
+    // meldet man sich im unteren ab und beim Schließen des oberen wieder an.
+    const entry: ActiveRoom = {
+      start: () => { try { handle.current = adapter().join(room, me.profileId, setPeers) } catch { handle.current = null } if (handle.current) send() },
+      stop: () => { handle.current?.leave(); handle.current = null; setPeers([]) },
+    }
+    activate(entry)
+    return () => deactivate(entry)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room, me?.profileId])
 
   const send = useMemo(() => () => {
