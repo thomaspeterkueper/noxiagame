@@ -35,6 +35,10 @@
       "schedule": "40 * * * *"
     },
     {
+      "path": "/api/cron/world-news",
+      "schedule": "50 */2 * * *"
+    },
+    {
       "path": "/api/cron/world-terrain",
       "schedule": "17 3 * * *"
     }
