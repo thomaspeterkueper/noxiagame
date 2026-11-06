@@ -44,6 +44,7 @@ Die Statusordner entstehen mit den ersten Aufgaben; leere Ordner müssen nicht k
 | `vehicles` | noχ¹ᐃ · Fahrzeuge & Raumschiffe |
 | `graphics` | noχ¹ᐃ · Grafik / Assets |
 | `qa` | noχ¹ᐃ · Release / QA / Testspieler |
+| `bodies` | noχ¹ᐃ · Weltkarte jenseits der Erde (`docs/workstreams/world-map-bodies.md`) |
 
 ## Wann wird eine interne Aufgabe angelegt?
 

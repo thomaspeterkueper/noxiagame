@@ -8,7 +8,8 @@
 // Anmeldung und Datenbank mit Testkacheln messen.
 
 import type { Application, Container, Graphics as PixiGraphics, Sprite, Texture } from 'pixi.js'
-import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
+import { mercPerGroundMetre, tileKey, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
+import { EARTH_PROJECTION, type Projection } from '@/lib/worldlab/bodyProjection'
 import { heightTint, terrainShade, type TileTerrainPart } from '@/lib/worldlab/terrain'
 import { shouldReanchor } from '@/lib/worldlab/reanchor'
 import { KIESEL_POSES, kieselDirFrom, kieselSVG, type KieselDir, type KieselLook, type KieselPose } from '@/lib/figures/kiesel'
@@ -78,6 +79,13 @@ export interface WorldEngineOptions {
    * Die Ansicht startet die Welt dann an `at` neu. Wird einmal je Engine gemeldet.
    */
   onFarFromAnchor?: (at: GeoPoint, zoom: number) => void
+  /**
+   * Andere Himmelskörper (06.11.2026, `lib/worldlab/bodies.ts`): Projektion mit dem Umfang
+   * des Körpers, Bodenfarbe und Sonnenstand. Fehlt es, gilt die Erde wie bisher.
+   */
+  projection?: Projection
+  ground?: number
+  sunElevation?: (lat: number, lonEast: number, nowMs: number) => number
 }
 
 /** Was unter dem Zeiger lag, als geklickt wurde. */
@@ -263,7 +271,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const cleanup: Array<() => void> = []
 
   const app: Application = new PIXI.Application()
-  await app.init({ resizeTo: host, background: GROUND_COLOR, antialias: settings.antialias, autoDensity: true, resolution: Math.min(settings.maxResolution, window.devicePixelRatio || 1) })
+  await app.init({ resizeTo: host, background: options.ground ?? GROUND_COLOR, antialias: settings.antialias, autoDensity: true, resolution: Math.min(settings.maxResolution, window.devicePixelRatio || 1) })
   host.appendChild(app.canvas)
 
   // ── Gezeichnete Bilder ──────────────────────────────────────────────
@@ -334,6 +342,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // Die Welt wird relativ zu einem festen Punkt gezeichnet, damit die
   // Grafikkarte mit kleinen Zahlen rechnet. Die wahre Position bleibt Mercator.
   const startGeo = options.start
+  const { geoToMerc, mercToGeo, tileAt, tileOrigin, tileSizeMerc: TILE_SIZE_MERC } = options.projection ?? EARTH_PROJECTION
+  const sunElevation = options.sunElevation ?? sunElevationDeg
   const anchorTile = tileAt(geoToMerc(startGeo))
   const anchor = tileOrigin(anchorTile)
   const k = mercPerGroundMetre(startGeo.lat)
@@ -2471,7 +2481,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const geo = toGeo(player)
     if (now - ambientAt > 20000) {
       ambientAt = now
-      sunNow = sunElevationDeg(geo.lat, geo.lon, Date.now())
+      sunNow = sunElevation(geo.lat, geo.lon, Date.now())
       const tint = dayTint(sunNow)
       if (tint !== worldTint) {
         worldTint = tint

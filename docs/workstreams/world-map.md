@@ -35,6 +35,8 @@ Wie es arbeitet:
 - **Jedes Gebäude einmal.** Es gehört zu der Kachel, in der seine Mitte liegt; doppelt importierte Objekte werden nur einmal gezählt.
 - **NOXIA-Gebäude** stehen mit ihren bestehenden Bildern an ihrer echten Position.
 
+**Andere Himmelskörper (06.11.2026):** Die Zeichenmaschine nimmt jetzt optional `projection`, `ground` und `sunElevation` (`WorldEngineOptions`); ohne sie gilt die Erde unverändert. Genutzt vom Teilprojekt „Weltkarte jenseits der Erde“ (`world-map-bodies.md`) für den Mars. Wer die Maschine ändert, bitte dort mitdenken.
+
 ## Geprüft und nicht geprüft
 
 - Geprüft: Kachelmathematik und Vereinfachung mit Tests; die Ansicht im Browser mit einer künstlichen Stadt (Laden, Laufen über Kachelgrenzen, Zoomen, keine Fehler).

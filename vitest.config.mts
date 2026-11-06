@@ -54,6 +54,7 @@ export default defineConfig({
       'lib/worldlab/buildingChronicle.test.ts',
       'lib/worldlab/buildingChronicleText.test.ts',
       'lib/worldlab/tileFormat.test.ts',
+      'lib/worldlab/bodyTiles.test.ts', 'lib/worldlab/marsSun.test.ts',
       'lib/worldlab/viewTiles.test.ts',
       'lib/worldlab/terrain.test.ts',
       'lib/worldlab/frameStats.test.ts',
