@@ -46,3 +46,10 @@ test('GET keeps read-only build snapshot and sale quotation', () => {
   assert.match(get, /if \(!action\)/, 'existing build snapshot must remain available');
   assert.match(get, /action\s*===\s*['"]sellQuote['"]/, 'read-only sale quote must remain available');
 });
+
+// Indirect writes through Core/RPC are mutations too; table-write checks alone miss them.
+test('GET building endpoint does not invoke state-changing Core commands or RPCs', () => {
+  const get = getHandlerBody(route);
+  assert.doesNotMatch(get, /\b(?:startBuildCommand|completeBuildCommand|completeSaleCommand)\s*\(/);
+  assert.doesNotMatch(get, /\.rpc\s*\(/);
+});
