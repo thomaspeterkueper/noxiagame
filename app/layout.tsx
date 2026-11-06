@@ -12,6 +12,7 @@ import MusicControls from './_components/MusicControls'
 import SiteFooter from './_components/SiteFooter'
 import LearningLinkInterceptor from './_components/LearningLinkInterceptor'
 import PlayerActivityRecorder from './_components/PlayerActivityRecorder'
+import PlayerAbsencePresence from './_components/PlayerAbsencePresence'
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] })
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] })
@@ -46,6 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-full flex flex-col">
         <LearningLinkInterceptor />
         <PlayerActivityRecorder />
+        <PlayerAbsencePresence />
         <MusicProvider>
           <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
             <div style={{ flex: 1 }}>{children}</div>
