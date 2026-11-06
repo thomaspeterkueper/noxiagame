@@ -24,6 +24,7 @@ export default function PlayerAbsencePresence() {
   const lastAction = useRef(Date.now())
   const lastSent = useRef(0)
   const inFlight = useRef(false)
+  const enabledRef = useRef(false)
   const modeRef = useRef<PresenceMode>('online')
   const session = useRef('')
   const mounted = useRef(false)
@@ -38,7 +39,7 @@ export default function PlayerAbsencePresence() {
     inFlight.current = true
     try {
       const token = await getToken()
-      if (!token) { setEnabled(false); return }
+      if (!token) { enabledRef.current = false; setEnabled(false); return }
       const response = await fetch(API, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -48,6 +49,7 @@ export default function PlayerAbsencePresence() {
       if (!response.ok) return
       const data = await response.json()
       if (data.presence?.mode) syncMode(data.presence.mode)
+      enabledRef.current = true
       setEnabled(true)
       lastSent.current = Date.now()
     } catch {
@@ -77,7 +79,7 @@ export default function PlayerAbsencePresence() {
     window.addEventListener('noxia:player-logout', explicitLogout)
 
     const timer = setInterval(() => {
-      if (!enabled || document.visibilityState !== 'visible' || modeRef.current === 'away-autopilot') return
+      if (!enabledRef.current || document.visibilityState !== 'visible' || modeRef.current === 'away-autopilot') return
       const elapsed = Date.now() - lastAction.current
       setRemainingMs(elapsed >= ABSENCE_POLICY.warnAfterMs
         ? Math.max(0, ABSENCE_POLICY.handoffAfterMs - elapsed) : null)
@@ -102,14 +104,14 @@ export default function PlayerAbsencePresence() {
       window.removeEventListener('noxia:player-logout', explicitLogout)
       mounted.current = false
     }
-  }, [send, syncMode, enabled])
+  }, [send, syncMode])
 
-  if (!enabled || remainingMs === null || mode === 'away-autopilot') return null
-  const seconds = Math.ceil(remainingMs / 1000)
+  if (!enabled || (remainingMs === null && mode !== 'away-autopilot')) return null
+  const seconds = Math.ceil((remainingMs ?? 0) / 1000)
   return (
     <div role="status" aria-live="polite" className="fixed bottom-5 right-5 z-[100] max-w-sm rounded-xl border border-amber-500/50 bg-slate-950 p-4 text-white shadow-xl">
       <p className="font-semibold">Du bist seit einiger Zeit inaktiv.</p>
-      <p className="mt-1 text-sm">In {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')} Minuten übernimmt die Simulation deine Figur.</p>
+      <p className="mt-1 text-sm">{mode === 'away-autopilot' ? 'Die Simulation hat deine Figur übernommen. Du kannst jederzeit weiter spielen.' : <>In {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')} Minuten übernimmt die Simulation deine Figur.</>}</p>
       <button type="button" className="mt-3 rounded-lg bg-amber-400 px-4 py-2 font-semibold text-slate-950"
         onClick={() => { lastAction.current = Date.now(); setRemainingMs(null); void send('resume') }}>
         Weiter spielen
