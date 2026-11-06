@@ -11,6 +11,7 @@
 // die zu einem Ort geht) ist keine Tafel, sondern ein Vermerk, der im Innenraum
 // genutzt wird.
 
+import { billOfMaterials, billText, costSplit } from '@/lib/game/construction/materials'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
@@ -93,6 +94,16 @@ export function panelForPick(pick: WorldPick, noxia: NoxiaBuilding[]): Panel {
 }
 
 type Line = { role: 'user' | 'assistant'; content: string }
+
+/** Stückliste unter einem Bautyp (NOXIA-MAT-0001): Material und Arbeit im Preis. */
+function MaterialLine({ item }: { item: { id: string; cost: number; footprint?: { widthM: number; depthM: number } } }) {
+  const area = (item.footprint?.widthM ?? 0) * (item.footprint?.depthM ?? 0)
+  if (!area) return null
+  const bill = billOfMaterials(item.id, area)
+  if (!bill.length) return null
+  const split = costSplit(item.cost, bill)
+  return <small className="material" title="Material wird vorerst zum Marktpreis zugekauft (NOXIA-MAT-0001)">{billText(bill)} · darin Material {credits(split.material)}, Arbeit {credits(split.labor)}</small>
+}
 
 /**
  * Kaufangebot für ein reales Gebäude, das noch niemandem gehört (Request R-12 an
@@ -850,7 +861,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         {!parcel.owned && ((parcel.forSale && !parcel.listed) || parcel.partsOnly) && parcel.areaM2 >= 600 && parcel.buildings.length === 0 && <div className="row"><span>{parcel.partsOnly ? parcel.reason : 'Zu groß oder zu teuer?'} Ein Stück hier abstecken, auch länglich.</span><button disabled={buying} onClick={() => setPanel({ kind: 'land', at: panel.at, parentId: parcel.id })}>Teilstück</button></div>}
         {parcel.own && <>
           <p>Hier bauen (an der angeklickten Stelle):</p>
-          {buildables === null ? <p>Bautypen werden geladen …</p> : <div className="build-list">{buildables.filter(item => (item.footprint?.widthM ?? 0) * (item.footprint?.depthM ?? 0) <= parcel.areaM2).sort((a, b) => a.cost - b.cost).map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}{item.requirements?.knowledgeOk === false && <> · Wissen fehlt <LearnLink unlock={item.requirements?.requiredUnlock} style={{ fontWeight: 700 }} /></>}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildOnParcel(item)}>Bauen</button></div>)}</div>}
+          {buildables === null ? <p>Bautypen werden geladen …</p> : <div className="build-list">{buildables.filter(item => (item.footprint?.widthM ?? 0) * (item.footprint?.depthM ?? 0) <= parcel.areaM2).sort((a, b) => a.cost - b.cost).map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}<MaterialLine item={item}/>{item.requirements?.knowledgeOk === false && <> · Wissen fehlt <LearnLink unlock={item.requirements?.requiredUnlock} style={{ fontWeight: 700 }} /></>}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildOnParcel(item)}>Bauen</button></div>)}</div>}
           {buyError && <p>{buyError}</p>}
           {parcel.listed
             ? <div className="row"><span>Angeboten für {credits(parcel.price ?? 0)} – {afterTax(parcel.price ?? 0, parcel.taxRate)}.</span><button disabled={buying} onClick={() => void parcelAction({ action: 'unlist' }, 'Zurückziehen nicht möglich.')}>Zurückziehen</button></div>
@@ -868,7 +879,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       <div className="head"><div><small>FREIE FLÄCHE</small><b>{plot?.name ?? 'Freie Fläche'}</b>{plot && <span>{Math.round(plot.w)} × {Math.round(plot.d)} m · {plot.own ? 'dein Grundstück' : 'gehört einem anderen Spieler'}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
       <BuildingHistory sourceRef={panel.source}/>
       {plot?.own && (buildables === null ? <p>Bautypen werden geladen …</p>
-        : fitting.length ? <div className="build-list">{fitting.map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}{item.requirements?.knowledgeOk === false ? ' · Wissen fehlt' : item.requirements?.creditsOk === false ? ' · zu teuer' : ''}{item.requirements?.knowledgeOk === false && <> <LearnLink unlock={item.requirements?.requiredUnlock} style={{ fontWeight: 700 }} /></>}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildHere(item)}>Bauen</button></div>)}</div>
+        : fitting.length ? <div className="build-list">{fitting.map(item => <div key={item.id} className="row"><span>{item.name} · {credits(item.cost)}<MaterialLine item={item}/>{item.requirements?.knowledgeOk === false ? ' · Wissen fehlt' : item.requirements?.creditsOk === false ? ' · zu teuer' : ''}{item.requirements?.knowledgeOk === false && <> <LearnLink unlock={item.requirements?.requiredUnlock} style={{ fontWeight: 700 }} /></>}</span><button disabled={buying || item.requirements?.canBuild === false} onClick={() => void buildHere(item)}>Bauen</button></div>)}</div>
           : <p>Kein Bautyp passt auf diese Fläche.</p>)}
       {buyError && <p>{buyError}</p>}
     </>}
@@ -904,6 +915,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       .head b{display:block;font-size:15px}
       .head span{display:block;font-size:11px;color:#9fb5b0;margin-top:2px}
       .head .grow{flex:1}
+      .material{display:block;font-size:10px;color:#9fb5b0;margin-top:1px}
       .hint{margin:6px 0 0;font-size:11px;color:#c9d6c2;line-height:1.4}
       .source{display:block;margin-top:8px;font-size:10px;color:#7f9792}
       .bar{height:6px;border-radius:3px;background:#2d2410;overflow:hidden;margin:6px 0}
