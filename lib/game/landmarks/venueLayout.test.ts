@@ -3,7 +3,7 @@ import { landmarkRoomLayout, LANDMARK_LEVELS, type LandmarkRoomKind } from './in
 import { toL, toV, toVenueLayout } from './venueLayout'
 import { isVenueBlocked, venuePath } from '../hospitality/venues'
 
-const KINDS: LandmarkRoomKind[] = ['library', 'worship', 'shop', 'workshop', 'artlounge', 'mosque', 'synagogue', 'hindu_temple', 'buddhist_temple', 'community_hall', 'resonance_place', 'hospitality', 'cemetery']
+const KINDS: LandmarkRoomKind[] = ['library', 'worship', 'shop', 'workshop', 'artlounge', 'mosque', 'synagogue', 'hindu_temple', 'buddhist_temple', 'community_hall', 'resonance_place', 'hospitality', 'cemetery', 'rowhouse', 'rowhouse_wg']
 
 describe('Orte im allgemeinen Innenraum-Motor', () => {
   it('rechnet Punkte hin und zurück', () => {

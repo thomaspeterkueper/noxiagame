@@ -556,7 +556,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
         {near.action === 'learn' && <div className="moves"><button onClick={() => window.location.assign('/ssf')}>Lernmodule der SSF öffnen</button></div>}
         {near.action === 'candle' && <div className="moves"><button onClick={() => { setCandles(count => Math.min(9, count + 1)); setStatus('Du zündest eine Kerze an.') }}>Kerze anzünden</button></div>}
         {near.action === 'sit' && !ctx.seat && <div className="moves"><button onClick={() => ctx.sit('lm-' + near.id)}>Hinsetzen</button></div>}
-        {near.action === 'stairs' && near.toLevel !== undefined && <div className="moves"><button onClick={() => onLevel(near.toLevel as number)}>{near.toLevel === 0 ? 'Ins Erdgeschoss' : near.toLevel > level ? `Ins ${near.toLevel}. Obergeschoss` : `Ins ${near.toLevel}. Obergeschoss hinunter`}</button></div>}
+        {near.action === 'stairs' && near.toLevel !== undefined && <div className="moves"><button onClick={() => onLevel(near.toLevel as number)}>{near.toName ?? (near.toLevel === 0 ? 'Ins Erdgeschoss' : near.toLevel > level ? `Ins ${near.toLevel}. Obergeschoss` : `Ins ${near.toLevel}. Obergeschoss hinunter`)}</button></div>}
         {near.action === 'memorial' && <div className="plea">
           <small>GEDENKEN · NUR FÜR DICH</small>
           <span>Wenn du magst, mit einem Namen. Niemand sonst sieht, was du hier hinterlässt.</span>
@@ -690,6 +690,16 @@ const LM_CSS = `
 .walkable-interior .lm-lamp{position:absolute;z-index:1;border-radius:50%;background:radial-gradient(circle,#ffffff55 0%,#ffffff1c 40%,transparent 70%);pointer-events:none}
 .walkable-interior .lm-lamp.warm{background:radial-gradient(circle,#ffd98a66 0%,#ffcc6e22 40%,transparent 70%)}
 .walkable-interior .room.lm .f{border-radius:3px}
+.walkable-interior .room.lm .f.bed{background:linear-gradient(90deg,#f4efe6 0 22%,#9fb6c9 22%);border:2px solid #6b7f91;border-radius:4px}
+.walkable-interior .room.lm .f.wardrobe{background:#8a6a4a;border:2px solid #5a4430}
+.walkable-interior .room.lm .f.bathtub{background:#f6fafb;border:3px solid #b9c9cf;border-radius:10px}
+.walkable-interior .room.lm .f.shower{background:repeating-linear-gradient(45deg,#e4eef1 0 4px,#cfdde2 4px 8px);border:2px solid #9fb3ba}
+.walkable-interior .room.lm .f.sink,.walkable-interior .room.lm .f.toilet{background:#fbfdfd;border:2px solid #b9c9cf;border-radius:40%}
+.walkable-interior .room.lm .f.stove{background:radial-gradient(circle at 30% 35%,#333 0 18%,transparent 19%),radial-gradient(circle at 70% 65%,#333 0 18%,transparent 19%),#d9d9d9;border:2px solid #888}
+.walkable-interior .room.lm .f.fridge,.walkable-interior .room.lm .f.washer{background:#eef2f3;border:2px solid #9aa7ab;border-radius:3px}
+.walkable-interior .room.lm .f.boiler{background:#c9504a;border:2px solid #8a2f2a;border-radius:6px}
+.walkable-interior .room.lm .f.pillar{background:#a7a39b;border:2px solid #6f6b64}
+.walkable-interior .room.lm .f.railing{background:repeating-linear-gradient(0deg,#555 0 2px,transparent 2px 6px),repeating-linear-gradient(90deg,#555 0 2px,transparent 2px 6px);opacity:.8}
 .walkable-interior .room.lm .f.table{background:#8c6b47;border:2px solid #5d4428;border-radius:5px;box-shadow:none}
 .walkable-interior .room.lm .f.table:after{display:none}
 .walkable-interior .room.lm .f.shelf{background:#4a2c1c;border:2px solid #2d1a10}

@@ -515,7 +515,7 @@ Anlass: Thomas hat den Eindruck, dass Grok direkter antwortet und zu den Gesprä
 
 **Zu klären (Thomas):** xAI-Konto und Schlüssel anlegen; Inhaltsrahmen für Beleidigungen festlegen (z. B. bis wohin die Figur zurückgibt, ab wann sie das Gespräch beendet).
 
-### G-9 (Schauplatz-Chat „Der Duft der bleibt“, 06.11.2026): Innenraum für ein Wohnhaus – WG Krokusweg 10
+### G-9 (Schauplatz-Chat „Der Duft der bleibt“, 06.11.2026): Innenraum für ein Wohnhaus – WG Krokusweg 10 – erledigt 06.11.2026 im Schauplatz-Chat (Raumart `rowhouse`/`rowhouse_wg`, `lib/game/landmarks/rowhouse.ts`)
 
 Ortskonzept mit Belegung: `docs/world/earth/friedrichsdorf-krokusweg-10-duft.md`. Gebraucht wird eine neue Raumart für ein privates, mehrgeschossiges Wohnhaus (Vorschlag `shared_house`), nach NOXIA-INTERIOR-0001 als Daten auf dem gemeinsamen Motor, mit Treppen wie bei der ArtLounge (`toLevel`).
 

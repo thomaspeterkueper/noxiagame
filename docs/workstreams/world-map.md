@@ -488,9 +488,9 @@ Auf Wunsch von Thomas im Philosophie/NPC-Chat gebaut (Details: `docs/architectur
 Thomas, 06.11.2026: „genau dieses Haus in noxiagame integrieren, als Schauplatz“ – die WG aus dem Roman „Der Duft der bleibt“. Ortskonzept: `docs/world/earth/friedrichsdorf-krokusweg-10-duft.md`.
 
 1. **Friedrichsdorf laden:** Kartendaten für die Zelle um Krokusweg 10, 61381 Friedrichsdorf nachladen (`POST /api/world-lab/refresh`). Stand 06.11.: kein Grundriss mit `addr:street` Krokusweg in `region_features`.
-2. **Landmark anlegen:** `earth-de-friedrichsdorf-krokusweg-10` in `lib/world/spatial/earthLandmarks.ts`, Tag `cross-universe`, `sourceProjects` mit Projekt „Der Duft der bleibt“, Relation `setting`, `references` leer. Kein öffentlicher Ort – im Register als privates Wohnhaus kennzeichnen.
+2. ✅ (06.11.2026, Schauplatz-Chat) **Landmark anlegen:** `earth-de-friedrichsdorf-krokusweg-10` in `lib/world/spatial/earthLandmarks.ts`, Tag `cross-universe`, `sourceProjects` mit Projekt „Der Duft der bleibt“, Relation `setting`, `references` leer. Kein öffentlicher Ort – im Register als privates Wohnhaus kennzeichnen.
 3. **Reihenhaus mit Versatz:** Das Haus ist Mittelhaus, vorn und hinten etwa 1 m gegenüber dem rechten Nachbarn vorgesetzt, links bündig. Falls OSM die Reihe als einen Block liefert, bitte die Einzelhäuser erhalten, damit der Versatz sichtbar bleibt.
-4. **Betreten:** „Klingeln“ an der Haustür für alle; „Betreten“ nur mit Einladung (aus R-37). Der Innenraum kommt aus G-9.
+4. **Betreten:** ✅ (06.11.2026) „Betreten“ für alle Häuser Krokusweg 2–14 über `rowhouseVariantFor` in `WorldPanels.tsx`, Innenraum aus `rowhouse.ts`. Offen: „Klingeln“ und Betreten nur mit Einladung (aus R-37).
 5. Umgebung bleibt wie OSM (Wohnwege, Spielplatz vor dem Haus); nichts dazuerfinden.
 
 

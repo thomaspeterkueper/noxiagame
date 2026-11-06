@@ -1,9 +1,10 @@
 import { serviceKindFor } from '../services/publicServices'
 // lib/game/landmarks/interiors.ts
-// Aktualisiert: 06.11.2026 — Betriebe (Laden, Werkstatt) aus der Nutzungskennung realer Gebäude; 26.10.2026 — CAMALEO-ArtLounge als dreigeschossiges Stadthaus (EG ArtLounge mit Flügel, Sitzreihen, Ausstellung, Büro im Hinterzimmer; Galerie und Dachstudio oben, Treppe); Räume für Betriebe: Laden (Tresen, Regale, Auslage) und Werkstatt (Hebebühne, Werkbank, Tor); Wegsuche um die Möbel herum (landmarkPath) für Spieler und Personal, Ziele im Raum (landmarkWaypoints); jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
-// Version:      1.8.0
+// Aktualisiert: 06.11.2026 — Reihenhausserie Krokusweg 2–14 in Friedrichsdorf mit vier Geschossen (rowhouse.ts), Nr. 10 als WG; Betriebe (Laden, Werkstatt) aus der Nutzungskennung realer Gebäude; 26.10.2026 — CAMALEO-ArtLounge als dreigeschossiges Stadthaus (EG ArtLounge mit Flügel, Sitzreihen, Ausstellung, Büro im Hinterzimmer; Galerie und Dachstudio oben, Treppe); Räume für Betriebe: Laden (Tresen, Regale, Auslage) und Werkstatt (Hebebühne, Werkbank, Tor); Wegsuche um die Möbel herum (landmarkPath) für Spieler und Personal, Ziele im Raum (landmarkWaypoints); jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
+// Version:      1.9.0
 
 import { establishmentFromUse } from '@/lib/game/business/establishments'
+import { rowhouseLayout, ROWHOUSE_LEVELS } from './rowhouse'
 
 export type LandmarkRoomKind =
   | 'library' | 'worship' | 'shop' | 'workshop' | 'artlounge'
@@ -18,12 +19,15 @@ export type LandmarkRoomKind =
   | 'cemetery'
   // Öffentliche Dienste (Gastronomie, 06.11.2026): öffnen den Innenraum-Motor (PublicServiceInterior).
   | 'police' | 'fire_station' | 'doctors' | 'hospital'
+  // Reihenhausserie Krokusweg 2–14, Friedrichsdorf; Nr. 10 ist die WG aus „Der Duft der bleibt“ (06.11.2026).
+  | 'rowhouse' | 'rowhouse_wg'
 export type LandmarkPoint = { x: number; y: number }
 export type LandmarkFurnitureKind = 'shelf' | 'shelf-low' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern' | 'armchair' | 'sofa' | 'plant' | 'globe' | 'pinboard' | 'counter' | 'goods' | 'lift' | 'bench' | 'vehicle' | 'gate' | 'crate' | 'piano' | 'chair' | 'wall' | 'artwork' | 'stairs'
   | 'grave' | 'tap' | 'tree' | 'memorial'
+  | 'bed' | 'wardrobe' | 'bathtub' | 'shower' | 'sink' | 'toilet' | 'stove' | 'fridge' | 'pillar' | 'railing' | 'boiler' | 'washer'
   | 'mihrab' | 'minbar' | 'ablution' | 'shoerack' | 'ark' | 'bimah' | 'eternal-light' | 'shrine' | 'bell' | 'diya' | 'buddha' | 'cushion' | 'incense' | 'gong' | 'stage'
 export type LandmarkFurniture = { id: string; kind: LandmarkFurnitureKind; x: number; y: number; w: number; h: number }
-export type LandmarkSpot = { id: string; label: string; x: number; y: number; text: string; action?: 'books' | 'learn' | 'candle' | 'sit' | 'staff' | 'stairs' | 'memorial'; /** Bei action 'stairs': Zielgeschoss (0 = Erdgeschoss). */ toLevel?: number }
+export type LandmarkSpot = { id: string; label: string; x: number; y: number; text: string; action?: 'books' | 'learn' | 'candle' | 'sit' | 'staff' | 'stairs' | 'memorial'; /** Bei action 'stairs': Zielgeschoss (0 = Erdgeschoss). */ toLevel?: number; /** Beschriftung des Treppenknopfs, z. B. „In den Keller“. */ toName?: string }
 /** Bodenzone – rein optisch, blockiert nicht. */
 export type LandmarkZone = { id: string; kind: LandmarkZoneKind; x: number; y: number; w: number; h: number }
 /** Deckenlampe: heller Lichtkegel auf dem Boden. */
@@ -528,7 +532,7 @@ function cemeteryLayout(): LandmarkRoomLayout {
 }
 
 /** Mehrgeschossige Häuser: Anzahl Geschosse je Raumart (alle anderen haben eines). */
-export const LANDMARK_LEVELS: Partial<Record<LandmarkRoomKind, number>> = { artlounge: 3 }
+export const LANDMARK_LEVELS: Partial<Record<LandmarkRoomKind, number>> = { artlounge: 3, rowhouse: ROWHOUSE_LEVELS, rowhouse_wg: ROWHOUSE_LEVELS }
 
 const STAIRS = { x: 690, y: 236, w: 44, h: 100 }
 const STAIRS_LANDING = { x: 640, y: 290 }
@@ -656,6 +660,7 @@ export function landmarkRoomKind(landmarkClass: string, tags?: Record<string, st
   if (landmarkClass === 'library') return 'library'
   if (landmarkClass === 'place_of_worship') return worshipRoomKind(tags?.religion, tags?.building)
   if (landmarkClass === 'artlounge') return 'artlounge'
+  if (landmarkClass === 'rowhouse' || landmarkClass === 'rowhouse_wg') return landmarkClass
   if (landmarkClass === 'community_centre') return 'community_hall'
   if (landmarkClass === 'resonance_place') return 'resonance_place'
   if (landmarkClass === 'cemetery' || landmarkClass === 'grave_yard') return 'cemetery'
@@ -692,6 +697,7 @@ export function landmarkRoomLayout(kind: LandmarkRoomKind, level = 0, byStairs =
     case 'worship': return worshipLayout()
     case 'shop': return shopLayout()
     case 'artlounge': return artLoungeLayout(level, byStairs)
+    case 'rowhouse': case 'rowhouse_wg': return rowhouseLayout(kind, level, byStairs)
     case 'mosque': return mosqueLayout()
     case 'synagogue': return synagogueLayout()
     case 'hindu_temple': return hinduTempleLayout()

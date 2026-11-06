@@ -23,6 +23,7 @@ import LandmarkWalkableInterior from '@/app/earth/LandmarkWalkableInterior'
 import RealVenueInterior from '@/app/earth/RealVenueInterior'
 import PublicServiceInterior from '@/app/earth/PublicServiceInterior'
 import { ARTLOUNGE_OSM_ID, buildingRoomKind, landmarkRoomKind, landmarkStaffName, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
+import { rowhouseVariantFor } from '@/lib/game/landmarks/rowhouse'
 import { establishmentFor, establishmentKnowledge, establishmentServices } from '@/lib/game/business/establishments'
 import { DriveButton, VehicleDesk, vehicleServiceIds } from '@/app/components/VehicleDesk'
 import { peopleAtPlace, type PresenceRow } from '@/lib/game/population/placePresence'
@@ -314,7 +315,9 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   // Omnizedenz-Begegnungsstätte (gekauft und umgebaut oder gebaut): offen für alle,
   // mit den Personen, die laut Simulation drinnen sind (28.10.2026).
   const resonance = own && isResonanceBuilding(own.typeId) ? meetingPlaces(noxia).find(place => place.noxiaId === own.id) ?? null : null
-  const buildingRoom = building && !building.noxiaId ? buildingRoomKind(building.use, building.source, { ...infoTags, ...(building.poi?.tags ?? {}) }) : resonance ? 'resonance_place' as const : null
+  // Reihenhausserie Krokusweg 2–14 in Friedrichsdorf (Nr. 10: WG aus „Der Duft der bleibt“), erkannt an Anschrift und Lage.
+  const rowhouse = building && !building.noxiaId ? rowhouseVariantFor(building.address, building.at) : null
+  const buildingRoom = building && !building.noxiaId ? (buildingRoomKind(building.use, building.source, { ...infoTags, ...(building.poi?.tags ?? {}) }) ?? rowhouse) : resonance ? 'resonance_place' as const : null
   /** „Hinfahren“ mit eigenem Fahrzeug – erscheint nur ab einigen hundert Metern (DriveButton prüft selbst). */
   function driveRow(to: { lat: number; lon: number }) {
     if (!engine) return null
@@ -332,6 +335,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   function buildingAsLandmark(): WorldLandmark | null {
     if (!building || !buildingRoom) return null
     if (resonance) return { at: building.at, name: resonance.name, kind: 'resonance_place', tags: { ...(resonance.round ? { opening_hours: 'Offene Resonanzrunde ' + resonance.round } : {}), description: 'Offen für alle – Gespräch, Lesen, Stille. Niemand muss etwas glauben.' } }
+    if (buildingRoom === 'rowhouse' || buildingRoom === 'rowhouse_wg') return { at: building.at, name: building.address ?? building.title, kind: buildingRoom, tags: { description: buildingRoom === 'rowhouse_wg' ? 'Wohngemeinschaft in einem Reihenhaus von 1979.' : 'Reihenhaus von 1979, Teil einer versetzten Reihe.' } }
     // Lokal: die Art aus der Nutzung (a:cafe, a:pub …) – sonst würde es als Gotteshaus geführt.
     const kind = buildingRoom === 'hospitality' ? (building.poi?.kind ?? String(building.use ?? '').split(':')[1] ?? 'cafe') : buildingRoom === 'community_hall' ? 'community_centre' : buildingRoom === 'artlounge' ? 'artlounge' : buildingRoom === 'police' || buildingRoom === 'fire_station' || buildingRoom === 'doctors' || buildingRoom === 'hospital' ? buildingRoom : 'place_of_worship'
     const religion = buildingRoom === 'mosque' ? 'muslim' : buildingRoom === 'synagogue' ? 'jewish' : buildingRoom === 'hindu_temple' ? 'hindu' : buildingRoom === 'buddhist_temple' ? 'buddhist' : buildingRoom === 'worship' ? 'christian' : undefined

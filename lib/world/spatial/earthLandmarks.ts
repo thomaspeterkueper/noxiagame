@@ -134,6 +134,19 @@ export const EARTH_LANDMARKS: readonly EarthLandmark[] = [
     ],
   },
   {
+    id: 'earth-de-friedrichsdorf-krokusweg-10',
+    name: 'WG Krokusweg 10',
+    countryCode: 'DE',
+    locality: 'Friedrichsdorf (Taunus)',
+    locator: { kind: 'address', value: 'Krokusweg 10, 61381 Friedrichsdorf, Germany' },
+    tags: ['culture'],
+    presentDayRole: 'Privates Reihenhaus in einer versetzten Reihe von 1979 (Krokusweg 2–14), genutzt als Wohngemeinschaft.',
+    noxiaRole: 'Begehbares Wohnhaus mit vier Geschossen; Schauplatz eines Romans. Die übrigen Häuser der Reihe haben denselben Grundriss.',
+    sourceProjects: [
+      { project: 'Der Duft der bleibt', relation: 'setting', note: 'Die WG, in die Priya nach der Zeit bei ihrer Schwester kommt.' },
+    ],
+  },
+  {
     id: 'earth-de-darmstadt-esoc',
     name: 'ESA · European Space Operations Centre (ESOC)',
     countryCode: 'DE',

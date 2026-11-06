@@ -1,6 +1,6 @@
 # noχ¹ᐃ Erde – Krokusweg 10, Friedrichsdorf / DER DUFT DER BLEIBT
 
-Status: Ortskonzept und Grundlage für Requests (noch nicht gebaut)
+Status: Innenraum gebaut (06.11.2026, `lib/game/landmarks/rowhouse.ts`); Bewohner offen (R-37)
 Stand: 2026-11-06
 Entscheidung: Thomas, 06.11.2026 – „genau dieses Haus in noxiagame integrieren, als Schauplatz“
 Verantwortung: Erdkarte (Ort, Grundriss, Betreten), Gastronomie (Innenraum-Motor, Einrichtung), Bevölkerung und Ökonomie (Bewohner, Wohnen)
@@ -20,6 +20,20 @@ Verantwortung: Erdkarte (Ort, Grundriss, Betreten), Gastronomie (Innenraum-Motor
 - **Versatz:** Von vorn gesehen schließt das Haus links bündig an das Nachbarhaus an. Zum rechten Nachbarn steht es etwa 1 m vor. Die Rückseite ist genauso versetzt.
 - **Terrassen hinten:** eine im 1. OG und eine im Dachgeschoss. Dazu kommt die Gartenterrasse im EG.
 - **Bäder:** im 1. OG und im DG je ein innenliegendes Bad (ohne Fenster) mit Dusche und Badewanne.
+- **Vorn:** 1. OG und DG kragen etwa 1,20 m über die Küche vor und stehen vorn auf zwei Betonpfeilern. Darunter liegt vor der Küche eine Terrasse, daneben der Hauseingang.
+- **Keller:** schließt hinten mit dem Wohnraum ab. Vorn reicht die Tiefgarage der Reihe über die Küche hinaus; vom Keller-Flur führt eine Tür direkt hinein.
+- **Hinten:** Das Haus treppt sich ab – EG bis zur Gartenterrasse, darauf der Balkon von Kind 1, darüber die Dachterrasse, die bündig mit der Rückwand von Kind 1 abschließt.
+
+### Grundriss (Bauvorhaben 1979, Flächen aus den Plänen)
+
+| Ebene | Raum | m² | Lage |
+|---|---|---|---|
+| Keller | Tiefgarage-Stellplatz, Flur, Vorraum, Heizung, Hausanschluss, Keller (≈ 14) | – | Tiefgarage vorn, Keller hinten |
+| EG | Flur 7,94 · WC 2,90 · Küche 10,84 · Wohnraum mit Essplatz 30,83 | | Küche vorn, Wohnraum hinten |
+| 1. OG | Elternzimmer 18,27 · Flur 4,80 · Bad 1 6,23 · Kind 1 11,31 · Kind 2 12,06 · Balkon | | Eltern vorn, Kind 1/2 hinten |
+| DG | Hobbyraum 20,65 · Flur 5,60 · Bad 2 3,89 · Mehrzweckraum 5,90 · Abstellraum 8,23 · Dachterrasse | | Hobbyraum vorn, übrige hinten |
+
+Die ganze Reihe Krokusweg 2–14 hat diesen Grundriss. Im Spiel: Nr. 10 als WG eingerichtet, die übrigen als Familienhäuser.
 
 ### Umgebung (aus dem Luftbild, 06.11.2026)
 
@@ -32,15 +46,15 @@ Verantwortung: Erdkarte (Ort, Grundriss, Betreten), Gastronomie (Innenraum-Motor
 
 | Ebene | Zimmer / Raum | Bewohner (Romanfigur) |
 |---|---|---|
-| Dachgeschoss | 3 Zimmer, innenliegendes Bad, Dachterrasse hinten | Chinesin (2), Russin, Tunesier |
-| 1. OG | Gartenseite ohne Terrasse | **Priya** (Inderin) |
-| 1. OG | Gartenseite mit Terrasse | Chinesin (1) |
-| 1. OG | Spielplatzseite | Deutscher |
+| Dachgeschoss | Hobbyraum, Abstellraum, Mehrzweckraum (mit Dachterrasse), innenliegendes Bad | Chinesin (2), Russin, Tunesier – Zuordnung offen |
+| 1. OG | Kind 2, Gartenseite ohne Terrasse | **Priya** (Inderin) |
+| 1. OG | Kind 1, Gartenseite mit Balkon | Chinesin (1) |
+| 1. OG | Elternzimmer, Spielplatzseite | Deutscher |
 | 1. OG | innenliegendes Bad | gemeinsam für die drei |
 | EG | große Küche, Wohn- und Esszimmer, Gartenterrasse, Garten | alle |
 | Keller | – | ab und zu ein Freund des Deutschen (Russe), nicht offiziell |
 
-Wer im DG die Dachterrasse hat, ist noch offen.
+Die Dachterrasse gehört zum Mehrzweckraum; wer von den dreien dort wohnt, ist noch offen.
 
 ## Grundsätze
 
@@ -64,15 +78,24 @@ Wer im DG die Dachterrasse hat, ist noch offen.
 - Keine Plotauflösung des Romans über Figurengespräche.
 - Keine Bauzeit, keine Preise, kein Eigentümer, bis Thomas entscheidet.
 
+## Im Spiel (06.11.2026)
+
+Auf Wunsch von Thomas („jetzt müssen wir das Gebäude bzw. die ganze Gebäudeserie ins Spiel integrieren“) im Schauplatz-Chat gebaut, ausnahmsweise über die Teilprojektgrenzen:
+
+- **Raumart** `rowhouse` (Familienhaus) und `rowhouse_wg` (Nr. 10) mit vier Geschossen: 0 EG, 1 erstes OG, 2 DG, 3 Keller (`lib/game/landmarks/rowhouse.ts`, Tests in `rowhouse.test.ts`). Wände mit Türen, Möbel, Bereiche mit Texten, Treppen zwischen allen Geschossen. Neue Möbelarten: Bett, Schrank, Wanne, Dusche, Waschbecken, WC, Herd, Kühlschrank, Pfeiler, Geländer, Heizkessel, Waschmaschine.
+- **Erkennung auf der Weltkarte:** Anschrift „Krokusweg 2…14“ und Lage im Umkreis von 350 m um Nr. 10 (`rowhouseVariantFor`, eingehängt in `WorldPanels.tsx`). Sobald Friedrichsdorf auf der Karte geladen ist (lädt beim Hingehen nach), zeigen die Häuser „Betreten“.
+- **Register:** `earth-de-friedrichsdorf-krokusweg-10` in `earthLandmarks.ts`, Relation `setting`.
+- **Noch nicht:** Bewohner (R-37), Einladen und Klingeln – vorerst ist jedes Haus der Reihe offen begehbar.
+
 ## Requests
 
-- **W-21** an Erdkarte – `docs/workstreams/world-map.md`
-- **G-9** an Gastronomie (Innenraum-Motor) – `docs/workstreams/hospitality.md`
+- **W-21** an Erdkarte – `docs/workstreams/world-map.md` (Register und Betreten erledigt; offen: prüfen, dass die Reihe als Einzelhäuser mit Versatz erscheint)
+- **G-9** an Gastronomie – erledigt im Schauplatz-Chat, siehe „Im Spiel“
 - **R-37** an Bevölkerung und Ökonomie – `docs/workstreams/population-economy.md`
 
 ## Offen für Thomas
 
-1. Wer im DG hat die Dachterrasse?
+1. Wer im DG wohnt im Mehrzweckraum mit der Dachterrasse, wer im Hobbyraum, wer im Abstellraum?
 2. Namen der übrigen Figuren (oder Pfad im Manuskript)?
 3. Gibt es im Roman einen Vermieter im Haus (früher erwähnt: Klaus, 58, der das Haus betreibt) und soll er im Spiel auftreten?
 4. Bleibt die echte Hausnummer im Spiel, oder soll – wie im Buch erwogen – eine leicht veränderte Adresse gelten?
