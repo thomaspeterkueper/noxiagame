@@ -1,66 +1,117 @@
-# Chronomap Dvaraka – erster Entwurf (02.11.2026)
+# Chronomap Dvaraka – zweiter Entwurf (06.11.2026)
 
-Entwurf für Thomas' Korrektur. Grundlage: sein Text „Das Lied von Dvārakā“ (erweiterte Fassung, Kapitel 1.0 bis 1.4.5) und seine Vorgabe: Alles ist fiktiv und muss **nur zu den gerade laufenden Ausgrabungen passen**; sonst freie Hand. Ort: das versunkene Dvaraka, um 1600 v. Chr., am Arabischen Meer. Nicht das echte Dwarka (Gujarat).
+Entwurf für Thomas' Korrektur, noch nichts gebaut. Grundlage ist jetzt die **Neue Fassung Mai 2026** von „Das Lied von Dvārakā“ (Claude-Projekt „Dvaraka Kapitel Verbesserungen“, vollständig gelesen, Stand 06.11.2026). Der erste Entwurf (02.11.) stützte sich teils auf die ältere v2.0 (Krishnan, Arjun, Tonscherben-Lager, Doppelaxt-Siegel in Kap. 1.2) und ist hiermit ersetzt.
+
+Vorgabe Thomas: Alles ist fiktiv und muss **nur zu den gerade laufenden Ausgrabungen passen**; sonst freie Hand. Ort: das versunkene Dvaraka, um 1600 v. Chr., am Arabischen Meer. Nicht das echte Dwarka (Gujarat).
+
+## 0. Kanon-Entscheidungen (Thomas, 06.11.2026)
+
+Im Manuskript bereits geändert (Projekt-Dokument `Das_Lied_von_Dvaraka_Neue_Fassung_Mai2026.md`):
+
+1. **Kap. 1.3:** „Als das letzte Dach *des Fischerviertels* unter der Wasseroberfläche verschwand“ (vorher: „der Stadt“). Damit passt 1.3 zu Prolog, 1.4 und 1.4.2: Am Bruchtag gehen Fischerviertel und Westbezirk unter, die Felsstadt im Osten steht noch.
+2. **Der 13. Same wandert ins Meer.** Amrita wirft ihn in 1.3 „als Spur für das Meer“; der Matsya-Epilog sagt jetzt: „Den dreizehnten Samen hatte niemand mitgenommen. Das Meer trug ihn. Vielleicht fuhr Matsya ihm nach …“
+3. **Indra ist Regenmeister** (Dhruvas Fragment; vorher „Wassermeister“). Varuna hält das Wasser aus Meer und Brunnen, Indra das Wasser vom Himmel; sein Stein bleibt der Donneramethyst.
+4. Nebenbei korrigiert: In 1.3 erreicht das Wasser „die Schwelle der Werkstatt“ (vorher „die untersten Stufen des Turms“ – die Szene spielt in Kasyapas Werkstatt).
+
+Für das Spiel folgt daraus: **Der 13. Same ist der einzige Fund, den die Grabung nie machen kann.**
 
 ## 1. Zwei Schichten, ein Ort
 
 | Schicht | Zeit | Was man sieht | Begehbar |
 | --- | --- | --- | --- |
-| **Grabung** | Spielgegenwart (2086) | Küste, Flachwasser, freigelegte Hafenanlagen, Grabungscamp, Labor | ja, an Land und auf Stegen; Taucherfeld als Szene |
-| **Chronomap** | um 1600 v. Chr. | die Stadt, wie sie vor dem Untergang aussah (Rekonstruktion) | ja, zu Fuß, wie eine Virtual-Reality-Reise |
+| **Grabung** | Spielgegenwart (2086) | Küste, Flachwasser, freigelegte Hafenanlagen, Grabungsfelder im Fischerviertel, Grabungscamp, Labor | ja, an Land und auf Stegen; Taucherfeld als Szene |
+| **Chronomap** | um 1600 v. Chr., drei Nächte und der Bruchtag | die Stadt vor und während des Bruchs (Rekonstruktion) | ja, zu Fuß, wie eine Virtual-Reality-Reise |
 
-Die Chronomap ist **Rekonstruktion**: Jeder Ort trägt ein Etikett, ob er belegt ist (durch einen Grabungsfund), geschlossen (aus Funden abgeleitet) oder frei erfunden (nur aus dem Buch) – nach dem [R]/[T]/[S]/[F]-Muster des OTA-Archivs. So bleibt sichtbar, was die Grabung stützt.
+Jeder Ort in der Chronomap trägt ein Etikett nach dem Muster des OTA-Archivs:
 
-## 2. Was die Grabung gefunden haben muss (Ankerpunkte)
+- **[R]** – Grabungsfund (im Spiel belegt, mit Fundzettel)
+- **[S]** – aus Funden erschlossen
+- **[F]** – frei, nur aus dem Buch
 
-Nur das legt die Karte fest. Alles andere ist Buchwelt.
+## 2. Was die Grabung gefunden hat (Ankerpunkte)
 
-1. **Hafenbecken mit Kaimauer** – Steinblöcke in einer Linie unter Wasser; trägt den Hafen aus Kap. 1.0 (Fischer Matsya, Netze, Kai, an dem Matsyas Frau stand).
-2. **Zwei Molenarme** – Steinwälle, die das Becken nach Westen zum Meer schließen; Hafeneinfahrt dazwischen.
-3. **Steinanker und Poller** – am Kai verteilt; belegen Schifffahrt und den Handel mit den Hethitern (Kasyapas Siegel mit der Doppelaxt, Kap. 1.2).
-4. **Fundament des Wasserturms (Jala)** – kreisrunder Steinring am Hafen; belegt Kap. 1.0, 1.4 (Varunas Turm, der als einer der drei letzten fiel).
-5. **Tonscherben-Lager** – dichte Schicht beschrifteter Scherben in einem Gebäudegrundriss nahe dem Kai; Dhruvas Liedersammlung (Kap. 1.0).
-6. **Brunnenreihe** – kleine Brunnenschächte in einer Gasse hinter dem Kai (Jaladharas „tausend kleine Brunnen“, Kap. 1.2.5).
+Nur das bindet die Karte. Alles andere ist Buchwelt.
 
-Alles Weitere in den Kapiteln (Türme von Ākāśa und Soma, Tempelbezirk, Heilgarten, Svaraṭi-Werkstatt) steht in der Chronomap ohne Grabungsbeleg und trägt das Etikett „frei erfunden“.
+| Nr. | Fund | Etikett | Buchstelle |
+| --- | --- | --- | --- |
+| G1 | **Inneres Hafenbecken mit Kaimauer**; dazu ein äußeres Becken (Ankerplatz der großen Schiffe) | [R] / äußeres [S] | Kap. 1.0.4 (Kupferschiff im äußeren Becken), 1.1 (Matsya) |
+| G2 | **Südmole**, 200 Jahre vor dem Bruch gebaut: äußerer Abschnitt neigt sich nach Westen; Abschnitt 3 mit drei Rissen und zwei Mörtel-Reparaturphasen, der dritte Riss offen | [R] | Kap. 1.0.7, Dhruvas Morgennotiz |
+| G3 | **Nordmole** | [S] | nicht im Buch, nötig für die Einfahrt |
+| G4 | **Ankerfeld unter der Südmole**: zwei Ankertypen in zwei Schichten – unten ältere, „nicht dreilochige“ Steinanker nach vergessenem Muster, darüber jüngere | [R] | Kap. 1.0.7 |
+| G5 | **Einfahrtsmarke**: glatter, muschelbesetzter Steinblock im Becken, Rest einer verlandeten Fahrrinne | [R] | Kap. 1.0.7 |
+| G6 | **Fundament des Wasserturms** (Steinring) | [R] | Kap. 1.0, 1.1 |
+| G7 | **Brunnenreihe mit Kristallkronen** in der Quergasse; einer davon „Brunnen 24“ (Wartungsnummer eingeritzt) | [R] | Kap. 1.0.6, 1.0.8 |
+| G8 | **Kanäle unter dem Hafenviertel**: vier Bauphasen im Mauerwerk, gerissene Verbindungsmuffe zwischen zwei Phasen | [R] | Kap. 1.0.7 (Hari, „vier Handschriften“) |
+| G9 | **Reste von Svaraṭi**: Eisenmahlwerk mit Osmium-Führungsringen, darüber eine silbrige Schicht aus Kristallstaub | [R] | Kap. 1.1.7, 1.2 |
+| G10 | **Leere Kristalle** als Fundserie: Lampensteine, zu leicht, innen leer. Ihre Fundstellen häufen sich im 300-m-Umkreis um G9 – die Grabung rekonstruiert damit Priyas Liste | [R] / Häufung [S] | Szene B, Kap. 1.0 |
+| G11 | **Osmium-Siegel** im Hafenschlick unterhalb des Felsens | [R] | Kap. 1.4.2 |
+| G12 | **Fischerviertel**: Hausfundamente im Flachwasser südlich des Hafens, Teerreste der Werft, ein trockener Brunnen mit stumpfer Kristallkrone | [R] | Kap. 1.0.6, 1.3 |
+| G13 | **Kalksteinbehälter mit Dhruvas Chronik-Fragment**, in der Schicht der zweiten Untergangsphase | [R] | Fragment nach Kap. 1.4.2 |
+| G14 | **Zwei Flutschichten**: Phase 1 (Bruchtag) über Fischerviertel und Westbezirk, Phase 2 (Generationen später) über der Felsstadt | [S] | Prolog, 1.4, 1.4.2 |
 
-## 3. Lageplan (Meter, Ursprung = Mitte des Hafenbeckens, x nach Osten, y nach Norden)
+Streitfall für die Grabung im Spiel: **Eisen um 1600 v. Chr.** an dieser Küste (G9) ist ein Fremdkörper. Daran kann sich eine Forschungs-Questkette aufhängen.
 
-Das Meer liegt im Westen; die Stadt steigt nach Osten an.
+## 3. Lageplan
 
-| Ort | Lage | Größe | Beleg | Aus dem Buch |
-| --- | --- | --- | --- | --- |
-| Hafenbecken | (0, 0) | 220 × 140 | Grabung (1) | Hafen, Matsya |
-| Kai | x = 0…90, Ostrand | 90 lang | Grabung (1, 3) | Kai, Netze, Abschiede |
-| Nördlicher Molenarm | (−110, 55) bis (−40, 80) | 80 lang | Grabung (2) | Hafeneinfahrt |
-| Südlicher Molenarm | (−110, −55) bis (−40, −80) | 80 lang | Grabung (2) | Hafeneinfahrt |
-| Wasserturm (Jala, Varuna) | (95, 40) | Ø 18, Höhe 40 | Grabung (4) | Varunas Balkon |
-| Brunnengasse | (110, 0) bis (110, −60) | 60 lang | Grabung (6) | tausend Kristallbrunnen |
-| Liederhaus (Dhruva) | (80, −25) | 14 × 10 | Grabung (5) | Tonscherben |
-| Bäckergasse (Kamala) | (130, 20) | Gasse 70 lang | frei | Kap. 1.0.5 |
-| Handwerkerviertel (Rohit, Esse) | (150, −30) | 60 × 50 | frei | Schmied |
-| Marktplatz (Krishnan, Gewürze) | (140, 60) | 50 × 40 | frei | Waage, Kurkuma |
-| Schulhof (Radha, Arjun) | (170, 0) | 30 × 30 | frei | Kristallkreisel, Klatschen |
-| Heilgarten (Amrita) | (190, 40) | 40 × 30 | frei | Ashwagandha, 13 Samen |
-| Manus Haus | (185, −20) | 12 × 10 | frei | Kap. 1.1.5 |
-| Turm Ākāśa (Raum) | (230, 70) | Ø 16, Höhe 45 | frei | einer der drei letzten |
-| Turm Soma (Bewusstsein) | (230, −10) | Ø 16, Höhe 45 | frei | einer der drei letzten |
-| Tempelbezirk | (260, 30) | 80 × 60 | frei | Kristallexplosion Kap. 1.3 |
-| Hügel mit Blick aufs Meer (Sternenritual) | (300, 0) | 40 Ø | frei | Kap. 1.3 |
-| Werkstatt Kasyapa (Svaraṭi) | (200, −70) | 30 × 20 | frei | Kap. 1.2 |
-| Verfallene Türme Vāyu, Prithvī, Agni, Indra | im Norden, Ruinen | je Ø 14 | frei | Kap. 1.2, nach Welle 4/5 zerstört |
+Eigene Koordinatenebene, Meter. Ursprung = Mitte des inneren Hafenbeckens, x nach Osten, y nach Norden. Das Meer liegt im Westen; die Stadt steigt nach Osten an. Drei Zonen:
+
+- **Fischerviertel (südliches Viertel)** – flach am Wasser südlich des Hafens; geht am Bruchtag zuerst unter.
+- **Westbezirk / Werkstattviertel** – auf altem Hafenschlick zwischen Hafen und Fels; geht am Bruchtag unter.
+- **Felsstadt** – ab etwa x = 800 auf Fels; steht nach dem Bruchtag noch (Phase 2).
+
+| Ort | Lage (x, y) | Größe | Zone | Etikett | Figuren / Buch |
+| --- | --- | --- | --- | --- | --- |
+| Äußeres Hafenbecken | (−260, 0) | 220 × 260 | Meer | [S] | Kupferschiff aus Magan |
+| Inneres Hafenbecken | (0, 0) | 240 × 160 | Hafen | [R] G1 | Möwen, Einfahrtsmarke G5 bei (−70, 10) |
+| Kai | x = 120, y −80 … 80 | 160 lang | Hafen | [R] G1 | Matsya, seine drei Schiffe |
+| Südmole | (−140, −90) bis (−10, −95) | 130 lang | Hafen | [R] G2, G4 | Babu frühstückt auf der Mole |
+| Nordmole | (−140, 90) bis (−10, 95) | 130 lang | Hafen | [S] G3 | – |
+| Hafenplatz | (170, 30) | 60 × 50 | Hafen | [F] | Meenas Gewürzladen, Poller |
+| Fels über dem Hafen | (60, 280) | Ø 60, Höhe 25 | Fels (Nord) | [F]; Siegel G11 darunter bei (50, 200) | Kasyapa in der Nacht nach dem Bruch |
+| Wasserturm (Varuna, Amrita) | (240, 90) | Ø 18, Höhe 40 | Westbezirk | [R] G6 | Varunas Balkon, Grundton |
+| Heilgarten (Amrita) | (260, 60) | 30 × 25 | Westbezirk | [F] | drei Ashwagandha-Reihen |
+| Manus Haus | (250, 125) | 12 × 10 | Westbezirk | [F] | Lamellenläden mit Blick auf Turm und Garten |
+| Bäckergasse (Kamala, Dilip) | (380, 130) | Gasse 80 lang | Westbezirk | [F] | Kamala, Leela, Dhruvas Haus zwei Türen weiter |
+| Platz hinter der Bäckergasse | (400, 170) | 20 × 20 | Westbezirk | [F] | Radha und Rohan klatschen; trockener Brunnen, drei schiefe Bäume |
+| Gasse der Weber | (520, 40) | 70 lang | Westbezirk | [F] | Priyas erste Lampen (Nr. 4 bis 7) |
+| Quergasse mit Brunnenreihe | (420, −40) bis (420, −120) | 80 lang | Westbezirk | [R] G7 | Govind, Rajan, Ketan; Haris Riss |
+| Werkstatt Kasyapa (Svaraṭi) | (450, 0) | 30 × 20 | Westbezirk | [R] G9 | Maschine, Ritual, Dhruva auf dem Pflaster davor |
+| Kristall-Schrein des Westbezirks | (560, −20) | 10 × 10 | Westbezirk | [F] | Pandey, Pilgerinnen |
+| Gopals Werkstatt | (580, 90) | 15 × 12 | Westbezirk | [F] | Priya, Devraj |
+| Wartungsgebäude (Bikram) | (650, −70) | 25 × 15 | Westbezirk | [F] | Stufen, auf denen Priya und Devraj sitzen |
+| Fischerviertel | x 0 … 420, y −180 … −420 | – | Fischerviertel | [R] G12 | Jaya (Haus am Wasser bei (60, −200)), Meera, Velu, Babu und Ramu |
+| Werft | (−30, −230) | 50 × 30 | Fischerviertel | [R] G12 | Teergeruch, Aryans Boote |
+| Küstenstraße mit Hauptbrunnen | (200, −450) | Brunnen Ø 4 | Küste Süd | [F] | Wasser holen, Savitri und Jaya |
+| Bauholzlager (Harish) | (720, −200) | 40 × 30 | Felsrand | [F] | Preise +15 % |
+| Pilgerherberge an der Südpforte | (900, −380) | 30 × 20 | Felsstadt | [F] | Deven, Akash; **Einstieg des Spielers** |
+| Stadtrat-Gebäude | (950, 0) | 30 × 20 | Felsstadt | [F] | Sitzung der Meister, Priyas Audienz |
+| Mittlerer Markt | (1050, −80) | 60 × 40 | Felsstadt | [F] | Prem, Suresh, Chandan, der Lautenspieler (dienstags) |
+| Tempel am Marktrand | (1100, −30) | 15 × 15 | Felsstadt | [F] | Kinder warten auf Brahmananda |
+| Dhruvas Schreibstube (Fundort G13) | (870, 60) | 10 × 8 | Felsstadt | [R] G13 | Chronik-Fragment im Kalksteinbehälter |
+| Turm Soma (Bewusstsein) | (1000, 120) | Ø 16, Höhe 45 | Felsstadt | [F] | steht nach dem Bruch |
+| Turm Ākāśa (Raum) | (1150, 160) | Ø 16, Höhe 45 | Felsstadt | [F] | steht nach dem Bruch |
+| Tempelbezirk | (1250, 20) | 100 × 80 | Felsstadt | [F] | – |
+| Türme Vāyu, Prithvī, Agnayya, Indra | (1300 … 1500, 250 … 400), Höhenrücken im Nordosten | je Ø 14 | Felsstadt | [F] | am weitesten vom Wassernetz; fallen zuerst |
+
+Prüfung: Im 300-m-Umkreis um Kasyapas Werkstatt liegen Wasserturm, Heilgarten, Bäckergasse, Gasse der Weber, Quergasse, Schrein und Gopals Werkstatt – also alle Orte, an denen das Buch Ausfälle nennt (auch Amritas Schneidklingen). Stadtrat, Markt und Felsstadt liegen außerhalb, so wie Varuna den Ausfall dort erst „schwach“ spürt.
+
+Dabei gestrichen: der „Hügel mit Sternenritual“ (das Ritual findet in der Werkstatt statt, „die Formation war kein Stern“), Krishnan (jetzt Meena/Prem), Arjun (jetzt Rohan), Jaladharas „tausend Brunnen“ und die „144 Minuten“ (beide nicht in der Neuen Fassung; dort: „zwei Stunden, vielleicht weniger“).
 
 ## 4. Erlebnis (begehbar wie VR)
 
-- **Einstieg:** im Reisebüro „Zeitreise“ buchen (siehe world-map.md), Ankunft am Kai am frühen Morgen, Fünfte Stunde vor Sonnenaufgang, Kap. 1.0.
-- **Zeitverlauf:** eine Stunde Spielzeit = die Tage des Buches (Kap. 1.0 bis 1.4): Morgen der Dissonanz → Maschine → Wasserwand (144 Minuten) → Abfahrt der vier Träger. So kann man den Untergang miterleben und dann in die Gegenwart zurückkehren.
-- **Figuren:** Meister und Handwerker als feste Orte (keine Simulation nötig): Matsya am Kai, Kamala in der Bäckergasse, Krishnan am Markt, Dhruva im Liederhaus, Amrita im Heilgarten.
-- **Hinweise zur Grabung:** An den belegten Orten (Tabelle „Grabung“) zeigt die Tafel den Fundzettel der Grabung mit Datum; an freien Orten „Rekonstruktion nach dem Buch“.
-- **Rückkehr:** Wasser steigt bis ins Becken, die Szene blendet in die Grabung der Gegenwart über; die Stelle, an der man stand, ist jetzt der Fundort.
+- **Einstieg:** Zeitreise im Reisebüro buchen (siehe world-map.md, Reiter „Zeit“). Ankunft als **Pilger in der Herberge an der Südpforte**, in der dritten Nacht (Kap. 1.0.3), wenn das Hämmern kurz aufhört. Vorbild ist Deven: Er hatte drei Tage geplant und blieb neun. So hat der Spieler einen Platz im Buch, ohne die Handlung zu ändern.
+- **Zeitverlauf (Vorschlag, 60 Minuten):**
+  - 10 Min. – die dritte Nacht: Hämmern, dunkle Lampen, Priya zählt in der Gasse der Weber, Pandey am Schrein.
+  - 35 Min. – der Bruchtag: Stadtrat am Morgen, Markt, Fischerviertel, Gang der Meister zur Werkstatt, Kasyapa zieht den Hebel.
+  - 15 Min. – der Bruch: Türme fallen, Wasserwand, Abfahrt am Kai.
+- **Figuren folgen dem Tag:** Sie stehen nicht fest, sondern sind zu jeder Stunde dort, wo das Buch sie hat (Priya nachts in der Gasse der Weber, morgens im Stadtrat; Varuna Turm → Bäckergasse → Stadtrat → Werkstatt). Dafür reicht ein Fahrplan pro Figur, keine Simulation.
+- **Fundzettel:** An Orten mit [R] zeigt eine Tafel den Fundzettel der Grabung mit Datum; bei [S] „aus Funden erschlossen“, bei [F] „Rekonstruktion nach dem Buch“.
+- **Ende:** Der Spieler steht am Kai oder auf dem Fels über dem Hafen. Das letzte Dach des Fischerviertels verschwindet unter Wasser. Dann blendet die Szene in die Grabung über: Wo das Dach war, liegt heute das Grabungsfeld G12. Die Felsstadt steht in der Chronomap noch; in der Gegenwart liegt auch sie unter Wasser (Phase 2).
 
 ## 5. Offene Punkte für Thomas
 
-1. Stimmen die Ankerpunkte (Kap. 2)? Dort ist der Plan an die Grabung gebunden; andere Funde lassen sich ergänzen.
-2. Einheiten: Soll die Chronomap eine eigene Koordinatenebene sein (empfohlen) oder auf der echten Karte vor der Küste von Gujarat liegen?
-3. Dauer des Besuchs: ganzer Ablauf (Kap. 1.0 bis 1.4) oder nur der Morgen vor dem Untergang?
-4. Kapitel 1.4.5 ff. (die vier Wege der Träger) enthalte ich hier nicht: Das sind Orte außerhalb Dvarakas (Iberien, Hattusa, Himalaya).
+1. Passen die 14 Fundpunkte (Kap. 2)? Vor allem: Dhruvas Kalksteinbehälter in seiner Schreibstube in der Felsstadt (G13) – oder lieber dort, wo er am Bruchtag vor der Werkstatt schrieb?
+2. Passt die Verteilung: Wasserturm, Heilgarten und Manus Haus im Westbezirk (innerhalb der 300 m), Stadtrat und Markt in der Felsstadt?
+3. Einstieg in der dritten Nacht als Pilger – oder doch am frühen Morgen des Bruchtags?
+4. Darf der Spieler eingreifen (z. B. Priyas Liste zum Wartungsrat tragen), oder ist er nur Zeuge? Vorschlag: nur Zeuge, die Geschichte ändert sich nicht.
+5. Kap. 1.4 ff. (die Wege der Träger nach Iberien, Ḫattuša, Himalaya, Ajanta) gehören nicht in diese Chronomap; das wären eigene Chronomaps.
