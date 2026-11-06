@@ -206,3 +206,8 @@ Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?)
 - Konstantinopel-Startpunkt korrigiert auf den Theodosianischen Hafen (Yenikapı, 40,999 N / 28,9515 O); Studio-Gegend 5 km um Fatih.
 - Live (Migration `20261106090000_immersion_studios.sql`, Trockenlauf ok): Studios in Dvārakā (osm:way:1343177734) und Istanbul/Fatih (osm:way:530509109). Gebäude-Panel zeigt die Erlebnisse mit „In Vorbereitung".
 - Requests eingefügt: `kueper-knowledge-graph` → `requests/open/REQ-L3-000003-noxiagame-chronomap-fakten.md`; `buecherwelten` → `external-tasks/open/EXT-NXU-BW-20261106-001.md`.
+
+## Studios Sundern und Frankfurt (06.11.2026)
+
+- Live (Migration `20261106100000_immersion_studios_sundern_frankfurt.sql`, Trockenlauf ok): Erlebnis-Studio Sundern (osm:way:246885862, 27,4 × 24,6 m, Region earth-sauerland) und Frankfurt (osm:way:174512109, 20,9 × 16 m). Beide in unbenannten, nicht als Wohnhaus eingetragenen Häusern nahe der Ortsmitte; die Häuser sind Vorschläge und lassen sich per Migration umsetzen.
+- Dort gibt es noch keine Zeitreise der Gegend (Chronomaps liegen in Dvārakā und Konstantinopel); das Studio zeigt Endia und Abstraktes, alle „In Vorbereitung".
