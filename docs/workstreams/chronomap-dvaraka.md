@@ -180,3 +180,17 @@ Folgerung für die Umsetzung: ein **Register der Chronomaps** (Kennung, Titel, E
 Folge: Requests an Wissensgraph (Schnittstelle für reale Fakten je Ort und Epoche) und Bücher (strukturierte Aussagen je Kapitel, Konsistenzprüfung). Die Karte liest nur, sie hält keine eigene Wahrheit.
 
 Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?), Format der Schnittstelle zum Wissensgraphen.
+
+## Entscheidungen 06.11.2026 (Thomas: „bei den anderen Fragen kannst du entscheiden")
+
+- **Konstantinopel startet am Hafen** (Thomas). Register: `lib/worldlab/chronomaps.ts`, Startpunkt vorläufig bei 41,0136 N / 28,9784 O, später auf den Theodosianischen Hafen (Yenikapı) feinjustieren.
+- **Register** gebaut: `CHRONOMAPS`, `chronomapsForPlace(name)` (Button am Ort), `chronomapsNear(at)` (Timetravel-Agencys). Status `planned`, bis begehbarer Inhalt existiert. Noch keine Oberfläche.
+- **Inhaltsquelle:** Wissensgraph für reales Wissen, Bücher als Ergänzung (Thomas). Die Karte liest nur.
+- **Austauschformat (Vorschlag):** je Chronomap eine JSON-Datei `chronomaps/<id>.json` mit `facts[]`: `{ id, claim, place?, from?, to?, source: 'graph'|'book', ref, label: 'R'|'S'|'F' }`. Die Konsistenzprüfung läuft in den Büchern gegen genau diese Aussagen.
+- **Reihenfolge:** zuerst Register und Oberfläche (Agency-Ortsart, Button), dann Inhalte.
+
+## Request-Entwürfe (zum Einfügen in die jeweiligen Repos)
+
+**An kueper-knowledge-graph:** Je Chronomap (Konstantinopel zuerst: Hafen, Spätantike bis Mittelalter) die gesicherten Fakten als Aussagen mit Ort, Zeitraum und Quelle liefern, im obigen Format mit `source: 'graph'`. Unsicheres als [S] markieren. Zweck: Grundschicht der Zeitreise.
+
+**An buecherwelten:** Die Buchtexte (zuerst „Das Lied von Dvārakā", Neue Fassung Mai 2026) kapitelweise in prüfbare Aussagen (Ort, Zeit, Personen, Dinge) zerlegen, `source: 'book'`, und gegen den Graphen sowie untereinander auf Widersprüche prüfen. Funde als Liste je Kapitel zurückmelden.

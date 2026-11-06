@@ -50,6 +50,7 @@ export default defineConfig({
       'lib/worldlab/viewOptions.test.ts',
       'lib/worldlab/landPlot.test.ts',
       'lib/worldlab/worldPlaceQueue.test.ts',
+      'lib/worldlab/chronomaps.test.ts',
       'lib/worldlab/roofRegion.test.ts',
       'lib/game/spatial/stationLayouts.test.ts',
       'lib/worldlab/buildingChronicle.test.ts',
