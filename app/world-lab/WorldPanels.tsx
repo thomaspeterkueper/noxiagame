@@ -27,6 +27,7 @@ import { establishmentFor, establishmentKnowledge, establishmentServices } from 
 import { DriveButton, VehicleDesk, vehicleServiceIds } from '@/app/components/VehicleDesk'
 import { peopleAtPlace, type PresenceRow } from '@/lib/game/population/placePresence'
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
+import { chronomapsForPlace } from '@/lib/worldlab/chronomaps'
 import { isResonanceBuilding, meetingPlaces } from '@/lib/worldlab/meetingPlaces'
 import { worshipAt, type WorshipItem } from '@/lib/worldlab/worshipTypes'
 import VenueStatusLine from '@/app/earth/VenueStatusLine'
@@ -840,6 +841,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         ? <><div className="row"><span>{room === 'cemetery' ? 'Du stehst am Friedhof.' : 'Du stehst davor.'}</span><button onClick={() => enterLandmark(room, landmark, landmarkSource)}>{room === 'cemetery' ? 'Friedhof betreten' : 'Betreten'}</button></div>
           {room === 'cemetery' && landmark.tags.chapel_name && <div className="row"><span>Auf dem Friedhof: {landmark.tags.chapel_name}</span><button onClick={() => enterLandmark('worship', { at: { lat: Number(landmark.tags.chapel_lat), lon: Number(landmark.tags.chapel_lon) }, name: landmark.tags.chapel_name, kind: 'place_of_worship', tags: { religion: 'christian', building: 'chapel' } }, landmark.tags.chapel_source || undefined)}>{landmark.tags.chapel_name} betreten</button></div>}</>
         : <div className="row"><span>{landmarkNear ? 'Ein eigener Innenraum für diesen Ort ist noch nicht gebaut.' : away(landmarkDistance, landmark.at)}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
+      {chronomapsForPlace(landmark.name).map(map => <div className="row" key={map.id}><span>Zeitreise: {map.title} ({map.era})</span><button disabled={map.status !== 'playable'}>{map.status === 'playable' ? 'Zeitreise starten' : 'In Vorbereitung'}</button></div>)}
       <span className="source">Quelle: OpenStreetMap</span>
     </>}
     {panel.kind === 'travel' && <>

@@ -194,3 +194,7 @@ Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?)
 **An kueper-knowledge-graph:** Je Chronomap (Konstantinopel zuerst: Hafen, Spätantike bis Mittelalter) die gesicherten Fakten als Aussagen mit Ort, Zeitraum und Quelle liefern, im obigen Format mit `source: 'graph'`. Unsicheres als [S] markieren. Zweck: Grundschicht der Zeitreise.
 
 **An buecherwelten:** Die Buchtexte (zuerst „Das Lied von Dvārakā", Neue Fassung Mai 2026) kapitelweise in prüfbare Aussagen (Ort, Zeit, Personen, Dinge) zerlegen, `source: 'book'`, und gegen den Graphen sowie untereinander auf Widersprüche prüfen. Funde als Liste je Kapitel zurückmelden.
+
+## Stand Oberfläche (06.11.2026)
+
+- Wahrzeichen-Panel zeigt bei Treffern im Register eine Zeile „Zeitreise: <Titel> (<Epoche>)" mit Knopf „In Vorbereitung" (deaktiviert, bis eine Chronomap `playable` ist). Ortsart `timetravel_agency` und deren Panel folgen.
