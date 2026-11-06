@@ -27,6 +27,7 @@ export default defineConfig({
       'lib/game/landmarks/readAloud.test.ts',
       'lib/game/readings/manuscript.test.ts',
       'lib/game/music/lounge.test.ts',
+      'lib/game/pilots.test.ts',
       'lib/game/rounds/roundTalk.test.ts',
       'lib/worldlab/placeStories.test.ts',
       'lib/ai/chatProvider.test.ts',

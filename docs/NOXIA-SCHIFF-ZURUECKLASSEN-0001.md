@@ -48,3 +48,11 @@ Der Spieler hat einen eigenen Ort, das Schiff auch. Sie sind nur „zusammen“,
 - Server: Aktion `dispatch` in `/api/game/transit`; `settleDueParkedShips` lässt fällige Schiffe ohne Spieler landen (beim Abfragen des Reisezustands).
 - Oberfläche: in den Kolonie-Details „Schiff mit Pilot nach X schicken · Honorar Y Cr“, wenn das Schiff am eigenen Ort liegt.
 - Offen: Schiffsauswahl bei mehreren Schiffen (API nimmt `shipId` schon an), Piloten als NPCs mit eigenem Honorar, Ladung für unbemannte Flüge.
+
+## Stand 06.11.2026 (später) – Flotte, Piloten, Ladung (umgesetzt)
+
+- **Mehrere Schiffe:** `GET /api/game/transit?fleet=1` liefert alle eigenen Schiffe mit Ort, Zustand, Ladung und Piloten des Tages. `dispatch` und `board` nehmen eine `shipId`. Mit Rücknahmetest geprüft: Spieler an Bord von Schiff 1, Schiff 2 fliegt mit Pilot los, Schiff 1 und Spielerort bleiben unverändert, Ankunft setzt nur Schiff 2 um.
+- **NPC-Piloten:** `lib/game/pilots.ts` – je Schiff, Ort und Tag drei Piloten (Neuling 0,8×, erfahren 1×, Veteran 1,35× Grundhonorar von 10 Cr je Energieeinheit), rein abgeleitet, kein Zustand. Das Honorar fällt bei unbemannten Flügen immer an.
+- **Ladung:** Die Ladung bleibt auf dem Schiff und fliegt mit. Die Oberfläche zeigt sie je Schiff an; gehandelt wird nach der Ankunft, wenn man an Bord geht.
+- **Oberfläche:** `app/dashboard/FleetDispatch.tsx` in den Kolonie-Details: Schiffe am Ort, Pilotenwahl mit Honorar, „Mit Pilot nach X“ und „An Bord“.
+- Offen: Piloten als dauerhafte NPCs mit Lebenslauf und Anstellung; Ladung vor dem Flug an- und abladen; Risiko und Verspätung je Pilotenstufe.
