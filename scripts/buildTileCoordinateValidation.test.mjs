@@ -15,7 +15,7 @@ test('tile parser preserves missing-parameter default and valid integer coordina
 })
 
 test('tile parser rejects partial, fractional, hexadecimal, blank and non-finite inputs', () => {
-  for (const raw of ['1oops', '0.5', '-0.5', '0x10', '', ' ', '1e2', '+1', 'Infinity', 'NaN']) {
+  for (const raw of ['1oops', '0.5', '-0.5', '0x10', '', ' ', '1e2', '+1', 'Infinity', 'NaN', '9007199254740992', '-9007199254740992', '999999999999999999999999999']) {
     assert.ok(Number.isNaN(parseTileInteger(raw)), `unexpectedly accepted ${JSON.stringify(raw)}`)
   }
 })
