@@ -198,3 +198,11 @@ Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?)
 ## Stand Oberfläche (06.11.2026)
 
 - Wahrzeichen-Panel zeigt bei Treffern im Register eine Zeile „Zeitreise: <Titel> (<Epoche>)" mit Knopf „In Vorbereitung" (deaktiviert, bis eine Chronomap `playable` ist). Ortsart `timetravel_agency` und deren Panel folgen.
+
+## Erlebnis-Studio statt „Timetravel-Agency" (Thomas, 06.11.2026)
+
+- Der Name „Timetravel-Agency" war zu eng: Es ist ein **VR-Anbieter**. Man legt sich in einen Pod und erlebt die Vergangenheit, **Spielwelten wie Endia** oder **ganz Abstraktes**. Gebäudeart: `immersion_studio`, Anzeigename „Erlebnis-Studio". Reisebüros bleiben bei normalen Reisen.
+- Register erweitert: `category` = `chronotrip` | `game` | `abstract`; `experiencesAt(at)` = Zeitreisen der Gegend plus alle Spiele und abstrakten Welten. Einträge: Dvārakā, Konstantinopel, Endia, Abstrakte Räume (alle `planned`).
+- Konstantinopel-Startpunkt korrigiert auf den Theodosianischen Hafen (Yenikapı, 40,999 N / 28,9515 O); Studio-Gegend 5 km um Fatih.
+- Live (Migration `20261106090000_immersion_studios.sql`, Trockenlauf ok): Studios in Dvārakā (osm:way:1343177734) und Istanbul/Fatih (osm:way:530509109). Gebäude-Panel zeigt die Erlebnisse mit „In Vorbereitung".
+- Requests eingefügt: `kueper-knowledge-graph` → `requests/open/REQ-L3-000003-noxiagame-chronomap-fakten.md`; `buecherwelten` → `external-tasks/open/EXT-NXU-BW-20261106-001.md`.

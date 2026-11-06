@@ -27,7 +27,7 @@ import { establishmentFor, establishmentKnowledge, establishmentServices } from 
 import { DriveButton, VehicleDesk, vehicleServiceIds } from '@/app/components/VehicleDesk'
 import { peopleAtPlace, type PresenceRow } from '@/lib/game/population/placePresence'
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
-import { chronomapsForPlace } from '@/lib/worldlab/chronomaps'
+import { chronomapsForPlace, experiencesAt } from '@/lib/worldlab/chronomaps'
 import { isResonanceBuilding, meetingPlaces } from '@/lib/worldlab/meetingPlaces'
 import { worshipAt, type WorshipItem } from '@/lib/worldlab/worshipTypes'
 import VenueStatusLine from '@/app/earth/VenueStatusLine'
@@ -142,7 +142,7 @@ export function panelLocation(panel: Panel, sites: WorldSite[], plots: WorldPlot
 type Buildable = { id: string; name: string; cost: number; footprint?: { widthM: number; depthM: number }; requirements?: { canBuild?: boolean; knowledgeOk?: boolean; creditsOk?: boolean; requiredUnlock?: string | null } }
 
 /** Die wichtigsten Gebäude, die alle Einwohner kennen: Eine Person führt den Spieler auch über größere Entfernung dorthin (31.10.2026). */
-const FAR_GUIDE_KINDS = new Set(['job_agency', 'bank', 'travel_agency', 'school', 'admin', 'spaceport_core', 'cafe', 'restaurant', 'bar', 'resonance_place', 'ssf_headquarters_sundern'])
+const FAR_GUIDE_KINDS = new Set(['job_agency', 'bank', 'travel_agency', 'immersion_studio', 'school', 'admin', 'spaceport_core', 'cafe', 'restaurant', 'bar', 'resonance_place', 'ssf_headquarters_sundern'])
 
 export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, onNote, presence = [], worship = [], onPeerGesture }: {
   /** W-16: eigene Geste an Mitspieler in der Nähe (über die Kartenanwesenheit) */
@@ -770,6 +770,10 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           ? <><TravelAgency from={building.at} onBooked={trip => { setShowAgency(false); onTripBooked?.(trip) }} onDrive={(at, note) => { setShowAgency(false); engine?.jump(at); onNote?.(note) }}/><div className="row"><span/><button onClick={() => setShowAgency(false)}>Schließen</button></div></>
           : <div className="row"><span>Bahn und Flug auf der Erde, Linienflüge ins All.</span><button onClick={() => setShowAgency(true)}>Reise buchen …</button></div>)
         : <div className="row"><span>Hier kann man Reisen buchen – auf der Erde und ins All.</span></div>)}
+      {own?.typeId === 'immersion_studio' && <>
+        <div className="row"><span>Erlebnis-Studio: du legst dich in einen Pod und erlebst die Vergangenheit, Spielwelten wie Endia oder ganz Abstraktes.</span></div>
+        {experiencesAt(building.at).map(map => <div className="row" key={map.id}><span>{map.title} · {map.era}</span><button disabled={map.status !== 'playable'}>{map.status === 'playable' ? 'In den Pod' : 'In Vorbereitung'}</button></div>)}
+      </>}
       {own && /^spaceport/.test(own.typeId) && (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
         ? (showTickets
           ? <><TicketCounter compact/><div className="row"><span/><button onClick={() => setShowTickets(false)}>Schließen</button></div></>
