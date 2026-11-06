@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ANALYSES, FIELD_LAB, analysisStatus, runAnalysis, type Finding } from '@/lib/game/lab/lab'
 import { SAMPLES } from '@/lib/worldlab/dvarakaGrabung'
+import type { BookAnalysis } from '@/lib/worldlab/grabungsbuch'
 
 type Tab = 'analyse' | 'lernen' | 'experiment'
 
@@ -11,9 +12,13 @@ type Tab = 'analyse' | 'lernen' | 'experiment'
  * Der Kern liegt in lib/game/lab/lab.ts und gilt ebenso für Erd- und Stationslabors. Hier: Feldlabor ohne Spektroskopie;
  * Proben dafür gehen später an ein Stationslabor. Freischaltungen (Lernen) sind angeschlossen, sobald es dafür Einträge gibt.
  */
-export default function GrabungLab({ seen, unlocked = [], onClose }: { seen: string[]; unlocked?: string[]; onClose: () => void }) {
+export default function GrabungLab({ seen, unlocked = [], past = [], onFinding, onClose }: { seen: string[]; unlocked?: string[]; past?: BookAnalysis[]; onFinding?: (entry: BookAnalysis) => void; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>('analyse')
-  const [done, setDone] = useState<Record<string, Finding[]>>({})
+  const [done, setDone] = useState<Record<string, Finding[]>>(() => {
+    const start: Record<string, Finding[]> = {}
+    for (const item of past) (start[item.sampleId] ??= []).push({ analysisId: item.analysisId, measurement: item.measurement, interpretation: item.interpretation } as Finding)
+    return start
+  })
   const [note, setNote] = useState<string | null>(null)
   const samples = seen.filter(id => SAMPLES[id]).map(id => SAMPLES[id])
 
@@ -28,6 +33,7 @@ export default function GrabungLab({ seen, unlocked = [], onClose }: { seen: str
     if (result.ok) {
       setDone(prev => ({ ...prev, [sampleId]: [...(prev[sampleId] ?? []).filter(f => f.analysisId !== analysisId), result.finding] }))
       setNote(null)
+      onFinding?.({ sampleId, source, analysisId, measurement: result.finding.measurement, ...(result.finding.interpretation ? { interpretation: result.finding.interpretation } : {}) })
     } else setNote(result.reason === 'needs-lab' ? 'Das kann das Feldlabor nicht. Die Probe müsste an ein Stationslabor gehen.' : result.reason === 'needs-learning' ? 'Dafür fehlt dir noch das Wissen. Im Reiter „Lernen“ findest du den Weg.' : 'Diese Analyse liefert an dieser Probe nichts Auswertbares.')
   }
 

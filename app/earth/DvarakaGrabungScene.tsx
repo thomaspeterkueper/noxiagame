@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { iso } from '@/lib/worldlab/facade'
 import GrabungLab from './GrabungLab'
+import { bookToMarkdown, campNear, emptyBook, noteAnalysis, noteFind, parseBook, type BookAnalysis, type Grabungsbuch } from '@/lib/worldlab/grabungsbuch'
 import { useSitePresence, type SitePeer } from '@/lib/multiplayer/sitePresence'
 import { BOUNDS, CAMP, FINDS, LAB, LABEL_TEXT, START, findNear, groundAt, labNear, stepTo, type Find, type Pt } from '@/lib/worldlab/dvarakaGrabung'
 
@@ -31,6 +32,17 @@ export default function DvarakaGrabungScene({ partyId, me, onLeave }: { partyId?
   const [seenIds, setSeenIds] = useState<string[]>([])
   const [atLab, setAtLab] = useState(false)
   const [inLab, setInLab] = useState(false)
+  const [atCamp, setAtCamp] = useState(false)
+  const [inBook, setInBook] = useState(false)
+  const [copied, setCopied] = useState(false)
+  // Grabungsbuch: bleibt im Browser dieser Spielerin (nur Besuche und Messungen, die im Spiel geschahen)
+  const BOOK_KEY = 'noxia:grabungsbuch:dvaraka'
+  const [book, setBook] = useState<Grabungsbuch>(emptyBook)
+  const bookRef = useRef(book)
+  useEffect(() => {
+    try { const loaded = parseBook(JSON.parse(localStorage.getItem(BOOK_KEY) ?? 'null')); bookRef.current = loaded; setBook(loaded); for (const id of loaded.finds) seen.current.add(id); setSeenCount(seen.current.size); setSeenIds([...seen.current]) } catch { /* ohne Speicher: nur diese Sitzung */ }
+  }, [])
+  const saveBook = (next: Grabungsbuch) => { bookRef.current = next; setBook(next); try { localStorage.setItem(BOOK_KEY, JSON.stringify(next)) } catch { /* ohne Speicher: nur diese Sitzung */ } }
 
   useEffect(() => {
     const el = canvas.current
@@ -66,9 +78,11 @@ export default function DvarakaGrabungScene({ partyId, me, onLeave }: { partyId?
       }
       const found = findNear(s.pos)
       setNear(prev => prev?.id === found?.id ? prev : found)
-      if (found && !seen.current.has(found.id)) { seen.current.add(found.id); setSeenCount(seen.current.size); setSeenIds([...seen.current]) }
+      if (found && !seen.current.has(found.id)) { seen.current.add(found.id); setSeenCount(seen.current.size); setSeenIds([...seen.current]); saveBook(noteFind(bookRef.current, found.id)) }
       const lab = labNear(s.pos)
       setAtLab(prev => prev === lab ? prev : lab)
+      const camp = campNear(s.pos)
+      setAtCamp(prev => prev === camp ? prev : camp)
 
       const w = el.width, h = el.height
       ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -140,7 +154,32 @@ export default function DvarakaGrabungScene({ partyId, me, onLeave }: { partyId?
           <button onClick={() => setInLab(true)} style={{ border: '1px solid #476b79', background: '#183e4d', color: '#fff', borderRadius: 7, padding: '6px 10px', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>Labor betreten</button>
         </div>
       )}
-      {inLab && <GrabungLab seen={seenIds} onClose={() => setInLab(false)} />}
+      {inLab && <GrabungLab seen={seenIds} past={book.analyses} onFinding={(entry: BookAnalysis) => saveBook(noteAnalysis(bookRef.current, entry))} onClose={() => setInLab(false)} />}
+      {atCamp && !atLab && !near && !shown && !inLab && !inBook && (
+        <div style={{ position: 'absolute', left: 10, right: 10, bottom: 10, background: 'rgba(238,241,237,.96)', color: '#1b3540', borderRadius: 8, padding: '8px 10px', font: '12px/1.45 system-ui', display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
+          <span><b>Grabungscamp</b><small style={{ display: 'block', color: '#65767b' }}>Grabungsbuch: {book.finds.length} Fundstellen, {book.analyses.length} Befunde</small></span>
+          <button onClick={() => setInBook(true)} style={{ border: '1px solid #476b79', background: '#183e4d', color: '#fff', borderRadius: 7, padding: '6px 10px', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>Grabungsbuch öffnen</button>
+        </div>
+      )}
+      {inBook && (
+        <div style={{ position: 'absolute', inset: 8, background: '#f4f1e4', color: '#2b2a22', border: '1px solid #b9ab7a', borderRadius: 10, display: 'flex', flexDirection: 'column', font: '12px/1.5 Georgia, serif', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#e6dfc0' }}>
+            <strong>Grabungsbuch Dvārakā</strong>
+            <span style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { void navigator.clipboard?.writeText(bookToMarkdown(book)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }, () => undefined) }} style={{ border: '1px solid #8a7e50', background: '#fff8dc', borderRadius: 6, padding: '3px 9px', cursor: 'pointer' }}>{copied ? 'Kopiert' : 'Als Markdown kopieren'}</button>
+              <button onClick={() => setInBook(false)} aria-label="Buch schließen" style={{ border: 0, background: 'transparent', fontSize: 20, cursor: 'pointer' }}>×</button>
+            </span>
+          </div>
+          <div style={{ padding: 12, overflow: 'auto', flex: 1 }}>
+            <b>Fundstellen ({book.finds.length} von {FINDS.length})</b>
+            {!book.finds.length && <p style={{ color: '#6a644a' }}>Noch keine besucht.</p>}
+            {book.finds.map(id => { const find = FINDS.find(item => item.id === id); return find && <p key={id} style={{ margin: '6px 0' }}><b>{find.id} · {find.title}</b><br/>{find.text}<br/><small style={{ color: '#6a644a' }}>{LABEL_TEXT[find.label]} · Buchstelle: {find.ref}</small></p> })}
+            <b>Laborbefunde</b>
+            {!book.analyses.length && <p style={{ color: '#6a644a' }}>Noch keine Analyse. Im Grabungslabor lassen sich Proben von besuchten Fundstellen untersuchen.</p>}
+            {book.analyses.map(item => <p key={item.sampleId + item.analysisId} style={{ margin: '6px 0' }}><small style={{ color: '#6a644a' }}>{item.source} · {item.analysisId}</small><br/><b>Messung:</b> {item.measurement}{item.interpretation && <><br/><b>Deutung:</b> {item.interpretation}</>}</p>)}
+          </div>
+        </div>
+      )}
       {near && !shown && (
         <div style={{ position: 'absolute', left: 10, right: 10, bottom: 10, background: 'rgba(238,241,237,.96)', color: '#1b3540', borderRadius: 8, padding: '8px 10px', font: '12px/1.45 system-ui', display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
           <span><b>{near.id} · {near.title}</b><small style={{ display: 'block', color: '#65767b' }}>{LABEL_TEXT[near.label]}</small></span>

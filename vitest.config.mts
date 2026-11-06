@@ -77,6 +77,7 @@ export default defineConfig({
       'lib/game/immersion.test.ts',
       'lib/game/lab/lab.test.ts',
       'lib/worldlab/dvarakaGrabung.test.ts',
+      'lib/worldlab/grabungsbuch.test.ts',
       'lib/multiplayer/sitePresence.test.ts',
       'lib/worldlab/placeName.test.ts',
       'lib/worldlab/buildingOffer.test.ts',
