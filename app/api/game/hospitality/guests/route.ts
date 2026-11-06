@@ -1,6 +1,6 @@
 // app/api/game/hospitality/guests/route.ts
-// Aktualisiert: 28.10.2026 — Hausregeln (services, canEditHouse) aus venue_service_rules/venue_owned_by (R-18); knownAgeYears (R-11)
-// Version:      1.2.0
+// Aktualisiert: 06.11.2026 — Bekannte Gäste mit ihrem aktuellen Namen (currentKnownName); 28.10.2026 — Hausregeln (services, canEditHouse) aus venue_service_rules/venue_owned_by (R-18); knownAgeYears (R-11)
+// Version:      1.2.1
 // GET ?tileEntityId=… → der Zustand eines Lokals, wie er sich aus dem
 // wirklichen Geschehen ergibt: wer im letzten Kaufabschnitt (sechs Stunden) gekauft
 // hat – jeder Besuch fest verteilt über den Abschnitt (spreadVisitAge) –, wie spät
@@ -14,7 +14,7 @@ import { ageAtTick } from '@/lib/game/gameCalendar'
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
-import { perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
+import { currentKnownName, perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
 import { appearanceFromRow, observableDescriptionFromAppearance } from '@/lib/game/population/personAppearance'
 import { venueHearsay } from '@/lib/game/hospitality/hearsay'
 import { FUNERAL_RECEPTION_KIND, receptionAt } from '@/lib/game/hospitality/funeralReception'
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
     return {
       resident: {
         id: person.id,
-        displayName: perceivedPersonLabel({ state: identityState, observableDescription, inferredName: identity?.inferred_name ?? null, knownName: identity?.known_name ?? null }),
+        displayName: perceivedPersonLabel({ state: identityState, observableDescription, inferredName: identity?.inferred_name ?? null, knownName: currentKnownName(identity?.known_name, person.display_name) }),
         identityState, observableDescription, appearance,
         knownAgeYears: identity?.known_birth_year ? ageAtTick(identity.known_birth_year, tickNow?.tick_number ?? null) : null,
         birthYear: person.birth_year, activityState: person.activity_state, lastAction: person.last_action,
