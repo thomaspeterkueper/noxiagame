@@ -31,20 +31,9 @@
 
 import { foldForScreening, revealContacts, squashSpacedLetters } from './textFold'
 
-export const EMAIL = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.[\p{L}]{2,}/gu
-export const URL = /\b(?:https?:\/\/|www\.)\S+|\b[\p{L}\p{N}-]+\.(?:com|de|net|org|io|me|app|gg|ly|tv)\b\S*/giu
-export const PHONE = /(?:\+|00)?\d[\d\s/().-]{6,}\d/g
-export const HANDLE = /(^|\s)@[\p{L}\p{N}_.]{2,}/gu
+export { EMAIL, URL, PHONE, HANDLE, stripContactData } from './personalData'
+import { stripContactData } from './personalData'
 export const MESSENGER = /\b(whats\s?app|telegram|snap(chat)?|insta(gram)?|discord|tiktok|signal|skype|kik|threema|wickr|wechat|line app|viber|session app|vk|вконтакте|телеграм|واتساب|تيليجرام)\b/iu
-
-/** Entfernt E-Mail, Links, Telefonnummern und @-Namen. */
-export function stripContactData(text: string): string {
-  return String(text ?? '')
-    .replace(EMAIL, '[Kontakt entfernt]')
-    .replace(URL, '[Link entfernt]')
-    .replace(PHONE, '[Nummer entfernt]')
-    .replace(HANDLE, '$1[Name entfernt]')
-}
 
 export type RiskSignal =
   | 'contact' | 'obfuscated_contact' | 'offline' | 'meetup' | 'real_goods' | 'money' | 'real_currency' | 'quantity' | 'trade_shape'
@@ -296,4 +285,17 @@ export function needsAiReview(assessment: RiskAssessment, context: { whisper: bo
 export function riskFlags(assessment: RiskAssessment): string[] {
   if (assessment.level === 'none') return []
   return [...assessment.signals.map(s => 'risk:' + s), 'risk:' + assessment.level]
+}
+
+// Thomas, 06.11.2026: „Gespräche über echte Währungen oder Krypto sollten zumindest
+// verwahrt bleiben.“ Solche Gespräche sind von der 14-Tage-Löschung ausgenommen und
+// werden ein Jahr verwahrt – maskiert und ohne Lesezugang im Adminbereich.
+export const REAL_MONEY_RETENTION_DAYS = 365
+const MONEY_SIGNALS: ReadonlySet<RiskSignal> = new Set(['real_currency', 'money', 'trade_shape'])
+
+/** Bis wann ein Gespräch verwahrt bleibt, oder null, wenn die normale Frist gilt. */
+export function retainUntilFor(assessment: RiskAssessment, now = Date.now()): string | null {
+  return assessment.signals.some(s => MONEY_SIGNALS.has(s))
+    ? new Date(now + REAL_MONEY_RETENTION_DAYS * 86_400_000).toISOString()
+    : null
 }

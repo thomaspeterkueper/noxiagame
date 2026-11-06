@@ -17,7 +17,8 @@
 // Nach einer Kontolöschung bleibt das Gelernte Teil der Biografie der Figur –
 // ohne Verbindung zum Konto (source_key statt Spieler-ID).
 
-import { stripContactData, type RiskAssessment } from '../safety/realWorldRisk'
+import { type RiskAssessment } from '../safety/realWorldRisk'
+import { containsMask, maskPersonalData } from '../safety/personalData'
 import type { ConversationTopic } from '../cognition/conversationTopic'
 import { normalizeUtterance } from '../cognition/conversationRepeat'
 import { topicWords } from '../cognition/conversationRecall'
@@ -32,7 +33,6 @@ const LEARNABLE_TOPICS: ReadonlySet<ConversationTopic> = new Set(['world_news', 
 const QUESTION_START = /^(wer|was|wo|wie|wann|warum|wieso|weshalb|welche\w*|kannst|koennt\w*|hast|habt|gibt es|gibts|ist|sind|bist|weisst|wisst|darf|duerfen|soll|sollen|willst|wollt|magst|who|what|where|how|when|why|which|can|could|do|does|did|is|are|have|has|will|would|should)\b/
 // Aussagen über den Sprecher oder das Gegenüber gehören ins persönliche Gedächtnis, nicht ins Weltwissen.
 const PERSONAL = /\b(ich|mir|mich|mein\w*|du|dir|dich|dein\w*|wir|uns|unser\w*|ihr|euch|euer\w*|i|me|my|mine|you|your|yours|we|us|our|ours)\b/
-const PLACEHOLDER = /\[(Kontakt|Link|Nummer|Name) entfernt\]/
 
 export type LearnableClaim = { claim: string; words: string[] }
 
@@ -41,8 +41,8 @@ export function learnableClaim(text: string, topic: ConversationTopic, risk: Ris
   if (!LEARNABLE_TOPICS.has(topic)) return null
   // Nur aus Sätzen, die der Schutzfilter lesen kann (06.11.2026): Deutsch und Englisch.
   if (risk.level !== 'none' || (risk.language !== 'de' && risk.language !== 'en' && risk.language !== 'none')) return null
-  const stripped = stripContactData(text).replace(/\s+/g, ' ').trim()
-  if (PLACEHOLDER.test(stripped)) return null
+  const stripped = maskPersonalData(text).replace(/\s+/g, ' ').trim()
+  if (containsMask(stripped) && !containsMask(text)) return null
   if (stripped.includes('?')) return null
   const norm = normalizeUtterance(stripped)
   if (QUESTION_START.test(norm) || PERSONAL.test(norm)) return null

@@ -31,7 +31,8 @@ import { ageAtTick } from '@/lib/game/gameCalendar'
 import { worldviewConversationLines, worldviewVoiceFromPublicRole } from '@/lib/game/population/worldviewVoices'
 import { languageDevelopmentCapacity, languagePromptConstraint } from '@/lib/game/cognition/languageSystem'
 import { loadPersonLanguageProfile, selectConversationLanguage } from '@/lib/game/cognition/languagePersistence'
-import { assessRealWorldRisk, riskFlags, stripContactData } from '@/lib/game/safety/realWorldRisk'
+import { assessRealWorldRisk, retainUntilFor, riskFlags, stripContactData } from '@/lib/game/safety/realWorldRisk'
+import { maskPersonalData } from '@/lib/game/safety/personalData'
 import { secureSuspicion } from '@/lib/game/safety/secureSuspicion'
 import { dreamConversationLines, insightConversationLines } from '@/lib/game/cognition/nightDreams'
 import { WORLD_AWARENESS_SOURCES } from '@/lib/game/worldAwareness'
@@ -161,7 +162,10 @@ export async function POST(request: NextRequest) {
     part: clean(body.sermon.part, 60),
     noun: clean(body.sermon.noun, 30) || 'Predigt',
   } : null
-  const player = opening ? '(tritt heran und hat noch nichts gesagt)' : sermonRequest ? `(sitzt in der Gemeinde und hört die ${sermonRequest.noun})` : clean(body.player)
+  const playerRaw = opening ? '(tritt heran und hat noch nichts gesagt)' : sermonRequest ? `(sitzt in der Gemeinde und hört die ${sermonRequest.noun})` : clean(body.player)
+  // Persönliche Daten maskiert, bevor der Text an den KI-Dienst, ins Protokoll oder ins
+  // Gedächtnis geht (06.11.2026). Der Schutzfilter sieht das Original nur im Speicher.
+  const player = opening || sermonRequest ? playerRaw : maskPersonalData(playerRaw)
   const npcIdRaw = clean(body.npcId, 120)
   let npcId = UUID_RE.test(npcIdRaw) ? npcIdRaw : null
   // Personal an realen Wahrzeichen (Bibliothek, …) ist keine simulierte Person,
@@ -427,7 +431,7 @@ export async function POST(request: NextRequest) {
   // Schutzfilter (NOXIA-SAFETY-0001): Gegenüber ist eine Figur, kein Mensch – eine
   // Absprache ist hier nicht möglich. Kennzeichen werden gezählt; gesichert wird nur
   // bei Missbrauchsdarstellungen.
-  const risk = opening || sermonRequest ? assessRealWorldRisk('') : assessRealWorldRisk(player)
+  const risk = opening || sermonRequest ? assessRealWorldRisk('') : assessRealWorldRisk(playerRaw)
   const correlationId = randomUUID()
   const causalStages: CausalStage[] = []
   const recordStage = (stage: CausalStage['stage'], status: CausalStage['status'], detail: CausalStage['detail']) => {
@@ -451,6 +455,8 @@ export async function POST(request: NextRequest) {
     headline: headline || null,
     headline_source: source || null,
     safety_flags: riskFlags(risk),
+    // Echte Währung, Bezahldienst oder Krypto: ein Jahr verwahrt statt 14 Tage.
+    retain_until: retainUntilFor(risk),
   }
   if (risk.signals.includes('abuse_material')) {
     await secureSuspicion(serviceClient, {

@@ -9,7 +9,8 @@
 // bei Gesprächen mit Figuren (conversationTopic). Reine Regeln.
 
 import { classifyConversationTopic, type ConversationTopic } from '../game/cognition/conversationTopic'
-import { assessRealWorldRisk, MESSENGER, riskFlags, stripContactData, type RiskAssessment } from '../game/safety/realWorldRisk'
+import { assessRealWorldRisk, MESSENGER, riskFlags, type RiskAssessment } from '../game/safety/realWorldRisk'
+import { maskPersonalData } from '../game/safety/personalData'
 
 
 export const ROOM_MESSAGE_MAX = 300
@@ -24,7 +25,7 @@ export function prepareRoomMessage(raw: string): PreparedMessage | null {
   const flags: string[] = []
   let shown = text
   const before = shown
-  shown = stripContactData(shown)
+  shown = maskPersonalData(shown)
   if (shown !== before) flags.push('contact')
   if (MESSENGER.test(text)) flags.push('messenger')
   const topic = classifyConversationTopic(text)

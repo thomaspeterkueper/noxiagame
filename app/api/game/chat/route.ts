@@ -20,7 +20,8 @@ async function getUserFromRequest(req: NextRequest) {
   return user
 }
 import { publishDirectMessage } from '@/lib/ably/server'
-import { assessRealWorldRisk, needsAiReview, stripContactData } from '@/lib/game/safety/realWorldRisk'
+import { assessRealWorldRisk, needsAiReview } from '@/lib/game/safety/realWorldRisk'
+import { maskPersonalData } from '@/lib/game/safety/personalData'
 import { secureSuspicion } from '@/lib/game/safety/secureSuspicion'
 import { aiVerdictIsSuspect, reviewWindow } from '@/lib/game/safety/aiReview'
 
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
 
     // Schutzfilter wie im Raum-Chat (NOXIA-SAFETY-0001, 06.11.2026): Kontaktdaten
     // werden ausgeblendet, gespeichert und zugestellt wird nur die gefilterte Fassung.
-    const shown = stripContactData(content)
+    const shown = maskPersonalData(content)
     const { data: message, error } = await supabase
       .from('chat_messages')
       .insert({ sender_id: user.id, receiver_id: receiverId, content: shown })
@@ -118,10 +119,11 @@ export async function POST(req: NextRequest) {
       const nameOf = (id: string) => id === user.id ? (sender?.username ?? 'Absender') : (receiver.username ?? 'Empfänger')
       const lines = [
         ...(recent ?? []).reverse().map(m => ({ speaker: nameOf(String(m.sender_id)), text: String(m.content), at: String(m.created_at) })),
-        // Die aktuelle Nachricht im Original: getarnte oder entfernte Kontakte zählen mit.
-        { speaker: nameOf(user.id), text: content, at: String(message.created_at) },
+        { speaker: nameOf(user.id), text: shown, at: String(message.created_at) },
       ]
-      const risk = assessRealWorldRisk(lines.map(l => l.text))
+      // Bewertet wird die aktuelle Nachricht im Original (nur im Speicher) – gespeichert
+      // und gesichert wird überall die maskierte Fassung.
+      const risk = assessRealWorldRisk([...lines.slice(0, -1).map(l => l.text), content])
       const roomKey = 'direct:' + [user.id, receiverId].sort().join(':')
       if (risk.level === 'suspect') {
         await secureSuspicion(supabase, { subjectProfileId: user.id, source: 'direct', risk, roomKey, locationName: 'Freundes-Chat', excerpt: lines })

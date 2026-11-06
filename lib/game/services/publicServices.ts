@@ -9,6 +9,7 @@
 
 import { CIVIC_STANDARD_INTERIOR } from '../buildings/interiors/templates/civicStandard'
 import { VENUE_HEIGHT, VENUE_WIDTH, staffSpot, standingSpot, type VenueLayout, type VenueSpot } from '../hospitality/venues'
+import { maskPersonalData } from '../safety/personalData'
 
 export type ServiceKind = 'police' | 'fire_station' | 'doctors' | 'hospital'
 
@@ -228,5 +229,6 @@ export function serviceKindFor(value: string | null | undefined): ServiceKind | 
 export function cleanCaseText(raw: unknown): string | null {
   const t = String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, 300)
   if (t.length < 3) return null
-  return t.replace(/[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.[\p{L}]{2,}/gu, '[Kontakt entfernt]').replace(/(?:\+|00)?\d[\d\s/().-]{6,}\d/g, '[Nummer entfernt]')
+  // Persönliche Daten überall maskieren (06.11.2026)
+  return maskPersonalData(t)
 }

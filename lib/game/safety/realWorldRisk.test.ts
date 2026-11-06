@@ -121,7 +121,7 @@ describe('Sprache', () => {
 
 describe('stripContactData und riskFlags', () => {
   it('entfernt Kontaktdaten', () => {
-    expect(stripContactData('mail an a@b.de oder 0171 1234567')).toBe('mail an [Kontakt entfernt] oder [Nummer entfernt]')
+    expect(stripContactData('mail an a@b.de oder 0171 1234567')).toBe('mail an xxx oder xxx')
   })
   it('liefert Kennzeichen ohne Wortlaut', () => {
     const flags = riskFlags(assessRealWorldRisk('Koks gegen Bitcoin'))

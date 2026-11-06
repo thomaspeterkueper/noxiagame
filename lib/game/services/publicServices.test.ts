@@ -32,6 +32,6 @@ describe('public services', () => {
   })
   it('case text cleaned', () => {
     expect(cleanCaseText('ab')).toBeNull()
-    expect(cleanCaseText('Ruf mich an 0171 2345678')).toContain('[Nummer entfernt]')
+    expect(cleanCaseText('Ruf mich an 0171 2345678')).toBe('Ruf mich an xxx')
   })
 })

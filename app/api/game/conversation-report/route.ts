@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { clipExcerpt, type ExcerptLine } from '@/lib/game/conversationInsights'
+import { maskPersonalData } from '@/lib/game/safety/personalData'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const KEY_RE = /^[A-Za-z0-9:_.\-]{1,120}$/
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
   if (!profileId) return NextResponse.json({ error: 'Anmeldung erforderlich' }, { status: 401 })
   const body = await req.json().catch(() => null) as Record<string, unknown> | null
   const reason = REASONS.includes(body?.reason as typeof REASONS[number]) ? body!.reason as string : 'other'
-  const comment = typeof body?.comment === 'string' ? body.comment.replace(/\s+/g, ' ').trim().slice(0, 500) || null : null
+  const comment = typeof body?.comment === 'string' ? maskPersonalData(body.comment.replace(/\s+/g, ' ').trim()).slice(0, 500) || null : null
   const db = createServiceClient()
 
   const { count } = await db.from('conversation_reports').select('id', { count: 'exact', head: true })

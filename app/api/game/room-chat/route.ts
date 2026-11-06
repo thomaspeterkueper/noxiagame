@@ -14,7 +14,7 @@ import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { prepareRoomMessage, ROOM_MESSAGES_PER_MINUTE } from '@/lib/multiplayer/roomChat'
 import { publishRoomMessage, publishWhisper } from '@/lib/ably/server'
 import { CHAT_RANGES, type ChatRange } from '@/lib/multiplayer/roomChat'
-import { assessRealWorldRisk, needsAiReview, riskFlags } from '@/lib/game/safety/realWorldRisk'
+import { assessRealWorldRisk, needsAiReview, retainUntilFor, riskFlags } from '@/lib/game/safety/realWorldRisk'
 import { aiVerdictIsSuspect, reviewWindow } from '@/lib/game/safety/aiReview'
 import { secureSuspicion } from '@/lib/game/safety/secureSuspicion'
 
@@ -73,7 +73,8 @@ export async function POST(req: NextRequest) {
   const senderName = String(profile?.username ?? 'Spieler').slice(0, 24)
   const { data: row, error } = await supabase.from('player_room_messages').insert({
     room_key: room, room_name: roomName, sender_id: profileId, sender_name: senderName,
-    text: prepared.text, shown_text: prepared.shown, topic: prepared.topic, flags: prepared.flags, peers,
+    // Persönliche Daten werden überall maskiert (06.11.2026) – auch im gespeicherten Text.
+    text: prepared.shown, shown_text: prepared.shown, topic: prepared.topic, flags: prepared.flags, peers,
     range, to_profile_id: toId, pos_x: posX, pos_y: posY,
   }).select('id,created_at').single()
   if (error || !row) return NextResponse.json({ error: 'Nicht gesendet.' }, { status: 500 })
@@ -83,18 +84,22 @@ export async function POST(req: NextRequest) {
   // Die Nachricht wird trotzdem zugestellt; bei Verdacht wird der Ausschnitt gesichert.
   try {
     const since = new Date(Date.now() - 30 * 60_000).toISOString()
-    let windowQuery = supabase.from('player_room_messages').select('sender_id,sender_name,text,created_at')
+    let windowQuery = supabase.from('player_room_messages').select('id,sender_id,sender_name,text,created_at')
       .eq('room_key', room).gte('created_at', since).order('created_at', { ascending: false }).limit(10)
     windowQuery = range === 'whisper'
       ? windowQuery.eq('range', 'whisper').or(`and(sender_id.eq.${profileId},to_profile_id.eq.${toId}),and(sender_id.eq.${toId},to_profile_id.eq.${profileId})`)
       : windowQuery.eq('sender_id', profileId)
     const { data: window } = await windowQuery
     const lines = (window ?? []).reverse()
-    const risk = assessRealWorldRisk(lines.map(l => String(l.text)))
+    // Die aktuelle Nachricht im Original bewerten (nur im Speicher), frühere sind maskiert.
+    const risk = assessRealWorldRisk(lines.map(l => String(l.id) === String(row.id) ? prepared.text : String(l.text)))
     if (risk.level !== 'none') {
       const flags = [...new Set([...prepared.flags.filter(f => !f.startsWith('risk:')), ...riskFlags(risk)])]
       await supabase.from('player_room_messages').update({ flags }).eq('id', row.id)
     }
+    // Echte Währung, Bezahldienst oder Krypto: das ganze Fenster ein Jahr verwahren.
+    const retainUntil = retainUntilFor(risk)
+    if (retainUntil) await supabase.from('player_room_messages').update({ retain_until: retainUntil }).in('id', lines.map(l => l.id))
     const excerpt = lines.map(l => ({ speaker: String(l.sender_name), text: String(l.text), at: String(l.created_at) }))
     if (risk.level === 'suspect') await secureSuspicion(supabase, {
       subjectProfileId: profileId, source: 'room', risk, roomKey: room, locationName: roomName, excerpt,
