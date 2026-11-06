@@ -244,3 +244,13 @@ Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?)
 - API: `GET /api/game/immersion` liefert jetzt `me` (Profilkennung, Name) für die Präsenz.
 - Geprüft im Headless-Browser mit zwei Szenen und einer Speicher-Präsenz (beide sehen sich, keine Fehler). Nicht geprüft: echtes Supabase Realtime mit zwei Konten.
 - Noch offen: Begleiter-NPCs im Pod, Sprechen/Gesten zwischen Mitspielern, Labor als eigener Raum, Grabungsbuch.
+
+## Labor (06.11.2026)
+
+Thomas: Das Labor ist wichtig, besonders für Stationen jenseits der Erde: **Analysen, Lernen, Experimentieren.**
+
+- **Kern** `lib/game/lab/lab.ts` (rein, 3 Tests): Fähigkeiten nach Innenraum-Vorlage `laboratory-standard-01`; Feldlabor = Probe aufnehmen, Basis- und Geoanalyse; Standardlabor zusätzlich Raman/IR. Status je Analyse: bereit / braucht besseres Labor / braucht Lernen. Befund trennt **Messung** von **Deutung**.
+- **Grabungslabor** (`app/earth/GrabungLab.tsx`): am Camp, „Labor betreten". Reiter Analysieren (Proben der besuchten Fundstellen G4, G9, G10, G13; Raman nur im Stationslabor), Lernen (Link zu Lernmodulen und Wissensstand), Experimentieren (angekündigt). Befunde halten sich an die Fundzettel; neue Fakten gehören in Wissensgraph und Bücher (`SAMPLES` in `dvarakaGrabung.ts`).
+- **Geprüft** im Headless-Browser: Labor betreten, Basisanalyse zeigt Messung und Deutung, Raman im Feldlabor wird abgelehnt.
+- **Nicht gebaut:** Experimente, Proben an Stationslabors schicken, echte Freischaltungen (es gibt noch keine Einträge für Analysearten), Speichern der Befunde (sie gelten nur für die Sitzung).
+- **Request R-35** an „Bevölkerung und Ökonomie" (`population-economy.md`): Anbindung an den Forschungslauf, Freischaltungen, Experimente, Probenversand.

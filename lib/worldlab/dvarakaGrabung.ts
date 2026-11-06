@@ -90,3 +90,31 @@ export function findNear(p: Pt, radius = 14): Find | null {
 }
 
 export const LABEL_TEXT: Record<FindLabel, string> = { R: 'Grabungsfund (belegt)', S: 'aus Funden erschlossen' }
+
+/**
+ * Proben für das Grabungslabor (Feldlabor, lib/game/lab/lab.ts). Befunde halten sich an die Fundzettel:
+ * „measurement“ sagt, was gemessen wurde, „interpretation“ ist die Deutung der Grabung (immer vorsichtig).
+ * Neue Fakten gehören nicht hierher, sondern in den Wissensgraphen und die Bücher (buecherwelten).
+ */
+export const SAMPLES: Record<string, import('@/lib/game/lab/lab').LabSample> = {
+  G4: { id: 'P-G4', label: 'Ankerstein aus der unteren Schicht', source: 'G4', findings: [
+    { analysisId: 'basic', measurement: 'Beide Ankertypen sind aus Stein; die älteren haben nicht die üblichen drei Löcher.' },
+    { analysisId: 'geo', measurement: 'Die älteren Anker liegen in einer tieferen Schicht als die jüngeren.', interpretation: 'Zwei Nutzungsphasen des Ankerplatzes, die ältere nach einem vergessenen Muster.' },
+  ] },
+  G9: { id: 'P-G9', label: 'Kristallstaub vom Mahlwerk', source: 'G9', findings: [
+    { analysisId: 'basic', measurement: 'Silbrige Schicht aus feinem Kristallstaub; sie liegt auf dem Mahlwerk, nicht darunter.', interpretation: 'Möglicherweise ist die Schicht erst nach dem Stillstand der Maschine entstanden.' },
+    { analysisId: 'geo', measurement: 'Kein Sedimentband zwischen Mahlwerk und Staubschicht.', interpretation: 'Der Staub hat sich vermutlich nicht langsam abgelagert.' },
+    { analysisId: 'raman', measurement: 'Das Spektrum zeigt ein regelmäßiges Kristallgitter; es passt zu keiner Referenzprobe der Grabung (Referenz fehlt).' },
+  ] },
+  G10: { id: 'P-G10', label: 'Leerer Lampenstein', source: 'G10', findings: [
+    { analysisId: 'basic', measurement: 'Deutlich leichter als ein gleich großer Vollkristall; innen hohl.' },
+    { analysisId: 'geo', measurement: 'Der Hohlraum ist glatt und ohne Einschlüsse.', interpretation: 'Möglicherweise wurde der Stein entleert, nicht verwittert.' },
+  ] },
+  G13: { id: 'P-G13', label: 'Kalksteinbehälter', source: 'G13', findings: [
+    { analysisId: 'basic', measurement: 'Verschlossener Kalksteinbehälter; Inhalt ist das Chronik-Fragment.' },
+    { analysisId: 'geo', measurement: 'Er liegt in der Schicht der zweiten Untergangsphase, über der Flutschicht des Bruchtags.', interpretation: 'Entweder wurde er später dorthin gebracht, oder Dhruva kam zurück – nicht entscheidbar.' },
+  ] },
+}
+
+/** Das Labor steht am Camp; man betritt es aus 14 m. */
+export function labNear(p: Pt, radius = 14): boolean { return Math.hypot(LAB.x - p.x, LAB.y - p.y) <= radius }

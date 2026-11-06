@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BOUNDS, FINDS, START, findNear, groundAt, stepTo } from './dvarakaGrabung'
+import { BOUNDS, FINDS, SAMPLES, START, findNear, groundAt, labNear, stepTo } from './dvarakaGrabung'
 
 describe('Dvārakā Grabung', () => {
   it('14 Fundpunkte, eindeutig, im Gelände', () => {
@@ -23,6 +23,15 @@ describe('Dvārakā Grabung', () => {
     const slow = stepTo({ x: 60, y: -150 }, { x: 60, y: -250 }, 4)
     expect(slow.y).toBeCloseTo(-152, 5)
     expect(stepTo({ x: 200, y: 0 }, { x: 300, y: 0 }, 5)).toEqual({ x: 205, y: 0 })
+  })
+  it('Proben gehören zu Funden und haben Befunde', () => {
+    for (const [id, sample] of Object.entries(SAMPLES)) {
+      expect(FINDS.some(f => f.id === id)).toBe(true)
+      expect(sample.source).toBe(id)
+      expect(sample.findings.length).toBeGreaterThan(0)
+    }
+    expect(labNear({ x: 355, y: 45 })).toBe(true)
+    expect(labNear({ x: 0, y: 200 })).toBe(false)
   })
   it('Fund in der Nähe', () => {
     expect(findNear({ x: 452, y: 2 })?.id).toBe('G9')

@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { iso } from '@/lib/worldlab/facade'
+import GrabungLab from './GrabungLab'
 import { useSitePresence, type SitePeer } from '@/lib/multiplayer/sitePresence'
-import { BOUNDS, CAMP, FINDS, LAB, LABEL_TEXT, START, findNear, groundAt, stepTo, type Find, type Pt } from '@/lib/worldlab/dvarakaGrabung'
+import { BOUNDS, CAMP, FINDS, LAB, LABEL_TEXT, START, findNear, groundAt, labNear, stepTo, type Find, type Pt } from '@/lib/worldlab/dvarakaGrabung'
 
 const SCALE = 0.9           // Bildpunkte je Meter
 const SPEED = 38            // Meter je Sekunde (die Grabung ist groß; Erkundung soll flott gehen)
@@ -27,6 +28,9 @@ export default function DvarakaGrabungScene({ partyId, me, onLeave }: { partyId?
   const [opened, setOpened] = useState<Find | null>(null)
   const seen = useRef(new Set<string>())
   const [seenCount, setSeenCount] = useState(0)
+  const [seenIds, setSeenIds] = useState<string[]>([])
+  const [atLab, setAtLab] = useState(false)
+  const [inLab, setInLab] = useState(false)
 
   useEffect(() => {
     const el = canvas.current
@@ -62,7 +66,9 @@ export default function DvarakaGrabungScene({ partyId, me, onLeave }: { partyId?
       }
       const found = findNear(s.pos)
       setNear(prev => prev?.id === found?.id ? prev : found)
-      if (found && !seen.current.has(found.id)) { seen.current.add(found.id); setSeenCount(seen.current.size) }
+      if (found && !seen.current.has(found.id)) { seen.current.add(found.id); setSeenCount(seen.current.size); setSeenIds([...seen.current]) }
+      const lab = labNear(s.pos)
+      setAtLab(prev => prev === lab ? prev : lab)
 
       const w = el.width, h = el.height
       ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -128,6 +134,13 @@ export default function DvarakaGrabungScene({ partyId, me, onLeave }: { partyId?
         Pfeiltasten / WASD oder Klick · gefundene Stellen: {seenCount} von {FINDS.length}{peers.length ? ` · mit dir hier: ${peers.map(p => p.name).join(', ')}` : ''}
       </div>
       <button onClick={onLeave} style={{ position: 'absolute', right: 10, top: 8, border: '1px solid #476b79', background: '#183e4d', color: '#fff', borderRadius: 7, padding: '6px 10px', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>Aufwachen</button>
+      {atLab && !near && !shown && !inLab && (
+        <div style={{ position: 'absolute', left: 10, right: 10, bottom: 10, background: 'rgba(238,241,237,.96)', color: '#1b3540', borderRadius: 8, padding: '8px 10px', font: '12px/1.45 system-ui', display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
+          <span><b>Grabungslabor</b><small style={{ display: 'block', color: '#65767b' }}>Proben analysieren, lernen, experimentieren</small></span>
+          <button onClick={() => setInLab(true)} style={{ border: '1px solid #476b79', background: '#183e4d', color: '#fff', borderRadius: 7, padding: '6px 10px', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>Labor betreten</button>
+        </div>
+      )}
+      {inLab && <GrabungLab seen={seenIds} onClose={() => setInLab(false)} />}
       {near && !shown && (
         <div style={{ position: 'absolute', left: 10, right: 10, bottom: 10, background: 'rgba(238,241,237,.96)', color: '#1b3540', borderRadius: 8, padding: '8px 10px', font: '12px/1.45 system-ui', display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'space-between' }}>
           <span><b>{near.id} · {near.title}</b><small style={{ display: 'block', color: '#65767b' }}>{LABEL_TEXT[near.label]}</small></span>

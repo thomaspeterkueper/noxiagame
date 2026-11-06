@@ -75,6 +75,7 @@ export default defineConfig({
       'lib/game/passengerOffers.test.ts',
       'lib/game/earthTrips.test.ts',
       'lib/game/immersion.test.ts',
+      'lib/game/lab/lab.test.ts',
       'lib/worldlab/dvarakaGrabung.test.ts',
       'lib/multiplayer/sitePresence.test.ts',
       'lib/worldlab/placeName.test.ts',
