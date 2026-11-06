@@ -1,6 +1,6 @@
 # NOXIA-FIN-0002 – Haushalt der Kolonien
 
-Status: **teilweise entschieden** – Teil A2/A3 und Mietsteuer umgesetzt (06.11.2026), Fragen 1, 3, 4, 5 offen
+Status: **weitgehend entschieden** – A1–A3, B, C, Miete und Linienfracht live (06.11.2026); offen: Teil D (Wasser ohne Käufer), Erde in der Anlaufhilfe
 Datum: 29.10.2026
 Bezug: NOXIA-FIN-0001 (Geldregeln), NOXIA-OMNI-0001 (Spielraum), NOXIA-ETHICS-0001, Essay „Warum der Mars Henry George recht gibt“, population-economy Aufgabe 23 (Zuzug mit der Fracht)
 Wunsch Thomas (29.10.2026): „ja bitte“ – ein Vorschlag, wie die Kolonien zu einem Haushalt kommen, damit der Zuzug in Gang kommt.
@@ -120,6 +120,32 @@ Thomas: „ja, auch auf Miete sollte es Steuern geben“ – Antwort auf Frage 2
   - Migration `20261106030000_rent_from_purchase_price.sql`.
 - **Noch offen:** Spieler-Anlagen (Wahl Mensch/Roboter im Spiel) und eine Oberfläche, in der Besitzer die Miete setzen.
 
+## Entschieden (06.11.2026, dritte Runde) – live seit 06.11.2026
+
+Thomas: „Ich denke 4 ist wichtig, damit dann auch 1 gelöst werden kann – wenn kein Käufer für Wasser da ist, kauft niemand und es gibt kein Geld.“ Auf den Vorschlag (Linienfracht, Anlaufhilfe, danach Wasser): „Ja mach das“.
+
+- **Frage 7 – Linienfracht:** Epona Fracht fährt jede Woche, auch ohne Handelsware.
+  - Montags gegen Mittag von der Erde zu Mond (2 h), Mars (61 h) und Phobos (62 h); donnerstags zurück.
+  - Tabelle `liner_routes` (Abfahrtsstunde in der Woche, Dauer), Funktion `run_liner_sailings`. Die Fahrt ist eine echte Sendung (`npc_shipments.service = 'liner'`, Menge 0).
+  - Crew geht mit an Bord; mit jeder Ankunft von der Erde kann eine Person zuziehen.
+  - Zugezogene zahlen 100 Cr Ticket an Epona (Transfer).
+  - Zuzug nimmt jetzt die günstigste Stelle bei einem Arbeitgeber, der zahlen kann. Vorher versperrte die leere öffentliche Kasse des Mondes die vier freien Stellen an Boanns Eisbohrern (im Rollback-Test kam die erste Person genau dorthin).
+  - Noch nicht gebucht: Energie für die Fahrt. Die Linie kostet Epona bisher nur die Heuer.
+  - Migration `20261106140000_weekly_liner_sailings.sql`.
+- **Frage 4 – Anlaufhilfe (C):** wie vorgeschlagen, ohne die Erde.
+  - `colony_fund` (Beginn Tick 2815, 8 Wochen, Obergrenze Mars 25 500, Mond 9 200, Phobos 3 300 Cr) und `colony_fund_payments` (eine Zeile je Woche, auch bei 0).
+  - `run_colony_fund` läuft jeden Tick und zahlt höchstens einmal je Woche, vor dem Zuzug.
+  - Gemessen beim Test für Woche 1: Mars Bedarf 7 980, Einnahmen 1 187, Zahlung 6 793 Cr; Mond 2 135 / 140 / 1 995; Phobos 945 / 142 / 803.
+  - Beleg `bootstrap:colony-fund:<ort>:<woche>`, Emittent Koloniegründungsfonds der Solar Central Bank.
+  - Migration `20261106150000_colony_fund.sql`.
+
+## Teil D – neu gerechnet (06.11.2026)
+
+- Boann bekam in der letzten Woche 15 364 Cr für 334 t Wasser vom Mars-Recycler gutgeschrieben, ohne Zahler. Auch Verkäufe der Handelsfirma an einen Ort werden gutgeschrieben, ohne dass jemand zahlt.
+- Wollte die Kolonie alles verbrauchte Wasser zum Marktpreis kaufen, kostete das je Woche: Mars 54 096 Cr, Mond 32 760 Cr, Phobos 7 392 Cr.
+- Dagegen stehen auf dem Mars 16 Menschen mit eigenem Konto bei 651 Einwohnern. Je Kopf sind es etwa 12 Cr am Tag – für jemanden mit Lohn tragbar. Die übrigen 635 Einwohner haben aber kein Konto, also gibt es für ihren Anteil keinen Zahler.
+- Weg 2 („die Kolonie kauft“) ist darum so nicht machbar. Vorschlag in der Antwort an Thomas: Wer ein Konto hat, zahlt seinen Anteil selbst (Transfer). Der Anteil der Einwohner ohne Konto wird als Emission „Haushalte ohne Konto“ ausgewiesen, mit Obergrenze je Woche.
+
 ## Nachtrag zum Befund (06.11.2026)
 
 - **Die Erde gerät selbst ins Minus.** In der letzten Woche nahm ihre öffentliche Kasse 786 Cr ein und zahlte 9 955 Cr Lohn. Die Kasse fiel von 20 500 auf 11 357 Cr; in etwa neun Tagen ist sie leer. Ein Fiskaltransfer von der Erde in die Kolonien (Frage 4, zweite Möglichkeit) scheidet damit aus. Die Erde braucht selbst eine Antwort.
@@ -130,10 +156,10 @@ Thomas: „ja, auch auf Miete sollte es Steuern geben“ – Antwort auf Frage 2
 1. ~~Förderabgabe (A1)~~ – **entschieden 06.11.2026:** je Ort einstellbar, Start 15 %.
 2. ~~Miete in staatlichen Wohnungen (A2) und Konsumsteuer 19 % (A3)~~ – **entschieden 06.11.2026**, dazu Mietsteuer 10 %.
 3. ~~Private Stellen an Förderanlagen (B1/B2)~~ – **entschieden 06.11.2026:** Mensch oder Roboter, der Eigentümer entscheidet.
-4. **Anlaufhilfe (C):** ja? Höhe und Dauer wie vorgeschlagen? Emittent Solar Central Bank – die Kasse der Erde kommt nicht mehr in Frage (Nachtrag). Und: Soll die Anlaufhilfe auch die Erde einschließen?
+4. ~~Anlaufhilfe (C)~~ – **entschieden 06.11.2026:** wie vorgeschlagen, ohne die Erde. Ursprünglich: ja? Höhe und Dauer wie vorgeschlagen? Emittent Solar Central Bank – die Kasse der Erde kommt nicht mehr in Frage (Nachtrag). Und: Soll die Anlaufhilfe auch die Erde einschließen?
 5. **Wasser ohne Käufer (D):** zuerst ausweisen (Weg 1)?
 6. ~~Kostenfreie Wohnungen auf der Erde~~ – **entschieden 06.11.2026:** Miete nach Kaufpreis, private Besitzer legen sie fest.
-7. **Neu – Frachten:** Die Handelsfirma liefert seit 13 Tagen nichts. Soll ich klären, warum, und eine Mindestverbindung vorschlagen (zum Beispiel eine Fracht je Woche zu Mond und Mars)? Daran hängen Mitflug und Zuzug.
+7. ~~Frachten~~ – **entschieden 06.11.2026:** Linienfracht jede Woche. Ursprünglich: Die Handelsfirma liefert seit 13 Tagen nichts. Soll ich klären, warum, und eine Mindestverbindung vorschlagen (zum Beispiel eine Fracht je Woche zu Mond und Mars)? Daran hängen Mitflug und Zuzug.
 
 ## Umsetzung nach Freigabe
 

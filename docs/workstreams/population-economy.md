@@ -94,6 +94,12 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
     - Fragt ein Spieler nach Toilette, eigenem Lokal, Büchern, Akademie, Tanz, Raumhafen oder Arbeit, bekommt die Figur die Wege als belegtes Wissen, mit den echten Häusern am Ort (`lib/game/cognition/gameGuide.ts`, Gesprächsroute 1.8.0).
     - Was fehlt, sagt sie ehrlich: Einen Nachtclub gibt es auf der Erde noch nicht.
     - Sexuelle Inhalte bleiben abgelehnt; der Abbruch beim dritten Grenztest bleibt.
+25. ✅ **Linienfracht und Anlaufhilfe (06.11.2026, Thomas: „Ja mach das“; NOXIA-FIN-0002 Fragen 4 und 7).**
+    - Epona Fracht fährt jede Woche: montags gegen Mittag von der Erde zu Mond, Mars und Phobos, donnerstags zurück (`liner_routes`, `run_liner_sailings`, Migration `20261106140000_weekly_liner_sailings.sql`, live).
+    - Crew geht mit an Bord. Mit jeder Ankunft kann eine Person zuziehen; sie zahlt 100 Cr Ticket an Epona.
+    - Zuzug nimmt die günstigste Stelle bei einem zahlungsfähigen Arbeitgeber, auf dem Mond zuerst Boanns Eisbohrer.
+    - Anlaufhilfe für Mond, Mars und Phobos: 8 Wochen, abnehmend, mit Obergrenze (`run_colony_fund`, Migration `20261106150000_colony_fund.sql`, live).
+    - **Offen, Entscheidung Thomas:** Wasser ohne Käufer (NOXIA-FIN-0002 Teil D, neu gerechnet).
 
 ## Requests aus anderen Teilprojekten
 

@@ -1,7 +1,8 @@
 // lib/game/jobs/crewSignon.ts
 // Erstellt:     29.10.2026
+// Aktualisiert: 06.11.2026 — Linienfracht: jede Woche fährt ein Schiff, Abfahrt bekannt
 // Aktualisiert: 29.10.2026 — Mitflug auf Handelsschiffen: Texte und Wissen für Raumhafen und Agentur
-// Version:      1.0.0
+// Version:      1.1.0
 //
 // Rein, ohne DB. Spielerwunsch „Raumhafen“ (entschieden von Thomas, 29.10.2026).
 // Server: app/api/game/crew, Migration 20261029120000_crew_signon_trade_ships.sql.
@@ -53,7 +54,7 @@ export function crewKnowledge(state: CrewState | null): string[] {
     `Fracht nach ${r.name}: ${r.departures} Abfahrten bisher, zuletzt ${sinceText(Math.max(0, state.tick - r.lastDepartTick))}, Flug etwa ${durationText(r.hours)}, Heuer ${r.wage} Cr`)
   return [
     'Wer kein eigenes Schiff hat, kann beim Frachtführer Epona Fracht als Crew anheuern: Man kommt auf die Heuerliste und geht an Bord, sobald die nächste Fracht zum Ziel ausläuft; die Heuer gibt es bei der Ankunft',
-    'Wann die nächste Fracht ausläuft, weiß niemand vorher – das entscheidet die Handelsfirma nach Bedarf',
+    'Epona fährt eine feste Linie: montags gegen Mittag von der Erde zu Mond, Mars und Phobos, donnerstags gegen Mittag zurück; dazu kommen Handelsfrachten nach Bedarf',
     ...lines,
   ]
 }

@@ -16,4 +16,5 @@ assert.ok(gameGuideLines('ich möchte zum Raumhafen', earth, 'earth').some(l => 
 assert.ok(gameGuideLines('ich suche Arbeit', earth, 'earth')[0].includes('Freiheitsmühle 7'))
 assert.ok(gameGuideLines('wo ist die Akademie?', earth, 'earth')[0].includes('Prämie'))
 assert.deepEqual(gameGuideLines('Moin, wie geht es dir?', earth, 'earth'), [])
+assert.ok(gameGuideLines('ich möchte zum Mars fliegen', earth, 'earth').some(l => l.includes('montags')))
 console.log('gameGuide ok')

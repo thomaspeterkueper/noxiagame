@@ -1,9 +1,10 @@
 // lib/game/cognition/gameGuide.ts
 // Erstellt:     29.10.2026
+// Aktualisiert: 06.11.2026 — Raumhafen: feste Linie jede Woche (montags hin, donnerstags zurück)
 // Aktualisiert: 06.11.2026 — Weltwissen statt Spielanleitung: Wie man selbst etwas eröffnet, nur auf Nachfrage;
 //                              neu: wann in Bars und Clubs etwas los ist (Bar im Metropol, Thomas 06.11.2026)
 // Aktualisiert: 29.10.2026 — Wege zu dem, was es schon gibt (Spielerwünsche „vorhanden“)
-// Version:      1.1.0
+// Version:      1.2.0
 //
 // Rein, ohne DB. Entschieden (Thomas, 29.10.2026): Wünsche, die es im Spiel schon gibt
 // (Lokal eröffnen, Bücher, Akademie, Tanz, Toilette), sollen Spieler finden. Fragt jemand
@@ -83,7 +84,7 @@ const ENTRIES: Entry[] = [
     re: /\b(raumhafen|weltraum|all\b|mond|mars|phobos|fliegen|flug|rakete|raumschiff)/i,
     lines: () => [
       'Vom Raumhafen geht es mit dem Linienflug gegen Ticket ins All',
-      'Wer kein eigenes Schiff hat, kann an der Flugleitung als Crew auf einem Frachter anheuern – mitfliegen und bei der Ankunft Heuer bekommen; wann die nächste Fracht ausläuft, weiß niemand vorher',
+      'Wer kein eigenes Schiff hat, kann an der Flugleitung als Crew auf einem Frachter anheuern – mitfliegen und bei der Ankunft Heuer bekommen; die Linie fährt montags gegen Mittag zu Mond, Mars und Phobos und donnerstags zurück',
     ],
   },
   { // Arbeit, Geld
