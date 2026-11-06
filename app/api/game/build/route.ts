@@ -33,7 +33,7 @@ function parseTileInteger(raw: string | null): number {
   // Missing coordinates retain the legacy default of zero. Explicitly malformed
   // values must not be coerced, truncated or interpreted as hexadecimal.
   if (raw === null) return 0
-  if (!/^-?\\d+$/.test(raw)) return Number.NaN
+  if (!/^-?\d+$/.test(raw)) return Number.NaN
   return Number(raw)
 }
 
