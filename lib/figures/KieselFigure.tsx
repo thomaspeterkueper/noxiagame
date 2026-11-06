@@ -15,7 +15,7 @@ import { kieselAnimated, kieselDirFrom, kieselSVG, type KieselDir, type KieselLo
 let reduced: boolean | null = null
 const reduceMotion = () => (reduced ??= typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
 
-const TEMPO: Partial<Record<KieselPose, number>> = { gehen: 150, tragen: 150, tanzen: 230, polieren: 260, wischen: 280, haemmern: 210, hacken: 260, schaufeln: 300, schubsen: 200, hinfallen: 160, zuschlagen: 170, abwehren: 240, getroffen: 160 }
+const TEMPO: Partial<Record<KieselPose, number>> = { trinken: 650, plaudern: 420, plaudern_sitzend: 460, gehen: 150, tragen: 150, tanzen: 230, polieren: 260, wischen: 280, haemmern: 210, hacken: 260, schaufeln: 300, schubsen: 200, hinfallen: 160, zuschlagen: 170, abwehren: 240, getroffen: 160 }
 
 /** Bild 0–3 der Pose; Hinfallen bleibt am Ende stehen. */
 export function useKieselFrame(pose: KieselPose, moving = false): number {

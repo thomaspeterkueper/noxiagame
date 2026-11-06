@@ -24,6 +24,7 @@ export type KieselPose =
   | 'winken' | 'jubeln' | 'klatschen' | 'verbeugen' | 'prost'
   | 'paartanz' | 'anstossen' | 'handschlag' | 'umarmen' | 'troesten'
   | 'armnehmen' | 'handinhand' | 'handinhand_l'
+  | 'trinken' | 'plaudern' | 'plaudern_sitzend'
 
 /**
  * Posen in Thomas' Steigerung (04.11.2026: „alles in genau dieser Steigerung, leider
@@ -62,6 +63,10 @@ export const KIESEL_POSES: Readonly<Record<KieselPose, { label: string; stufe: '
   armnehmen: { label: 'In den Arm nehmen', stufe: 'gemeinsam', animated: false },
   handinhand: { label: 'Hand in Hand', stufe: 'gemeinsam', animated: false },
   handinhand_l: { label: 'Hand in Hand (andere Hand)', stufe: 'gemeinsam', animated: false },
+  // Alltag im Raum (06.11.2026, Thomas: „Bewegungen sind noch so einfach“)
+  trinken: { label: 'Trinken (sitzend)', stufe: 'grund', animated: true },
+  plaudern: { label: 'Plaudern', stufe: 'grund', animated: true },
+  plaudern_sitzend: { label: 'Plaudern (sitzend)', stufe: 'grund', animated: true },
 }
 
 /** Läuft die Pose in Schritten (Bild 0–3)? Tragen nur, wenn die Figur dabei geht. */
@@ -155,6 +160,9 @@ function rig(pose: KieselPose, f: number, moving: boolean): Rig {
     case 'armnehmen': return { back: moving ? ph * 14 : 0, front: 102, lean: 4, legs: moving ? 'walk' : 'stand', bob: moving && i % 2 ? -1 : 0, face: 'freundlich' }
     case 'handinhand': return { back: moving ? ph * 16 : 0, front: 30, lean: 0, legs: moving ? 'walk' : 'stand', bob: moving && i % 2 ? -1 : 0, face: 'freundlich' }
     case 'handinhand_l': return { back: 30, front: moving ? -ph * 16 : 0, lean: 0, legs: moving ? 'walk' : 'stand', bob: moving && i % 2 ? -1 : 0, face: 'freundlich' }
+    case 'trinken': return { back: 10, front: pick([60, 118, 128, 90]), lean: pick([0, -2, -4, -1]), legs: 'sit', bob: 0, face: 'freundlich', tool: 'becher' }
+    case 'plaudern': return { back: pick([10, 18, 12, 6]), front: pick([40, 72, 52, 64]), lean: pick([0, 2, 1, -1]), legs: 'stand', bob: 0, face: 'freundlich' }
+    case 'plaudern_sitzend': return { back: 8, front: pick([38, 66, 48, 58]), lean: pick([0, 3, 1, 2]), legs: 'sit', bob: 0, face: 'freundlich' }
     case 'liegen': return { back: 170, front: 150, lean: 0, legs: 'stand', bob: 0, face: 'traurig' }
     default: return { back: 0, front: 0, lean: 0, legs: 'stand', bob: 0 }
   }

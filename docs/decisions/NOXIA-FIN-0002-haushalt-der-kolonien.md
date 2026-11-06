@@ -101,7 +101,7 @@ Thomas: „ja, auch auf Miete sollte es Steuern geben“ – Antwort auf Frage 2
 - **Ertrag der Mieten:** etwa 750 Cr je Woche auf dem Mars, je etwa 190 Cr auf Mond und Phobos.
 - **Nicht geändert:** Die kostenfreien Wohnungen auf der Erde (15) bleiben, bis Thomas anders entscheidet.
 
-## Entschieden (06.11.2026, zweite Runde) – gebaut, Anwendung in der Datenbank steht aus
+## Entschieden (06.11.2026, zweite Runde) – live seit 06.11.2026
 
 - **Frage 1 – Förderabgabe:** „ein flexibler Wert, vielleicht entscheiden manche Orte später anders.“
   - `colony_settings.extraction_tax_rate` je Ort, Start 15 %.

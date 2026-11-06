@@ -1,3 +1,5 @@
+// Aktualisiert: 06.11.2026 — Regionen (NewsRegion), tagesschau und WDR freigeschaltet (NOXIA-LIVING-0016)
+
 export type AwarenessTopic = 'general' | 'science' | 'technology' | 'climate' | 'economy' | 'society' | 'space'
 
 export interface WorldAwarenessSource {
@@ -11,7 +13,12 @@ export interface WorldAwarenessSource {
   ingestEnabled?: boolean
   language?: 'de' | 'en'
   usageNote?: string
+  /** Region, für die die Quelle als Nachrichtenquelle der Figuren gilt (NOXIA-LIVING-0016). */
+  region?: NewsRegion
 }
+
+/** de = Deutschland, de-nrw = Sauerland/Südwestfalen, space = Mond, Mars, Stationen („Nachrichten von der Erde“). */
+export type NewsRegion = 'de' | 'de-nrw' | 'space'
 
 /**
  * Source policy for real-world topics used by NOXIA residents.
@@ -24,6 +31,7 @@ export interface WorldAwarenessSource {
 export const WORLD_AWARENESS_SOURCES: WorldAwarenessSource[] = [
   {
     id: 'deutschlandfunk-news',
+    region: 'de',
     name: 'Deutschlandfunk',
     kind: 'journalism',
     trustTier: 1,
@@ -35,6 +43,7 @@ export const WORLD_AWARENESS_SOURCES: WorldAwarenessSource[] = [
   },
   {
     id: 'deutschlandfunk-wissen',
+    region: 'de',
     name: 'Deutschlandfunk Wissen',
     kind: 'journalism',
     trustTier: 1,
@@ -46,6 +55,7 @@ export const WORLD_AWARENESS_SOURCES: WorldAwarenessSource[] = [
   },
   {
     id: 'esa-space-news',
+    region: 'space',
     name: 'European Space Agency',
     kind: 'institution',
     trustTier: 1,
@@ -57,6 +67,7 @@ export const WORLD_AWARENESS_SOURCES: WorldAwarenessSource[] = [
   },
   {
     id: 'esa-space-science',
+    region: 'space',
     name: 'ESA Space Science',
     kind: 'institution',
     trustTier: 1,
@@ -68,6 +79,7 @@ export const WORLD_AWARENESS_SOURCES: WorldAwarenessSource[] = [
   },
   {
     id: 'nasa',
+    region: 'space',
     name: 'NASA',
     kind: 'institution',
     trustTier: 1,
@@ -79,6 +91,7 @@ export const WORLD_AWARENESS_SOURCES: WorldAwarenessSource[] = [
   },
   {
     id: 'nasa-jpl',
+    region: 'space',
     name: 'NASA Jet Propulsion Laboratory',
     kind: 'institution',
     trustTier: 1,
@@ -106,9 +119,25 @@ export const WORLD_AWARENESS_SOURCES: WorldAwarenessSource[] = [
     trustTier: 1,
     topics: ['general', 'economy', 'society', 'science', 'technology', 'climate'],
     homepage: 'https://www.tagesschau.de/',
-    ingestEnabled: false,
+    feedUrl: 'https://www.tagesschau.de/index~rss2.xml',
+    ingestEnabled: true,
+    region: 'de',
     language: 'de',
-    usageNote: 'RSS publication/reuse is licence-dependent. Do not ingest into production until the intended NOXIA use is cleared.',
+    usageNote: 'Freigegeben von Thomas am 06.11.2026 (NOXIA-LIVING-0016). Nur Titel, Link und ein Satz Anreißer, kein Volltext.',
+  },
+  {
+    id: 'wdr',
+    name: 'WDR',
+    kind: 'journalism',
+    trustTier: 1,
+    topics: ['general', 'society', 'economy', 'climate'],
+    // Feed-Adresse beim ersten Abruf prüfen (world_news_source_status); bei Fehler bleibt die Quelle leer.
+    feedUrl: 'https://www1.wdr.de/uebersicht-100.feed',
+    homepage: 'https://www1.wdr.de/nachrichten/',
+    ingestEnabled: true,
+    region: 'de-nrw',
+    language: 'de',
+    usageNote: 'Freigegeben von Thomas am 06.11.2026 (NOXIA-LIVING-0016). Nur Titel, Link und ein Satz Anreißer, kein Volltext.',
   },
 ]
 

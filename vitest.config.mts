@@ -16,6 +16,9 @@ export default defineConfig({
     environment: 'node',
     include: [
       'lib/game/rounds/bubbles.test.ts',
+      'lib/game/cognition/nightDreams.test.ts',
+      'lib/game/worldNewsFeed.test.ts',
+      'lib/game/population/playerIdentityKnowledge.test.ts',
       'lib/multiplayer/roomPresence.test.ts',
       'lib/multiplayer/mapPresence.test.ts',
       'lib/figures/workPose.test.ts',

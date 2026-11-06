@@ -2,6 +2,7 @@
 // Erstellt:     01.06.2026
 // Aktualisiert: 06.11.2026 — Miete nach Kaufpreis, einmal am Tag angepasst (noxia_refresh_rents)
 // Aktualisiert: 06.11.2026 — Förderabgabe je Ort; Förderanlagen brauchen Bedienung (Mensch oder Roboter), run_facility_operation
+// Aktualisiert: 06.11.2026 — Träume im Nachtlauf (runDreamTick, NOXIA-LIVING-0016)
 // Aktualisiert: 29.10.2026 — Zuzug in die Kolonien mit der Fracht (run_colony_immigration)
 // Aktualisiert: 29.10.2026 — Mitflug: wer angeheuert hat, geht an Bord, wenn eine Fracht ausläuft (noxia_crew_board_due)
 // Aktualisiert: 28.10.2026 — Bankzinsen einmal am Tag in der Datenbank (run_bank_daily), Bank zahlt aus eigenem Konto
@@ -13,7 +14,7 @@
 //               zählt nicht mehr als Firmenbestand (wurde ein zweites Mal verkauft); Bau wird nur
 //               gebucht, wenn das Gebäude auf einer freien Kachel wirklich entsteht
 // Vorher:       09.10.2026 — Lagergrenzen (lib/game/storageCapacity.ts)
-// Version:      3.12.0
+// Version:      3.13.0
 
 import { gateProduction } from './production/inputGate'
 import {
@@ -43,6 +44,7 @@ import { runHousingShadowTick } from './population/housingShadowRuntime'
 import { projectSurfacePresence } from './population/surfacePresence'
 import { runWishTick } from './wishes/service.server'
 import { extractionTax, FACILITIES_PER_OPERATOR, operatedBuildings } from './economy/facilityOperation'
+import { runDreamTick } from './cognition/dreamRuntime'
 import { runNpcConsumptionTick, runNpcPayrollTick, runNpcPropertyMarketTick, runNpcSelfBuildTick, runVenueStaffingTick } from './npcEconomy'
 
 /** Nur für einen bewussten Rückfall: NOXIA_LEGACY_BUILDING_PAYOUT=true. Standard: aus. */
@@ -812,6 +814,8 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const encounters = await persistPopulationEncounters(supabase, tickNumber)
   const interoception = await runInteroceptionTick(supabase, tickNumber)
   const socialLife = await runSocialLifeTick(supabase, tickNumber)
+  // Träume (NOXIA-LIVING-0016): wer in diesem Tick schläft, träumt einmal je Nacht. Fehler bremsen den Tick nicht.
+  const dreams = await runDreamTick(supabase, tickNumber).catch((error: any) => ({ sleepers: 0, dreams: 0, remembered: 0, error: String(error?.message ?? error) }))
 
   // Aggregate population may update location population/capacity. Load one
   // fresh post-population snapshot and share it across the remaining readers.
@@ -841,7 +845,7 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const landValues = await runLandValueTick(supabase, locationSnapshot ?? [])
   // Wünsche und Gebete (29.10.2026): einordnen, Figuren wünschen sich, was fehlt
   const wishes = await runWishTick(supabase, tickNumber)
-  return { tickNumber, crew, immigration, facilityOperation, rents, wishes, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
+  return { tickNumber, crew, immigration, facilityOperation, rents, wishes, dreams, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {
