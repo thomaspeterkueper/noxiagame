@@ -1,0 +1,26 @@
+name: Global Memory regression
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/knowledge/globalMemory*.ts'
+      - 'lib/game/cognition/personEpistemicPersistence.ts'
+      - 'lib/game/cognition/npcRelationalMemory.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/global-memory-regression.yml'
+  workflow_dispatch:
+
+jobs:
+  global-memory:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run test:global-memory
