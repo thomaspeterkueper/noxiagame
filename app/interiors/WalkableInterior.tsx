@@ -797,14 +797,14 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
         {layout.danceFloor&&<div className={'dancefloor'+(closed?' off':'')+(fitting.floorMood?' mood-'+fitting.floorMood:'')} style={{left:layout.danceFloor.x,top:layout.danceFloor.y,width:layout.danceFloor.w,height:layout.danceFloor.h}}><i/></div>}
         {layout.furniture.filter(item=>item.kind==='table'||item.kind==='high-table').map(item=><div key={'lamp:'+item.id} className="lamp" style={{left:item.x+item.w/2-70,top:item.y+item.h/2-70}}/>)}
         {iso&&layout.furniture.filter(item=>item.kind!=='board').map(item=><div key={'sh:'+item.id} className="fshadow" style={{left:item.x-3,top:item.y-3,width:item.w+6,height:item.h+6}}/>)}
-        {layout.furniture.map((item,index)=><div key={item.id} className={'f '+item.kind+(item.kind==='chair'||item.kind==='stool'?' c'+(index%4):'')} style={{left:item.x,top:item.y,width:item.w,height:item.h}}>{item.kind==='counter'&&fitting.counterDressing}{iso&&item.kind!=='board'&&<><b className="fs"/><b className="fw"/></>}</div>)}
+        {layout.furniture.map((item,index)=><div key={item.id} className={'f '+item.kind+(item.kind==='chair'||item.kind==='stool'?' c'+(index%4):'')+(/^shelf-[a-z]+$/.test(item.id)?' '+item.id:'')} style={{left:item.x,top:item.y,width:item.w,height:item.h}}>{item.kind==='counter'&&fitting.counterDressing}{iso&&item.kind==='board'&&fitting.furnitureLabel(item.kind,service)&&<span className="board-text">{fitting.furnitureLabel(item.kind,service)}</span>}{iso&&item.kind!=='board'&&<><b className="fs"/><b className="fw"/></>}</div>)}
         {iso&&layout.furniture.filter(item=>item.kind==='table'||item.kind==='high-table'||item.kind==='chair'||item.kind==='stool').map(item=><div key={'leg:'+item.id} className={'leg '+item.kind} style={{left:item.x+item.w/2,top:item.y+item.h/2}}/>)}
         {iso&&!closed&&layout.furniture.filter(item=>item.kind==='table'||item.kind==='high-table').map(item=><div key={'pend:'+item.id} className="pendant" style={{left:item.x+item.w/2,top:item.y+item.h/2}}><i/><b/></div>)}
         {iso&&robot&&<div className={'serve-robot'+(robot.flip?' flip':'')+(robot.carrying?' carrying':'')} style={{left:robot.x,top:robot.y}} onClick={e=>{e.stopPropagation();setStatus('Der Servierroboter bringt Bestellungen vom Tresen an die Tische. Er weicht dir aus – einfach vorbeigehen.')}} title="Servierroboter"><span>Servierroboter</span><ServeRobotSVG/></div>}
         {(decor?.plants??[]).map(([x,y],index)=><div key={'plant:'+index} className="plant" style={{left:x-14,top:y-26}}><i/><b/></div>)}
         {(fitting.furnish?.decor??[]).map(d=><div key={'deco:'+d.id} className={'deco '+d.kind+(fitting.furnish?.editing?' movable':'')} style={{left:d.x,top:d.y}} onPointerDown={fitting.furnish?.editing?startDrag('decor',d.id,d):undefined}>{d.kind==='pflanze'?<><i/><b/></>:<i/>}{fitting.furnish?.editing&&<button className="rm" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();fitting.furnish?.onRemoveDecor?.(d.id)}} aria-label="Entfernen">×</button>}</div>)}
         {fitting.furnish?.editing&&layout.furniture.filter(f=>/^table-\d+$/.test(f.id)).map(f=><div key={'drag:'+f.id} className="drag-table" style={{left:f.x-22,top:f.y-4,width:f.w+44,height:f.h+8}} onPointerDown={startDrag('table',f.id,f)} title="Tisch ziehen"/>)}
-        {labelled.map(item=><div key={'label:'+item.id} className="label" style={{left:item.x+item.w/2,top:item.y+item.h/2}}>{fitting.furnitureLabel(item.kind,service)}</div>)}
+        {labelled.filter(item=>!(iso&&item.kind==='board')).map(item=><div key={'label:'+item.id} className="label" style={{left:item.x+item.w/2,top:item.y+item.h/2}}>{fitting.furnitureLabel(item.kind,service)}</div>)}
         {shown.map(({figure,resident,moment})=>{
           const near=Math.hypot(figure.spot.x-pos.x,figure.spot.y-pos.y)<70
           return <div key={resident.id} className={'npc'+(figure.spot.id.startsWith('dance-')&&!closed?' dancing':'')+(figure.roomRole==='companion'?' with-player':'')} style={{left:figure.spot.x-19,top:figure.spot.y-50}}>
@@ -961,6 +961,29 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
 .walkable-interior .room.iso .f.bed{--h:22px}
 .walkable-interior .room.iso .f.locker{--h:80px}
 .walkable-interior .room.iso .f.board{transform-origin:50% 100%;transform:translateZ(54px) rotateX(-90deg);height:26px!important;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 50%,#000)}
+/* Tafeln an der Wand: Beschriftung auf der Tafel, nicht am Boden */
+.walkable-interior .room.iso .f.board .board-text{position:absolute;left:8px;top:4px;font:800 10px/1 ui-monospace,monospace;letter-spacing:.14em;color:var(--accent);text-shadow:0 0 6px color-mix(in srgb,var(--accent) 70%,transparent)}
+/* Trennwände als Milchglas: man sieht, was dahinter ist */
+.walkable-interior .room.iso .f.wall{background:linear-gradient(#ffffff55,#e8f1f466)!important;box-shadow:0 0 0 1px color-mix(in srgb,var(--accent) 55%,transparent),inset 0 0 0 1px #fff8}
+.walkable-interior .room.iso .f.wall>.fs,.walkable-interior .room.iso .f.wall>.fw{background:linear-gradient(#ffffff66,#dce8ec55 40%,#cfdde2aa);filter:none}
+.walkable-interior .room.iso .f.wall>.fs:before,.walkable-interior .room.iso .f.wall>.fw:before{content:'';position:absolute;left:0;right:0;top:46%;height:6px;background:repeating-linear-gradient(90deg,#ffffffcc 0 10px,transparent 10px 14px);opacity:.7}
+/* Regale je nach Haus: Ordner und Zeitschriften statt Flaschen */
+.walkable-interior .room.iso .f.shelf-files,.walkable-interior .room.iso.bank .f.shelf,.walkable-interior .room.iso.job_agency .f.shelf{background:repeating-linear-gradient(90deg,#2f4f7a 0 9px,#f2f2ee 9px 10px,#4d4d55 10px 19px,#f2f2ee 19px 20px,#7a8fa8 20px 29px,#f2f2ee 29px 30px)!important;border:0}
+.walkable-interior .room.iso .f.shelf-files>.fs,.walkable-interior .room.iso.bank .f.shelf>.fs,.walkable-interior .room.iso.job_agency .f.shelf>.fs{background:repeating-linear-gradient(#c9ccd0 0 2px,transparent 2px 24px),repeating-linear-gradient(90deg,#2f4f7a 0 9px,#4d4d55 9px 18px,#7a8fa8 18px 27px,#e8e8e2 27px 28px);filter:brightness(.8)}
+.walkable-interior .room.iso .f.shelf-mags{background:repeating-linear-gradient(90deg,#f1c7a8 0 12px,#ffffff 12px 14px,#9fd3c7 14px 26px,#ffffff 26px 28px,#e7e0a2 28px 40px,#ffffff 40px 42px)!important;border:0}
+.walkable-interior .room.iso .f.shelf-mags>.fs{background:repeating-linear-gradient(#e6ecea 0 3px,transparent 3px 24px),repeating-linear-gradient(90deg,#f1c7a8 0 12px,#9fd3c7 12px 24px,#e7e0a2 24px 36px,#fff 36px 38px);filter:brightness(.9)}
+/* Empfangstresen in Praxis, Krankenhaus und Wache: hell statt Kneipenholz */
+.walkable-interior .room.iso.doctors .f.counter,.walkable-interior .room.iso.hospital .f.counter{background:linear-gradient(#fbfdfd,#e3eeec)!important;border:0}
+.walkable-interior .room.iso.doctors .f.counter>.fs,.walkable-interior .room.iso.hospital .f.counter>.fs{background:linear-gradient(transparent 0 70%,#5fe0c8 70% 74%,transparent 74%),#eef5f4;filter:brightness(.9)}
+.walkable-interior .room.iso.doctors .f.counter>.fw,.walkable-interior .room.iso.hospital .f.counter>.fw{background:#e6efed;filter:brightness(.85)}
+.walkable-interior .room.iso.police .f.counter{background:linear-gradient(#eef2f6,#c9d3de)!important;border:0}
+.walkable-interior .room.iso.police .f.counter>.fs{background:linear-gradient(transparent 0 70%,#2c4a7c 70% 78%,transparent 78%),#d9e0e8;filter:brightness(.85)}
+.walkable-interior .room.iso.police .f.counter>.fw{background:#cdd6e0;filter:brightness(.8)}
+/* Löschfahrzeug: Fahrerhaus links mit Scheibe, Rollläden, weißer Streifen, Räder, Blaulicht */
+.walkable-interior .room.iso .f.vehicle{background:linear-gradient(90deg,#b81d16 0 26%,#d42a20 26%)!important;border-radius:4px}
+.walkable-interior .room.iso .f.vehicle:before{content:'';position:absolute;left:14px;top:18%;width:12px;height:64%;border-radius:3px;background:linear-gradient(#5ab8ff,#1d6fe0);box-shadow:0 0 14px #3a9bff;transform:translateZ(3px)}
+.walkable-interior .room.iso .f.vehicle>.fs{background:radial-gradient(circle at 16% 100%,#1b1b1b 0 13px,#555 13px 15px,transparent 16px),radial-gradient(circle at 70% 100%,#1b1b1b 0 13px,#555 13px 15px,transparent 16px),radial-gradient(circle at 86% 100%,#1b1b1b 0 13px,#555 13px 15px,transparent 16px),linear-gradient(90deg,#9fd3ea 4% 22%,transparent 22%) 0 8px/100% 26px no-repeat,linear-gradient(transparent 62%,#f4f4f0 62% 70%,transparent 70%),repeating-linear-gradient(90deg,transparent 0 26%,#00000022 26% 27%),linear-gradient(90deg,#b31c15 0 26%,#c9231b 26%);filter:none}
+.walkable-interior .room.iso .f.vehicle>.fw{background:linear-gradient(transparent 0 8%,#9fd3ea 8% 92%,transparent 92%) 0 6px/100% 26px no-repeat,linear-gradient(transparent 62%,#f4f4f0 62% 70%,transparent 70%),#a81a14;filter:none}
 .walkable-interior .room.iso .fshadow{position:absolute;border-radius:6px;background:#0007;filter:blur(5px);pointer-events:none}
 /* Aufrecht zur Kamera: Figuren, Namen, Knöpfe, Pflanzen */
 .walkable-interior .room.iso .npc,.walkable-interior .room.iso .peer,.walkable-interior .room.iso .player,.walkable-interior .room.iso .plant,
