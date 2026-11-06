@@ -9,7 +9,7 @@ import type { Application, Container, Graphics as PixiGraphics, Sprite, Texture 
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
 import { heightTint, terrainShade, type TileTerrainPart } from '@/lib/worldlab/terrain'
 import { shouldReanchor } from '@/lib/worldlab/reanchor'
-import { kieselDirFrom, kieselSVG, type KieselDir, type KieselLook } from '@/lib/figures/kiesel'
+import { KIESEL_POSES, kieselDirFrom, kieselSVG, type KieselDir, type KieselLook, type KieselPose } from '@/lib/figures/kiesel'
 import { hasSpires, roofRegion, ROOF_FACTOR } from '@/lib/worldlab/roofRegion'
 import { effectivePlaceKind, isTravelPlace } from '@/lib/worldlab/landmarks'
 import { DEFAULT_VIEW, placeHasFunction, type ViewOptions } from '@/lib/worldlab/viewOptions'
@@ -78,6 +78,8 @@ export interface WorldEngineOptions {
 /** Was unter dem Zeiger lag, als geklickt wurde. */
 export type WorldPick =
   | { type: 'person'; id: string }
+  /** Mitspieler (W-16): andere Spieler in der Nähe */
+  | { type: 'peer'; id: string; name: string }
   | { type: 'building'; at: GeoPoint; address?: string; name?: string; kind: BlockKind; noxiaId?: string; landmark?: WorldLandmark; poi?: WorldLandmark; source?: string; areaM2: number; levels: number; /** Heutige Nutzung aus OSM (Kennung, `lib/worldlab/buildingUse.ts`) */ use?: string; /** Flurstück, auf dem das Haus steht */ parcel?: string }
   | { type: 'landmark'; landmark: WorldLandmark }
   | { type: 'noxia'; noxiaId: string; at: GeoPoint }
@@ -113,6 +115,8 @@ export interface WorldPerson {
   strollAround?: GeoPoint | null
   /** W-17: Aussehen als Kiesel-Figur (`kieselLookFor`); fehlt es, die einfache Figur. */
   look?: KieselLook
+  /** Arbeitspose vor dem Arbeitsort (`workPoseFor`), solange die Figur dort steht. */
+  pose?: KieselPose | null
 }
 
 export interface WorldEngine {
@@ -179,6 +183,12 @@ export interface WorldEngine {
   setView: (view: ViewOptions) => void
   /** W-17: Aussehen der eigenen Figur (Kiesel, wie in den Innenräumen). */
   setPlayerLook: (look: KieselLook) => void
+  /** W-16: Mitspieler in der Nähe (ersetzt die bisherige Liste); `emote` erscheint als kurze Blase. */
+  setPeers: (peers: Array<{ id: string; name: string; at: GeoPoint; look: KieselLook | null; emote?: string | null }>) => void
+  /** Wo ein Mitspieler gerade steht. */
+  peerAt: (id: string) => GeoPoint | null
+  /** Kurze Blase über der eigenen Figur (eigene Geste, z. B. „winkt“), verschwindet nach 4 s. */
+  playerEmote: (text: string) => void
   /** W-18: Veranstaltungen als Zeichen über dem Lokal (Zeichen und Uhrzeit, immer sichtbar). */
   setEventMarks: (marks: Array<{ id: string; lat: number; lon: number; text: string; running: boolean }>) => void
   /** Erster Start: hüpfender Pfeil über einem Ziel (null: keiner). */
@@ -1474,7 +1484,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // (SVG → Textur) und zwischengespeichert. Bis das Bild da ist, steht die einfache Figur.
   const KIESEL_H = 11.5, KIESEL_W = KIESEL_H * 64 / 96
   const kieselCache = new Map<string, Texture | 'loading'>()
-  function kieselTexture(look: KieselLook, dir: KieselDir, pose: 'stehen' | 'gehen', frame: number): Texture | null {
+  function kieselTexture(look: KieselLook, dir: KieselDir, pose: KieselPose, frame: number): Texture | null {
     const key = JSON.stringify(look) + '|' + dir + '|' + pose + '|' + frame
     const hit = kieselCache.get(key)
     if (hit === 'loading') return null
@@ -1487,7 +1497,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
     return null
   }
-  type KieselState = { look: KieselLook | null; sprite: InstanceType<typeof PIXI.Sprite>; fallback: PixiGraphics; dir: KieselDir; lastFoot: { x: number; y: number } | null; movedAt: number }
+  type KieselState = { look: KieselLook | null; sprite: InstanceType<typeof PIXI.Sprite>; fallback: PixiGraphics; dir: KieselDir; lastFoot: { x: number; y: number } | null; movedAt: number; pose?: KieselPose | null }
   /** Blickrichtung und Schritt aus der Bewegung auf dem Bildschirm, dann das passende Bild. */
   function stepKiesel(state: KieselState, foot: { x: number; y: number }, now: number) {
     if (!state.look) return
@@ -1496,8 +1506,10 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     if (Math.hypot(dx, dy) > 0.02) { state.dir = kieselDirFrom(dx * 20, dy * 20, state.dir); state.movedAt = now }
     state.lastFoot = { x: foot.x, y: foot.y }
     const moving = now - state.movedAt < 180
-    const frame = moving ? Math.floor(now / 140) % 4 : 0
-    const texture = kieselTexture(state.look, state.dir, moving ? 'gehen' : 'stehen', frame)
+    // Stehend mit Arbeit: Arbeitspose (animiert in vier Bildern, langsamer als der Schritt)
+    const pose: KieselPose = moving ? 'gehen' : state.pose ?? 'stehen'
+    const frame = moving ? Math.floor(now / 140) % 4 : KIESEL_POSES[pose]?.animated ? Math.floor(now / 260) % 4 : 0
+    const texture = kieselTexture(state.look, state.dir, pose, frame)
     if (texture) { state.sprite.texture = texture; state.sprite.visible = true; state.fallback.visible = false }
   }
   function kieselSprite() {
@@ -1599,7 +1611,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const known = walkers.get(spec.id)
       if (known) {
         const before = standPoint(known.spec, known.seed, known.slot, known.slots)
-        known.spec = spec; known.label.text = spec.label; known.kiesel.look = spec.look ?? null
+        known.spec = spec; known.label.text = spec.label; known.kiesel.look = spec.look ?? null; known.kiesel.pose = spec.pose ?? null
         const after = standPoint(spec, known.seed, known.slot, known.slots)
         // Neuer Ort aus der Simulation (z. B. Wohnung → Arbeit): hingehen statt springen.
         // Ein Weg aus einem Gespräch (Mitgehen, Hinschicken) hat Vorrang.
@@ -1612,6 +1624,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       const made = makeFigure(spec.tint ?? PERSON_COLORS[seed % PERSON_COLORS.length])
       const figure = made.g
       made.kiesel.look = spec.look ?? null
+      made.kiesel.pose = spec.pose ?? null
       ;(figure as unknown as { pick: WorldPick }).pick = { type: 'person', id: spec.id }
       const label = new PIXI.Text({ text: spec.label, style: { fontFamily: 'system-ui, sans-serif', fontSize: 26, fontWeight: '600', fill: 0x1f2a30, stroke: { color: 0xf8f6ef, width: 6, join: 'round' } } })
       label.anchor.set(0.5, 1)
@@ -1650,9 +1663,10 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
         const home = toWorld(walker.spec.anchor)
         const out = (walker.spec.anchorRadiusM ?? 6) + 3
         const spread = anchorSpread(walker.slot, walker.slots)
-        const sway = now / 1000 * 0.35 + walker.seed % 7
-        x = home.x + out * 0.71 + spread * 0.71 + Math.cos(sway) * 1.2
-        y = home.y + out * 0.71 - spread * 0.71 + Math.sin(sway * 0.8) * 1.2
+        // Bei der Arbeit steht man still (sonst zählt das Wiegen als Gehen)
+        const sway = now / 1000 * 0.35 + walker.seed % 7, swing = walker.spec.pose ? 0 : 1.2
+        x = home.x + out * 0.71 + spread * 0.71 + Math.cos(sway) * swing
+        y = home.y + out * 0.71 - spread * 0.71 + Math.sin(sway * 0.8) * swing
       } else {
         // Neue Straße, wenn noch keine da ist oder die Figur weit weg zurückblieb.
         // Spaziergang um die eigene Wohnung; ohne Wohnung wie bisher in Spielernähe.
@@ -1695,6 +1709,74 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       if (walker.bubble) { walker.bubble.position.set(foot.x, foot.y - 17); walker.bubble.visible = near && zoom >= 1.6 }
     }
   }
+
+  // ── Mitspieler (W-16) ───────────────────────────────────────────────
+  // Lage kommt über Realtime etwa jede Sekunde; die Figur gleitet dorthin, statt zu springen.
+  type Peer = { id: string; name: string; figure: Container; kiesel: KieselState; label: InstanceType<typeof PIXI.Text>; x: number; y: number; tx: number; ty: number; bubble?: Container; emote?: string | null }
+  const peers = new Map<string, Peer>()
+  function emoteBubble(text: string) {
+    const words = new PIXI.Text({ text, style: { fontFamily: 'system-ui, sans-serif', fontSize: 24, fontStyle: 'italic', fill: 0x14324a } })
+    words.anchor.set(0.5, 1)
+    words.position.set(0, -6)
+    const w = words.width + 18, h = words.height + 10
+    const box = new PIXI.Graphics()
+    box.roundRect(-w / 2, -6 - h + 5, w, h, 12).fill({ color: 0xe8f1fb }).stroke({ color: 0x6b93bd, width: 2 })
+    const bubble = new PIXI.Container()
+    bubble.addChild(box, words)
+    bubble.scale.set(0.12)
+    labels.addChild(bubble)
+    return bubble
+  }
+  function setPeers(list: Array<{ id: string; name: string; at: GeoPoint; look: KieselLook | null; emote?: string | null }>) {
+    const keep = new Set(list.map(peer => peer.id))
+    for (const [id, peer] of peers) if (!keep.has(id)) { peer.figure.destroy({ children: true }); peer.label.destroy(); peer.bubble?.destroy(); peers.delete(id) }
+    for (const spec of list) {
+      const target = toWorld(spec.at)
+      let peer = peers.get(spec.id)
+      if (!peer) {
+        const made = makeFigure(0x3d7cc9)
+        ;(made.g as unknown as { pick: WorldPick }).pick = { type: 'peer', id: spec.id, name: spec.name }
+        const label = new PIXI.Text({ text: spec.name, style: { fontFamily: 'system-ui, sans-serif', fontSize: 26, fontWeight: '700', fill: 0x1d4f86, stroke: { color: 0xf8f6ef, width: 6, join: 'round' } } })
+        label.anchor.set(0.5, 1)
+        label.scale.set(0.12)
+        labels.addChild(label)
+        peer = { id: spec.id, name: spec.name, figure: made.g, kiesel: made.kiesel, label, x: target.x, y: target.y, tx: target.x, ty: target.y }
+        peers.set(spec.id, peer)
+        placeDepth(made.g, target.x + target.y)
+      }
+      // Weit gesprungen (Reise, Neuladen): gleich dort
+      if (Math.hypot(target.x - peer.x, target.y - peer.y) > 80) { peer.x = target.x; peer.y = target.y }
+      peer.tx = target.x; peer.ty = target.y
+      peer.kiesel.look = spec.look ?? null
+      if (peer.name !== spec.name) { peer.name = spec.name; peer.label.text = spec.name; (peer.figure as unknown as { pick: WorldPick }).pick = { type: 'peer', id: spec.id, name: spec.name } }
+      const emote = spec.emote ?? null
+      if (emote !== (peer.emote ?? null)) { peer.bubble?.destroy(); peer.bubble = emote ? emoteBubble(emote) : undefined; peer.emote = emote }
+    }
+  }
+  function movePeers(now: number, dt: number) {
+    for (const peer of peers.values()) {
+      const dx = peer.tx - peer.x, dy = peer.ty - peer.y, d = Math.hypot(dx, dy)
+      // Gehtempo, bei Rückstand schneller (bis 6 m/s), nie über das Ziel hinaus
+      const step = Math.min(d, Math.max(1.4, d * 1.5) * dt)
+      if (d > 0.01) { peer.x += dx / d * step; peer.y += dy / d * step }
+      const foot = iso(peer.x, peer.y)
+      peer.figure.position.set(foot.x, foot.y)
+      placeDepth(peer.figure, peer.x + peer.y)
+      stepKiesel(peer.kiesel, foot, now)
+      peer.label.position.set(foot.x, foot.y - 12)
+      const near = Math.hypot(peer.x - player.x, peer.y - player.y) < 400
+      peer.figure.visible = near
+      peer.label.visible = near && zoom >= 1.6
+      if (peer.bubble) { peer.bubble.position.set(foot.x, foot.y - 16); peer.bubble.visible = near }
+    }
+    if (playerBubble) {
+      const foot = iso(player.x, player.y)
+      playerBubble.bubble.position.set(foot.x, foot.y - 16)
+      if (now > playerBubble.until) { playerBubble.bubble.destroy(); playerBubble = null }
+    }
+  }
+  let playerBubble: { bubble: Container; until: number } | null = null
+  let peersLastAt = 0
 
   /** Weg entlang der nächsten Straße, vom Spieler weg, etwa `distanceM` lang. */
   function roadAhead(from: { x: number; y: number }, distanceM: number) {
@@ -2331,6 +2413,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     stepAutoWalk(dt)
     checkAnchor(dt)
     moveWalkers(logicStart)
+    movePeers(logicStart, peersLastAt ? Math.min(0.25, (logicStart - peersLastAt) / 1000) : 0)
+    peersLastAt = logicStart
     moveTrains()
     // Die Kamera gleitet hinterher statt zu springen.
     const follow = 1 - Math.exp(-dt * 9)
@@ -2488,6 +2572,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     tileReadyAt(at) { const p = toWorld(at); return tileDoneAt(p.x, p.y) },
     setView(next) { view = { ...next }; applyView() },
     setPlayerLook,
+    setPeers,
+    peerAt(id) { const peer = peers.get(id); return peer ? toGeo({ x: peer.x, y: peer.y }) : null },
+    playerEmote(text) {
+      playerBubble?.bubble.destroy()
+      playerBubble = { bubble: emoteBubble(text), until: performance.now() + 4000 }
+    },
     setGuideArrow: setGuide,
     setJobMark(mark) {
       for (const old of jobLayer.removeChildren()) old.destroy({ children: true })

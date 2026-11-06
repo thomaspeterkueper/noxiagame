@@ -47,6 +47,8 @@ import ConversationReport from '@/app/components/ConversationReport'
 export type Panel =
   | { kind: 'none' }
   | { kind: 'person'; id: string }
+  /** Mitspieler auf der Karte (W-16) */
+  | { kind: 'peer'; id: string; name: string }
   | { kind: 'building'; at: GeoPoint; title: string; address?: string; noxiaId?: string; source?: string; areaM2?: number; levels?: number; block?: BlockKind; poi?: WorldLandmark; /** Nutzung aus OSM (`buildingUse.ts`) und OSM-Name des Hauses */ use?: string; osmName?: string }
   | { kind: 'landmark'; landmark: WorldLandmark; /** OSM-Kennung des Hauses, wenn das Wahrzeichen in einem Gebäude steht */ source?: string }
   | { kind: 'site'; id: string }
@@ -74,6 +76,7 @@ function role(resident: ColonyResident) { return resident.assignments.find(item 
 /** Tafel zu einem Klick auf der Karte (Boden schließt die Tafel). */
 export function panelForPick(pick: WorldPick, noxia: NoxiaBuilding[]): Panel {
   if (pick.type === 'person') return { kind: 'person', id: pick.id }
+  if (pick.type === 'peer') return { kind: 'peer', id: pick.id, name: pick.name }
   if (pick.type === 'ground') return { kind: 'land', at: pick.at }
   if (pick.type === 'landmark') return { kind: 'landmark', landmark: pick.landmark }
   if (pick.type === 'site') return { kind: 'site', id: pick.id }
@@ -126,7 +129,9 @@ type Buildable = { id: string; name: string; cost: number; footprint?: { widthM:
 /** Die wichtigsten Gebäude, die alle Einwohner kennen: Eine Person führt den Spieler auch über größere Entfernung dorthin (31.10.2026). */
 const FAR_GUIDE_KINDS = new Set(['job_agency', 'bank', 'travel_agency', 'school', 'admin', 'spaceport_core', 'cafe', 'restaurant', 'bar', 'resonance_place', 'ssf_headquarters_sundern'])
 
-export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, presence = [], worship = [] }: {
+export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, presence = [], worship = [], onPeerGesture }: {
+  /** W-16: eigene Geste an Mitspieler in der Nähe (über die Kartenanwesenheit) */
+  onPeerGesture?: (text: string) => void
   /** Wer laut Simulation wo ist (für Innenräume realer Orte, 28.10.2026). */
   presence?: PresenceRow[]
   /** Gottesdienste und Gebete mit laufendem und nächstem Termin (28.10.2026). */
@@ -315,7 +320,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   }
 
   // Jede neue Tafel beendet ein laufendes Hingehen und leert die Eingabe.
-  const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind === 'site' ? 's:' + panel.id : panel.kind === 'plot' ? 'f:' + panel.source : panel.kind === 'parcel' ? 'g:' + panel.id : panel.kind === 'travel' ? 't:' + panel.at.lat + ',' + panel.at.lon : panel.kind
+  const panelKey = panel.kind === 'person' ? 'p:' + panel.id : panel.kind === 'peer' ? 'm:' + panel.id : panel.kind === 'building' ? 'b:' + panel.at.lat + ',' + panel.at.lon : panel.kind === 'landmark' ? 'l:' + panel.landmark.at.lat + ',' + panel.landmark.at.lon : panel.kind === 'site' ? 's:' + panel.id : panel.kind === 'plot' ? 'f:' + panel.source : panel.kind === 'parcel' ? 'g:' + panel.id : panel.kind === 'travel' ? 't:' + panel.at.lat + ',' + panel.at.lon : panel.kind
   const [shownKey, setShownKey] = useState(panelKey)
   if (shownKey !== panelKey) { setShownKey(panelKey); setWalking(false); setMessage(''); setBuyError(''); setConfirmDemolish(false); setShowConversions(false); setShowTickets(false); setShowAgency(false); setAskPrice('') }
 
@@ -666,6 +671,24 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         : <div className="row"><span>{personDistance === null ? 'Nicht in Sichtweite.' : `${Math.round(personDistance)} m entfernt – zu weit zum Ansprechen.`}</span>{personDistance !== null && <button onClick={() => walkTo(() => engine?.personAt(person.id) ?? null, TALK_RANGE_M - 2)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
     </>}
     {!person && panel.kind === 'person' && <div className="head"><div><small>PERSON</small><b>Nicht mehr da</b></div><button onClick={close}>×</button></div>}
+    {panel.kind === 'peer' && (() => {
+      const at = engine?.peerAt(panel.id) ?? null
+      const distance = at && engine ? engine.distanceTo(at) : null
+      return <>
+        <div className="head"><div><small>MITSPIELER</small><b>{panel.name}</b></div><button onClick={close} aria-label="Schließen">×</button></div>
+        {at
+          ? <>
+            <p>{distance !== null && distance <= TALK_RANGE_M ? 'Steht neben dir.' : `${Math.round(distance ?? 0)} m entfernt.`} Was du zeigst, sehen alle Spieler in der Nähe.</p>
+            <div className="row">
+              <button onClick={() => onPeerGesture?.('winkt')}>Winken</button>
+              <button onClick={() => onPeerGesture?.('grüßt')}>Grüßen</button>
+              {distance !== null && distance > TALK_RANGE_M && <button onClick={() => walkTo(() => engine?.peerAt(panel.id) ?? null, 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}
+            </div>
+            <p className="hint">Credits geben, Gesten und gemeinsame Bewegungen gehen drinnen – betretet zusammen ein Haus, dann seid ihr im selben Raum.</p>
+          </>
+          : <p>Nicht mehr in der Nähe.</p>}
+      </>
+    })()}
     {building && <>
       <div className="head"><div><small>{own ? 'NOXIA-GEBÄUDE' : 'GEBÄUDE'}</small><b>{building.title}</b>{building.address && <span>{building.address}</span>}{building.poi && <span>Hier: {building.poi.name} · {landmarkLabel(building.poi.kind, building.poi.tags)}</span>}</div><button onClick={close} aria-label="Schließen">×</button></div>
       <PlaceStory source={building.source}/>

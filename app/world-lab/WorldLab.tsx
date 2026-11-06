@@ -14,7 +14,7 @@
 import { landmarkRoomKind } from '@/lib/game/landmarks/interiors'
 import { bubbleDurationMs, bubbleText } from '@/lib/game/rounds/bubbles'
 import type { PresenceRow } from '@/lib/game/population/placePresence'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useColonyStateStore, type ColonyResident } from '@/lib/store/colonyStateStore'
 import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
 import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
@@ -23,7 +23,9 @@ import WorldPanels, { panelForPick, panelLocation, type Panel } from './WorldPan
 import { constructionState } from '@/lib/game/constructionProgress'
 import { landmarkLabel } from '@/lib/worldlab/landmarks'
 import { kieselLookFor } from '@/lib/figures/kiesel'
+import { workPoseFor } from '@/lib/figures/workPose'
 import { useMyLook } from '@/lib/figures/KieselFigure'
+import { useMapPresence } from '@/lib/multiplayer/mapPresence'
 import { eventLine, eventRunning, upcoming, VENUE_EVENT_KINDS, whenText, type VenueEvent } from '@/lib/game/hospitality/venueEvents'
 import { DEFAULT_VIEW, loadView, saveView, showPlace, type ViewOptions } from '@/lib/worldlab/viewOptions'
 import { worshipWhen, type WorshipItem } from '@/lib/worldlab/worshipTypes'
@@ -79,6 +81,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const engine = useRef<WorldEngine | null>(null)
   const [engineReady, setEngineReady] = useState<WorldEngine | null>(null)
   const [hud, setHud] = useState<Hud | null>(null)
+  /** Eigenes Profil für die Kartenanwesenheit (W-16) */
+  const [me, setMe] = useState<{ profileId: string; name: string } | null>(null)
   const [tick, setTick] = useState(0)
   const [panel, setPanel] = useState<Panel>({ kind: 'none' })
   // Neuer Spieler: nach dem Onboarding den Innenraum des Startcafés öffnen (?starterCafe=<id>).
@@ -374,6 +378,8 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         id: resident.id,
         label: personSceneLabel(resident),
         look: kieselLookFor({ id: resident.id, appearance: resident.appearance as never }, atWork ? workplace?.typeId ?? null : null),
+        // Arbeit draußen vor dem Arbeitsort sichtbar (W-17)
+        pose: atWork && !surface ? workPoseFor(workplace?.typeId ?? null) : null,
         activity, inside: inside || inRoom(surface),
         anchor: surface ? { lat: surface.lat, lon: surface.lon } : place ? { lat: place.lat, lon: place.lon } : null,
         anchorRadiusM: surface ? 3 : place ? Math.max(place.w, place.d) / 2 : undefined,
@@ -433,11 +439,12 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
     let live = true
     void (async () => {
       try {
-        const { token } = await getSessionInfo()
+        const { token, userId } = await getSessionInfo()
         const response = await fetch('/api/game/profile', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
         const json = response.ok ? await response.json() : null
         const name = String(json?.profile?.username ?? '').trim()
         if (live && name) engineReady.setPlayerName(name)
+        if (live && userId) setMe({ profileId: userId, name: name || 'Spieler' })
       } catch { /* ohne Namen */ }
     })()
     return () => { live = false }
@@ -765,6 +772,12 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   // W-17: eigene Figur als Kiesel, wie in den Innenräumen
   const myLook = useMyLook().look
   useEffect(() => { engineReady?.setPlayerLook(myLook) }, [engineReady, myLook])
+  // W-16: andere Spieler in der Nähe (Realtime je Kartenzelle, nichts gespeichert); während einer Reise nicht
+  const mapPresence = useMapPresence(hud && !trip ? { lat: hud.lat, lon: hud.lon } : null, me, myLook)
+  useEffect(() => {
+    engineReady?.setPeers(mapPresence.peers.map(peer => ({ id: peer.profileId, name: peer.name, at: { lat: peer.lat, lon: peer.lon }, look: peer.look, emote: peer.emote?.text ?? null })))
+  }, [engineReady, mapPresence.peers])
+  const peerGesture = useCallback((text: string) => { mapPresence.gesture(text); engineReady?.playerEmote(text) }, [mapPresence, engineReady])
   // W-18: Zeichen über Lokalen mit laufender oder heute beginnender Veranstaltung (minütlich neu)
   useEffect(() => {
     if (!engineReady) return
@@ -944,7 +957,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         </>}
       </div>
       <TimeSlider plots={plots} asOf={asOf} onChange={setAsOf}/>
-      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { bust.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick} onTripBooked={booked => { setTrip(booked); setTripNow(Date.now()); choosePanel({ kind: 'none' }) }} presence={surfacePeople} worship={worship}/>
+      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { bust.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick} onTripBooked={booked => { setTrip(booked); setTripNow(Date.now()); choosePanel({ kind: 'none' }) }} presence={surfacePeople} worship={worship} onPeerGesture={peerGesture}/>
     </div>
     <style jsx>{`
       .world-lab{position:fixed;inset:0;background:#a9bd8c;font-family:system-ui;color:#eef2ed}
