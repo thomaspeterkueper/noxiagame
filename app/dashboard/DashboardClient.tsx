@@ -38,6 +38,7 @@ import { ABLY_CHANNELS, ABLY_EVENTS } from '@/lib/ably/channels'
 import React, { useState, useEffect } from 'react'
 import { useGameStore, ResourceType, LocationSlug } from '@/lib/store/gameStore'
 import { registerLocationBodies } from '@/lib/game/locationBody'
+import { gameDateFromCoreTick } from '@/lib/game/simulationCalendar'
 import { getToken, getSessionInfo } from '@/lib/supabase/auth'
 import TransitPanel from './TransitPanel'
 import ColonyGrid from './ColonyGrid'
@@ -243,6 +244,7 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
   registerLocationBodies(locations)
   const news = worldData?.news ?? []
   const stats = worldData?.stats
+  const gameDate = gameDateFromCoreTick(stats?.tickNumber)
   const currentLocationData = locations.find((l: any) => l.slug === location)
   const currentPrices = prices.filter((p: any) => p.locations?.slug === location)
   const used = cargoUsed(); const cargoFree = cargoMax - used
@@ -416,9 +418,9 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
           <button onClick={() => setJourneyOpen(true)} style={{ background: 'transparent', color: T.blueDeep, border: `1px solid ${T.line}`, borderRadius: T.radius, padding: '0.45rem 0.8rem', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.02em' }}>☰ Einweisung</button>
         </div>
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-          <div data-testid="noxia-simulation-time" title="NOXIA ist eine Simulation mit realen und fiktiven Inhalten. Der Core-Tick ist kein Kalenderdatum." style={{ color: T.inkSoft, fontSize: '0.68rem', whiteSpace: 'nowrap', lineHeight: 1.35 }}>
+          <div data-testid="noxia-simulation-time" title="NOXIA ist eine Simulation mit realen und fiktiven Inhalten. Spielkalender: Core-Basistick 1 = 1. Januar 2077; 24 Stunden-Ticks pro Tag." style={{ color: T.inkSoft, fontSize: '0.68rem', whiteSpace: 'nowrap', lineHeight: 1.35 }}>
             <div style={{ fontWeight: 700, color: T.gold }}>Simulierte Welt</div>
-            <div>{Number.isSafeInteger(stats?.tickNumber) && stats.tickNumber >= 0 ? `Core-Tick ${stats.tickNumber.toLocaleString('de-DE')}` : 'Spielzeit nicht verfügbar'}</div>
+            <div>{gameDate ? `${gameDate.date} · Tag ${gameDate.day}` : 'Spielzeit nicht verfügbar'}</div>
             <div style={{ fontSize: '0.59rem' }}>Reale & fiktive Inhalte</div>
           </div>
           {([['Credits', `${credits.toLocaleString('de')} Cr`], [shipId ? 'Frachter' : 'Fracht (Spediteur)', `${used} / ${cargoMax} t`], ['Standort', `${LOC_ICON[location] ?? '🪐'} ${LOC_NAME[location] ?? location}`], ['Bevölkerung', totalPop.toLocaleString('de')]] as [string,string][]).map(([l, v], i) => <div key={i}><div style={{ fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600 }}>{l}</div><div style={{ fontWeight: 700, color: T.blue, fontSize: '0.88rem', marginTop: '2px' }}>{v}</div></div>)}
