@@ -43,3 +43,9 @@ Preise der Credits-Anteile nicht ändern, bis Marktpreise feststehen; der Zukauf
 - [ ] Material wird genau einmal verbraucht (Reservierung → Verbrauch), Bestände nie negativ.
 - [ ] Bestehende Baustellen laufen unverändert zu Ende.
 - [ ] Abrechnung zeigt Material und Arbeit getrennt.
+
+## Zwischenstand (06.11.2026, Erdkarte)
+
+- Katalog, Stückliste und Preisaufteilung als reine Regel: `lib/game/construction/materials.ts` (+ Test). Werte vorläufig, Spielpreise relativ (Beton 3 Cr/t, Stahl 25 Cr/t, Schnittholz 10 Cr/m³ …), Material höchstens 80 % des heutigen Baupreises.
+- Anzeige in der Bautafel der Weltkarte. Noch kein Verbrauch aus einem Lager, keine Migration.
+- Nächster Schritt: Güter im Inventar (`resource_type` bzw. `logistics_inventory_items`), Baustelle reserviert und verbraucht.

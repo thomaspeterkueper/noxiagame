@@ -79,6 +79,12 @@ Dieselben Regeln: Auf dem Mars gibt es kein Holz; Baustoffe sind Regolith (Ziege
 5. Ökonomie: Märkte und Preise für die neuen Güter; NPC-Betriebe (Sägewerk, Kieswerk, Bauernhof) als Arbeitgeber.
 6. Tierhaltung mit lebenden Tieren (Anschluss an NOXIA-LIVING-appearance-clothing-heritage-animals).
 
+## Stand der Umsetzung (06.11.2026)
+
+1. **Erledigt:** Produktion nur mit Eingängen (`lib/game/production/inputGate.ts`, im Tick; Request 0930 in `coordination/done/`).
+2. **Begonnen:** Katalog der Baustoffe, Stückliste je Bautyp und Aufteilung des Baupreises in Material und Arbeit (`lib/game/construction/materials.ts`, getestet). Die Bautafel der Weltkarte zeigt je Bautyp die größten Posten („72 t Beton, 48 t Ziegel, 4 t Stahl · darin Material 540 Cr, Arbeit 360 Cr“). Der Gesamtpreis ist unverändert; noch wird kein Lager belastet.
+3. Offen: Inventare für die neuen Güter, Reservierung und Verbrauch auf der Baustelle, Zukauf beim Lieferanten mit Lieferzeit, Recycling beim Abriss; Holzeinschlag und Feldbau auf Flurstücken (Request 0041).
+
 ## Requests
 
 | Request | Inhalt |
