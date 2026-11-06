@@ -1,6 +1,6 @@
 # NOXIA-FIN-0002 – Haushalt der Kolonien
 
-Status: **proposed** – Entscheidung Thomas offen
+Status: **teilweise entschieden** – Teil A2/A3 und Mietsteuer umgesetzt (06.11.2026), Fragen 1, 3, 4, 5 offen
 Datum: 29.10.2026
 Bezug: NOXIA-FIN-0001 (Geldregeln), NOXIA-OMNI-0001 (Spielraum), NOXIA-ETHICS-0001, Essay „Warum der Mars Henry George recht gibt“, population-economy Aufgabe 23 (Zuzug mit der Fracht)
 Wunsch Thomas (29.10.2026): „ja bitte“ – ein Vorschlag, wie die Kolonien zu einem Haushalt kommen, damit der Zuzug in Gang kommt.
@@ -92,13 +92,29 @@ Empfehlung: zuerst Weg 1, damit die Geldmenge stimmt; Weg 2 oder 3 entscheiden, 
 - **Mars:** Mit A1 und C wird der öffentliche Dienst bezahlt; Zuzug kommt über freie Wohnungen bei Figuren und neue Stellen.
 - **Phobos:** Mit A2 und C wird der öffentliche Dienst bezahlt; Zuzug erst, wenn dort Förderanlagen oder Betriebe entstehen.
 
+## Entschieden und umgesetzt (06.11.2026)
+
+Thomas: „ja, auch auf Miete sollte es Steuern geben“ – Antwort auf Frage 2. Live mit `20261106010000_colony_rent_and_taxes.sql`:
+- **Miete in staatlichen Habitaten (A2):** 24 Wohnungen in Mars (16), Mond (4) und Phobos (4) kosten 200 Cr je 30 Tage. Bisher waren sie kostenfrei. Die erste Miete wird nach einer Woche fällig.
+- **Konsumsteuer 19 % (A3)** für Mond, Mars, Phobos und Deimos. Gelesen als Teil derselben Antwort („auch auf Miete“).
+- **Mietsteuer 10 %** auf jede abgerechnete Miete, auch auf der Erde. Bei staatlichen Vermietern fließt sie in dieselbe Kasse zurück; spürbar wird sie bei privaten Vermietern.
+- **Ertrag der Mieten:** etwa 750 Cr je Woche auf dem Mars, je etwa 190 Cr auf Mond und Phobos.
+- **Nicht geändert:** Die kostenfreien Wohnungen auf der Erde (15) bleiben, bis Thomas anders entscheidet.
+
+## Nachtrag zum Befund (06.11.2026)
+
+- **Die Erde gerät selbst ins Minus.** In der letzten Woche nahm ihre öffentliche Kasse 786 Cr ein und zahlte 9 955 Cr Lohn. Die Kasse fiel von 20 500 auf 11 357 Cr; in etwa neun Tagen ist sie leer. Ein Fiskaltransfer von der Erde in die Kolonien (Frage 4, zweite Möglichkeit) scheidet damit aus. Die Erde braucht selbst eine Antwort.
+- **Seit 13 Tagen läuft keine Fracht aus.** Die letzte Abfahrt war Tick 2479. Mitflug und Zuzug warten deshalb; bisher hat niemand angeheuert, und keine Fracht wurde für den Zuzug geprüft.
+
 ## Entscheidungsfragen an Thomas
 
 1. **Förderabgabe (A1):** ja? Satz 15 % oder anders?
-2. **Miete in staatlichen Wohnungen (A2)** und **Konsumsteuer 19 % (A3)** in den Kolonien: ja?
+2. ~~Miete in staatlichen Wohnungen (A2) und Konsumsteuer 19 % (A3)~~ – **entschieden 06.11.2026**, dazu Mietsteuer 10 %.
 3. **Private Stellen an Förderanlagen (B1)** und **Datenkorrektur (B2):** ja?
-4. **Anlaufhilfe (C):** ja? Höhe und Dauer wie vorgeschlagen? Emittent Solar Central Bank, oder lieber die Kasse der Erde als Fiskaltransfer (sie hat 20 500 Cr, ist aber selbst aus Reserven gespeist)?
+4. **Anlaufhilfe (C):** ja? Höhe und Dauer wie vorgeschlagen? Emittent Solar Central Bank – die Kasse der Erde kommt nicht mehr in Frage (Nachtrag). Und: Soll die Anlaufhilfe auch die Erde einschließen?
 5. **Wasser ohne Käufer (D):** zuerst ausweisen (Weg 1)?
+6. **Neu – kostenfreie Wohnungen auf der Erde:** auch dort 200 Cr Miete?
+7. **Neu – Frachten:** Die Handelsfirma liefert seit 13 Tagen nichts. Soll ich klären, warum, und eine Mindestverbindung vorschlagen (zum Beispiel eine Fracht je Woche zu Mond und Mars)? Daran hängen Mitflug und Zuzug.
 
 ## Umsetzung nach Freigabe
 
