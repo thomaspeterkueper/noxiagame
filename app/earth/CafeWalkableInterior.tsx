@@ -507,6 +507,9 @@ export default function CafeWalkableInterior({entityId,buildingTypeId,buildingNa
 
   const fitting:InteriorFitting={
     kind:layout.kind,layout,noun:layout.noun,locative:layout.locative,sectionLabel:'LOKAL',
+    // 2,5D: Name als Leuchtschrift; moderne Cafés und Restaurants mit Servierroboter (06.11.2026).
+    wallSign:(()=>{const n=String(buildingName??'').replace(/^(Bar|Café|Cafe|Restaurant|Club|Kneipe|Hotel)\s*·\s*/i,'').trim();return /^\p{Lu}?[\p{L}\d .'&-]{2,22}$/u.test(n)&&!/stra(ß|ss)e\s*\d|weg\s*\d|platz\s*\d|\d+$/i.test(n)?n:layout.kind==='cafe'?'café':null})(),
+    serviceRobot:layout.kind==='cafe'||layout.kind==='restaurant',
     headerNote:playerHour!==null?(hours.clock==='player'?'Ortszeit ':'Koloniezeit ')+playerHour+' Uhr · geöffnet '+venueHoursText(kind,hours):undefined,
     service,
     closedText:figures=>{

@@ -54,6 +54,14 @@ import {
 } from '@/lib/game/hospitality/venues'
 import ConversationReport from '@/app/components/ConversationReport'
 
+/** Mitte der breitesten freien Wandfläche zwischen den Fenstern – dort hängt die Leuchtschrift. */
+function signSpot(windows:readonly{x:number;w:number}[],width=760):number{
+  const edges=[...windows].sort((a,b)=>a.x-b.x)
+  let best={from:0,to:0},last=0
+  for(const w of [...edges,{x:width,w:0}]){if(w.x-last>best.to-best.from)best={from:last,to:w.x};last=Math.max(last,w.x+w.w)}
+  return Math.round((best.from+best.to)/2)
+}
+
 export type Point = { x:number; y:number }
 export type ShownFigure = { figure:VenueFigure; resident:ColonyResident; moment:GuestMoment|null }
 /** Ein Besucher, der wirklich hier war (z. B. ein Kauf): Alter zum Zeitpunkt des Abrufs. */
@@ -164,6 +172,10 @@ export interface InteriorFitting {
   banChoices?:Array<[number,string]>
   /** Was die Einrichtung über eine Figur für gemeinsame Bewegungen weiß (Trauer, Beileid). */
   jointContext?:(personId:string)=>Partial<Pick<NpcJointContext,'mourning'|'condoled'>>
+  /** Leuchtschrift an der Rückwand (2,5D), z. B. der Name des Cafés. */
+  wallSign?:string|null
+  /** Servierroboter, der Bestellungen vom Tresen an die Tische bringt (moderne Cafés). */
+  serviceRobot?:boolean
   /** Pose aus einem Ereignis (Rangelei, Kampf; R-32) – vor allen anderen. */
   poseFor?:(personId:string)=>{pose:KieselPose;verletzt:boolean}|null
   /** Stimmung der Tanzfläche (Musikstil des DJ), als CSS-Klasse. */
@@ -188,6 +200,22 @@ export type Props = {
 
 const SPEED=12
 const BRING_S=9
+
+/** Servierroboter (06.11.2026): eigenes, schlichtes Design – weißer Körper, zwei Tablettfächer, Bildschirmgesicht. */
+function ServeRobotSVG(){
+  return <svg viewBox="0 0 48 80" width="40" height="66" aria-hidden="true" style={{display:'block',overflow:'visible'}}>
+    <ellipse cx="24" cy="77" rx="15" ry="3.5" fill="#0006"/>
+    <rect x="11" y="66" width="26" height="10" rx="5" fill="#3a4148"/>
+    <rect x="13" y="22" width="22" height="47" rx="9" fill="#f4f6f7"/>
+    <rect x="23" y="22" width="12" height="47" rx="6" fill="#00000010"/>
+    <rect x="6" y="34" width="36" height="4" rx="2" fill="#d9b98f"/><rect x="6" y="50" width="36" height="4" rx="2" fill="#d9b98f"/>
+    <g className="cargo"><rect x="13" y="27" width="7" height="7" rx="1.5" fill="#e8c35a"/><rect x="13" y="25.5" width="7" height="2" rx="1" fill="#fbf6e6"/><ellipse cx="30" cy="33" rx="6" ry="1.6" fill="#fff"/><path d="M26 32.5 q4 -4 8 0z" fill="#c98a5a"/></g>
+    <rect x="12" y="4" width="24" height="18" rx="8" fill="#f4f6f7"/>
+    <rect x="15" y="7" width="18" height="12" rx="5" fill="#16252b"/>
+    <path d="M19 13 q2 -2.4 4 0 M25 13 q2 -2.4 4 0" stroke="#7fe0ff" strokeWidth="1.6" fill="none" strokeLinecap="round"/>
+    <rect x="22" y="0" width="4" height="4" rx="2" fill="#7fe0ff"/>
+  </svg>
+}
 
 export default function WalkableInterior({entityId,buildingName,companion=null,onClose,fitting,onContext,learnRequest=null,companionHistory=[]}:Props){
   const {layout}=fitting
@@ -218,8 +246,45 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
   const toggleView=()=>setIso(v=>{const next=!v;try{localStorage.setItem('noxia.interiorView',next?'iso':'flat')}catch{};return next})
   const stageRef=useRef<HTMLDivElement|null>(null)
   const[fit,setFit]=useState(1)
-  useEffect(()=>{const el=stageRef.current;if(!el||typeof ResizeObserver==='undefined')return;const ro=new ResizeObserver(([e])=>{const r=e.contentRect;setFit(Math.max(.5,Math.min(1.35,r.width/920,r.height/660)))});ro.observe(el);return()=>ro.disconnect()},[iso])
+  useEffect(()=>{const el=stageRef.current;if(!el||typeof ResizeObserver==='undefined')return;const ro=new ResizeObserver(([e])=>{const r=e.contentRect;setFit(Math.max(.4,Math.min(1.6,r.width/900,r.height/600)))});ro.observe(el);return()=>ro.disconnect()},[iso])
   const pins=useRef<Array<HTMLDivElement|null>>([])
+  // Servierroboter: fährt vom Tresen an besetzte Tische und zurück (nur 2,5D, nur wenn geöffnet).
+  const seatedRef=useRef<Point[]>([])
+  const[robot,setRobot]=useState<{x:number;y:number;flip:boolean;carrying:boolean}|null>(null)
+  const robotRef=useRef<{x:number;y:number;path:Point[];wait:number;phase:'home'|'out'|'back';flip:boolean;carrying:boolean}|null>(null)
+  // Kamera (06.11.2026, „sollte größer sein“): näher heran, folgt der Figur; Mausrad oder +/− zoomt.
+  const[zoom,setZoomRaw]=useState(1.35)
+  useEffect(()=>{try{const z=Number(localStorage.getItem('noxia.interiorZoom'));if(z>=.8&&z<=2.6)setZoomRaw(z)}catch{}},[])
+  const robotOn=useRef(false)
+  useEffect(()=>{
+    if(!fitting.serviceRobot)return
+    const home={x:layout.servicePoint.x+(layout.servicePoint.x>layout.width/2?-34:34),y:layout.servicePoint.y+22}
+    const id=setInterval(()=>{
+      if(!robotOn.current){if(robotRef.current){robotRef.current=null;setRobot(null)}return}
+      const r=robotRef.current??(robotRef.current={...home,path:[],wait:1500,phase:'home',flip:false,carrying:false})
+      if(r.path.length){
+        const t=r.path[0],dx=t.x-r.x,dy=t.y-r.y,d=Math.hypot(dx,dy),v=4.6
+        if(Math.abs(dx+dy)>.5)r.flip=(dx+dy)<0
+        if(d<=v){r.x=t.x;r.y=t.y;r.path.shift();if(!r.path.length)r.wait=r.phase==='out'?2600:3200}
+        else{r.x+=dx/d*v;r.y+=dy/d*v}
+      }else if(r.wait>0)r.wait-=60
+      else if(r.phase==='home'){
+        const seats=seatedRef.current
+        if(!seats.length){r.wait=4000}
+        else{
+          const seat=seats[Math.floor(Math.random()*seats.length)]
+          const cx=layout.width/2,cy=layout.height/2,len=Math.hypot(cx-seat.x,cy-seat.y)||1
+          const target={x:seat.x+(cx-seat.x)/len*26,y:seat.y+(cy-seat.y)/len*26}
+          const path=venuePath(layout,{x:r.x,y:r.y},target)
+          if(path.length>1){r.path=path.slice(1);r.phase='out';r.carrying=true}else r.wait=2000
+        }
+      }else if(r.phase==='out'){r.carrying=false;r.path=venuePath(layout,{x:r.x,y:r.y},home).slice(1);r.phase='back'}
+      else{r.phase='home';r.wait=2500+Math.random()*3000}
+      setRobot({x:r.x,y:r.y,flip:r.flip,carrying:r.carrying})
+    },60)
+    return()=>clearInterval(id)
+  },[fitting.serviceRobot,layout])
+  const setZoom=(z:number)=>{const v=Math.max(.8,Math.min(2.6,Math.round(z*100)/100));setZoomRaw(v);try{localStorage.setItem('noxia.interiorZoom',String(v))}catch{}}
   const isoRef=useRef(true);isoRef.current=iso
   const dragging=useRef<{kind:'table'|'decor';id:string;dx:number;dy:number}|null>(null)
   const roomPoint=(e:{clientX:number;clientY:number})=>{
@@ -368,6 +433,13 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
 
   const visits=fitting.visits
   const worksHere=(r:ColonyResident)=>r.assignments.some(a=>a.type==='work'&&a.tileEntityId===entityId)
+  // Alltag (06.11.2026, „Bewegungen sind noch so einfach“): Wer sitzt, trinkt mal oder plaudert; wer steht, erzählt auch mal.
+  const idlePose=(id:string,sit:boolean,hasDrink:boolean):KieselPose=>{
+    let h=0;for(let i=0;i<id.length;i++)h=(h*33+id.charCodeAt(i))>>>0
+    const phase=Math.floor(nowMs/4200+(h%97)/13)%7
+    if(sit)return phase===1&&hasDrink?'trinken':phase===3||phase===5?'plaudern_sitzend':'sitzen'
+    return phase===2||phase===4?'plaudern':'stehen'
+  }
   // Arbeit sichtbar wie in Siedler (Thomas, 04.11.2026): Putzkraft wischt, am Tresen
   // werden Gläser poliert, die Bedienung trägt das Tablett, der DJ tanzt am Pult.
   // Zwischendurch steht man auch mal nur da.
@@ -700,16 +772,23 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
   const closedInfo=closed?fitting.closedText(figures):null
   const decor=fitting.decor
   const labelled=layout.furniture.filter(item=>fitting.furnitureLabel(item.kind,service))
+  seatedRef.current=shown.filter(item=>item.figure.spot.kind==='seat').map(item=>item.figure.spot)
+  // Bildschirmversatz eines Raumpunkts zur Raummitte (aus der Kippung: x' = .707(x+y), y' = .354(y−x))
+  const isoScale=fit*zoom
+  robotOn.current=iso&&!closed&&Boolean(fitting.serviceRobot)
+  const cam=(()=>{if(zoom<=1.02)return{x:0,y:0};const cx=layout.width/2,cy=layout.height/2;const dx=.7071*((pos.x-cx)+(pos.y-cy)),dy=.3536*((pos.y-cy)-(pos.x-cx))-30;const lim={x:.7071*(layout.width+layout.height)/2*(1-1/zoom)*1.05,y:(.3536*(layout.width+layout.height)/2+70)*(1-1/zoom)*1.1};return{x:-Math.max(-lim.x,Math.min(lim.x,dx))*isoScale,y:-Math.max(-lim.y,Math.min(lim.y,dy))*isoScale}})()
+  const isoTransform=`translate(calc(-50% + ${cam.x.toFixed(1)}px),calc(-50% + ${cam.y.toFixed(1)}px)) scale(${isoScale.toFixed(3)}) rotateX(60deg) rotateZ(-45deg)`
 
   return <div className="walkable-interior">
     <NpcVisualStyles/>
     <header><div><small>INNENRAUM · {fitting.noun.toUpperCase()}</small><b>{buildingName}</b><span>{iso?'Boden anklicken oder WASD':'WASD bewegen'} · Platz anklicken zum Hinsetzen · Person anklicken · ESC verlassen{fitting.headerNote?' · '+fitting.headerNote:''}</span></div><div className="head-actions"><button className="view-toggle" onClick={toggleView} title="Ansicht wechseln">{iso?'Draufsicht':'2,5D'}</button><button onClick={onClose}>← Verlassen</button></div></header>
     <main>
-      <div ref={stageRef} className={iso?'iso-stage':'flat-stage'}>
-      <div ref={roomRef} className={'room '+fitting.kind+(iso?' iso':'')+(fitting.furnish?.editing?' editing':'')} style={iso?{transform:`translate(-50%,-50%) scale(${fit.toFixed(3)}) rotateX(60deg) rotateZ(-45deg)`}:undefined} onPointerMove={fitting.furnish?.editing?moveDrag:undefined} onPointerUp={endDrag} onPointerCancel={endDrag}
+      <div ref={stageRef} className={iso?'iso-stage':'flat-stage'} onWheel={iso?e=>{if(e.ctrlKey)return;setZoom(zoom*(e.deltaY<0?1.08:1/1.08))}:undefined}>
+      {iso&&<div className="zoom-ctl"><button onClick={()=>setZoom(zoom*1.15)} aria-label="Näher heran">+</button><button onClick={()=>setZoom(zoom/1.15)} aria-label="Weiter weg">−</button><button onClick={()=>setZoom(zoom>1.1?1:1.35)} aria-label="Ganzer Raum">{zoom>1.1?'Raum':'Nah'}</button></div>}
+      <div ref={roomRef} className={'room '+fitting.kind+(iso?' iso':'')+(fitting.furnish?.editing?' editing':'')} style={iso?{transform:isoTransform}:undefined} onPointerMove={fitting.furnish?.editing?moveDrag:undefined} onPointerUp={endDrag} onPointerCancel={endDrag}
         onClick={e=>{if((e.target as HTMLElement).closest('.npc,.peer,.player,.f,.seat-hit,.context,.item,.deco,.drag-table,.task-marker,button')||fitting.furnish?.editing||closed)return;const q=roomPoint(e);if(q.x>6&&q.y>6&&q.x<layout.width-6&&q.y<layout.height-6&&!isVenueBlocked(layout,q,VENUE_PLAYER_RADIUS))walkTo(q)}}>
         <div ref={el=>{pins.current[0]=el}} className="pin" style={{left:0,top:0}}/><div ref={el=>{pins.current[1]=el}} className="pin" style={{left:layout.width,top:0}}/><div ref={el=>{pins.current[2]=el}} className="pin" style={{left:0,top:layout.height}}/>
-        {iso&&<><div className="wall3d n"><i className="seam"/>{layout.windows.map((win,index)=><div key={index} className="win" style={{left:win.x,width:win.w}}/>)}</div><div className="wall3d e"><i className="seam"/></div></>}
+        {iso&&<><div className="wall3d n"><i className="seam"/>{layout.windows.map((win,index)=><div key={index} className="win" style={{left:win.x,width:win.w}}/>)}{fitting.wallSign&&<div className="neon-sign" style={{left:signSpot(layout.windows)}}>{fitting.wallSign}</div>}</div><div className="wall3d e"><i className="seam"/></div></>}
         {layout.windows.map((win,index)=><div key={index} className="window" style={{left:win.x,width:win.w}}><i/><em/></div>)}
         <div className="door"><small>AUSGANG</small></div>
         {fitting.sideDoor&&<div className="door side" style={{left:fitting.sideDoor.x-30}}><small>{fitting.sideDoor.label}</small></div>}
@@ -718,7 +797,10 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
         {layout.danceFloor&&<div className={'dancefloor'+(closed?' off':'')+(fitting.floorMood?' mood-'+fitting.floorMood:'')} style={{left:layout.danceFloor.x,top:layout.danceFloor.y,width:layout.danceFloor.w,height:layout.danceFloor.h}}><i/></div>}
         {layout.furniture.filter(item=>item.kind==='table'||item.kind==='high-table').map(item=><div key={'lamp:'+item.id} className="lamp" style={{left:item.x+item.w/2-70,top:item.y+item.h/2-70}}/>)}
         {iso&&layout.furniture.filter(item=>item.kind!=='board').map(item=><div key={'sh:'+item.id} className="fshadow" style={{left:item.x-3,top:item.y-3,width:item.w+6,height:item.h+6}}/>)}
-        {layout.furniture.map(item=><div key={item.id} className={'f '+item.kind} style={{left:item.x,top:item.y,width:item.w,height:item.h}}>{item.kind==='counter'&&fitting.counterDressing}{iso&&item.kind!=='board'&&<><b className="fs"/><b className="fw"/></>}</div>)}
+        {layout.furniture.map((item,index)=><div key={item.id} className={'f '+item.kind+(item.kind==='chair'||item.kind==='stool'?' c'+(index%4):'')} style={{left:item.x,top:item.y,width:item.w,height:item.h}}>{item.kind==='counter'&&fitting.counterDressing}{iso&&item.kind!=='board'&&<><b className="fs"/><b className="fw"/></>}</div>)}
+        {iso&&layout.furniture.filter(item=>item.kind==='table'||item.kind==='high-table'||item.kind==='chair'||item.kind==='stool').map(item=><div key={'leg:'+item.id} className={'leg '+item.kind} style={{left:item.x+item.w/2,top:item.y+item.h/2}}/>)}
+        {iso&&!closed&&layout.furniture.filter(item=>item.kind==='table'||item.kind==='high-table').map(item=><div key={'pend:'+item.id} className="pendant" style={{left:item.x+item.w/2,top:item.y+item.h/2}}><i/><b/></div>)}
+        {iso&&robot&&<div className={'serve-robot'+(robot.flip?' flip':'')+(robot.carrying?' carrying':'')} style={{left:robot.x,top:robot.y}} onClick={e=>{e.stopPropagation();setStatus('Der Servierroboter bringt Bestellungen vom Tresen an die Tische. Er weicht dir aus – einfach vorbeigehen.')}} title="Servierroboter"><span>Servierroboter</span><ServeRobotSVG/></div>}
         {(decor?.plants??[]).map(([x,y],index)=><div key={'plant:'+index} className="plant" style={{left:x-14,top:y-26}}><i/><b/></div>)}
         {(fitting.furnish?.decor??[]).map(d=><div key={'deco:'+d.id} className={'deco '+d.kind+(fitting.furnish?.editing?' movable':'')} style={{left:d.x,top:d.y}} onPointerDown={fitting.furnish?.editing?startDrag('decor',d.id,d):undefined}>{d.kind==='pflanze'?<><i/><b/></>:<i/>}{fitting.furnish?.editing&&<button className="rm" onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();fitting.furnish?.onRemoveDecor?.(d.id)}} aria-label="Entfernen">×</button>}</div>)}
         {fitting.furnish?.editing&&layout.furniture.filter(f=>/^table-\d+$/.test(f.id)).map(f=><div key={'drag:'+f.id} className="drag-table" style={{left:f.x-22,top:f.y-4,width:f.w+44,height:f.h+8}} onPointerDown={startDrag('table',f.id,f)} title="Tisch ziehen"/>)}
@@ -726,7 +808,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
         {shown.map(({figure,resident,moment})=>{
           const near=Math.hypot(figure.spot.x-pos.x,figure.spot.y-pos.y)<70
           return <div key={resident.id} className={'npc'+(figure.spot.id.startsWith('dance-')&&!closed?' dancing':'')+(figure.roomRole==='companion'?' with-player':'')} style={{left:figure.spot.x-19,top:figure.spot.y-50}}>
-            {isRobot(resident)?<RobotFigure name={resident.displayName} selected={selected?.id===resident.id} showLabel={selected?.id===resident.id||near} onClick={()=>select(resident)}/>:(()=>{const m=motion(resident.id,figure.spot.x,figure.spot.y);const walking=m.moving||moment?.phase==='to-seat'||moment?.phase==='leaving';const label=personSceneLabel(resident);const sitting=figure.spot.posture==='sitting';const roleText=resident.assignments.find(a=>a.type==='work')?.roleCode??'';const forced=fitting.poseFor?.(resident.id)??null;const joint=npcJoint&&npcJoint.id===resident.id?poseNow(npcJoint.state,nowMs):null;const pose:KieselPose=forced?forced.pose:joint?joint:figure.spot.id.startsWith('dance-')&&!closed&&!walking?'tanzen':sitting?'sitzen':(worksHere(resident)&&!closed?workPose(roleText,resident.id,walking):null)??(walking?'gehen':'stehen');return <button className={'kiesel'+(selected?.id===resident.id?' selected':'')} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();select(resident)}} title={label}>
+            {isRobot(resident)?<RobotFigure name={resident.displayName} selected={selected?.id===resident.id} showLabel={selected?.id===resident.id||near} onClick={()=>select(resident)}/>:(()=>{const m=motion(resident.id,figure.spot.x,figure.spot.y);const walking=m.moving||moment?.phase==='to-seat'||moment?.phase==='leaving';const label=personSceneLabel(resident);const sitting=figure.spot.posture==='sitting';const roleText=resident.assignments.find(a=>a.type==='work')?.roleCode??'';const forced=fitting.poseFor?.(resident.id)??null;const joint=npcJoint&&npcJoint.id===resident.id?poseNow(npcJoint.state,nowMs):null;const pose:KieselPose=forced?forced.pose:joint?joint:figure.spot.id.startsWith('dance-')&&!closed&&!walking?'tanzen':sitting?idlePose(resident.id,true,Boolean(moment?.served)):(worksHere(resident)&&!closed?workPose(roleText,resident.id,walking):null)??(walking?'gehen':idlePose(resident.id,false,false));return <button className={'kiesel'+(selected?.id===resident.id?' selected':'')} onPointerDown={e=>e.stopPropagation()} onClick={e=>{e.stopPropagation();select(resident)}} title={label}>
               <KieselFigure look={{...kieselLookFor(resident as any,worksHere(resident)?workKey:null),...(forced?.verletzt?{verletzt:true}:{})}} dir={joint?(FOLLOW_JOINTS.has(joint)?(walking?m.dir:'se'):faceTowards(figure.spot,pos)):walking||sitting?m.dir:'se'} pose={joint?sidePose(pose,walking?m.dir:'se',figure.spot,pos):pose} moving={walking} title={label}/>
               {(iso||selected?.id===resident.id||near)&&<span>{label}</span>}
             </button>})()}
@@ -905,6 +987,63 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
 .walkable-interior .head-actions{display:flex;gap:8px}
 .walkable-interior .view-toggle{background:#0b1f26;border:1px solid #2f5d78;color:#cfe8f2}
 .walkable-interior .flat-stage{display:contents}
+
+/* ── 2,5D Teil 2 (06.11.2026): Kamera, modernes Café, Roboter, Alltag ── */
+.walkable-interior .room.iso{transition:transform .45s cubic-bezier(.2,.7,.2,1)}
+.walkable-interior .zoom-ctl{position:absolute;left:14px;bottom:14px;z-index:40;display:flex;gap:6px}
+.walkable-interior .zoom-ctl button{min-width:34px;height:34px;padding:0 10px;border-radius:8px;border:1px solid #2f5d78;background:#0b1f26e6;color:#e6f6ff;font:700 15px system-ui;cursor:pointer}
+.walkable-interior .zoom-ctl button:last-child{font-size:12px}
+/* Tischfüße, Hängelampen (aufrecht) */
+.walkable-interior .room.iso .leg{position:absolute;width:6px;height:26px;margin:-26px 0 0 -3px;background:linear-gradient(90deg,#3a3a3a,#6a6a6a,#3a3a3a);border-radius:2px;transform-origin:50% 100%;transform:rotateZ(45deg) rotateX(-90deg) scaleY(1.155);pointer-events:none}
+.walkable-interior .room.iso .leg.high-table{height:40px;margin-top:-40px}
+.walkable-interior .room.iso .leg.chair,.walkable-interior .room.iso .leg.stool{width:4px;height:14px;margin:-14px 0 0 -2px}
+.walkable-interior .room.iso .pendant{position:absolute;width:24px;height:150px;margin:-150px 0 0 -12px;transform-origin:50% 100%;transform:rotateZ(45deg) rotateX(-90deg) scaleY(1.155);pointer-events:none}
+.walkable-interior .room.iso .pendant i{position:absolute;left:11.5px;top:0;width:1px;height:62px;background:#2a2a2acc}
+.walkable-interior .room.iso .pendant b{position:absolute;left:3px;top:60px;width:18px;height:14px;border-radius:9px 9px 4px 4px;background:radial-gradient(circle at 50% 85%,#fff7d6,#ffd98a 45%,#c9a25a 75%);box-shadow:0 10px 26px 8px #ffd98a55}
+.walkable-interior .room.iso.nightclub .pendant b,.walkable-interior .room.iso.bar .pendant b{background:radial-gradient(circle at 50% 85%,#fff,var(--accent) 60%);box-shadow:0 10px 26px 8px color-mix(in srgb,var(--accent) 40%,transparent)}
+.walkable-interior .room.iso.police .pendant,.walkable-interior .room.iso.fire_station .pendant,.walkable-interior .room.iso.doctors .pendant,.walkable-interior .room.iso.hospital .pendant,.walkable-interior .room.iso.bank .pendant{display:none}
+/* Servierroboter */
+.walkable-interior .room.iso .serve-robot{position:absolute;width:100px;height:84px;margin:-84px 0 0 -50px;padding-top:0;transform-origin:50% 100%;transform:rotateZ(45deg) rotateX(-90deg) scaleY(1.155);cursor:pointer}
+.walkable-interior .room.iso .serve-robot svg{position:absolute;bottom:0;left:30px}
+.walkable-interior .room.iso .serve-robot.flip svg{transform:scaleX(-1)}
+.walkable-interior .room.iso .serve-robot .cargo{opacity:0;transition:opacity .3s}
+.walkable-interior .room.iso .serve-robot.carrying .cargo{opacity:1}
+.walkable-interior .room.iso .serve-robot>span{position:absolute;top:0;left:50%;transform:translateX(-50%);white-space:nowrap;background:#0b1f26e6;border:1px solid var(--accent);color:#eaf8ff;font:700 7px ui-monospace,monospace;padding:1px 4px;border-radius:3px}
+/* Leuchtschrift an der Nordwand */
+.walkable-interior .wall3d .neon-sign{position:absolute;left:52%;top:30px;transform:translateX(-50%);font:800 30px "Trebuchet MS",system-ui,sans-serif;letter-spacing:.06em;color:#fff;white-space:nowrap;text-shadow:0 0 4px #fff,0 0 12px var(--accent),0 0 26px var(--accent)}
+/* Alltag: leises Atmen, Gleiten beim Platzwechsel */
+@keyframes iso-breathe{0%,100%{transform:scaleY(1)}50%{transform:scaleY(1.018)}}
+.walkable-interior .room.iso .kiesel svg{transform-origin:50% 100%;animation:iso-breathe 3.4s ease-in-out infinite}
+.walkable-interior .room.iso .npc:nth-child(3n) .kiesel svg{animation-duration:3.9s}
+.walkable-interior .room.iso .npc:nth-child(3n+1) .kiesel svg{animation-duration:3.1s;animation-delay:-1s}
+.walkable-interior .room.iso .npc{transition:left 1.1s linear,top 1.1s linear}
+@media (prefers-reduced-motion:reduce){.walkable-interior .room.iso .kiesel svg{animation:none}.walkable-interior .room.iso,.walkable-interior .room.iso .npc{transition:none}}
+/* Modernes Café (koreanisch inspiriert): hell, Holzlamellen, Terrazzo, Marmor, Pastell */
+.walkable-interior .room.iso.cafe{--accent:#f2b880;--wallTop:#fbf9f5;--wallBase:#f3efe8;
+  background:radial-gradient(circle at 20% 30%,#c9bfb2 0 1.2px,transparent 1.6px) 0 0/23px 19px,radial-gradient(circle at 70% 60%,#b7a99a 0 1px,transparent 1.5px) 0 0/31px 27px,radial-gradient(circle at 40% 80%,#e0b9a0 0 1.4px,transparent 1.8px) 0 0/41px 37px,linear-gradient(135deg,#efebe4,#e6e0d6)}
+.walkable-interior .room.iso.cafe:after{display:none}
+.walkable-interior .room.iso.cafe .wall3d{background:linear-gradient(#fbf9f5 0 48%,transparent 48%),repeating-linear-gradient(90deg,#d8b88e 0 9px,#c9a77b 9px 10px,#e2c49c 10px 11px),#d8b88e;box-shadow:inset 0 3px 0 #ffffff,inset 0 -5px 0 #b89268}
+.walkable-interior .room.iso.cafe .wall3d:after{top:48%;height:3px;background:#b89268;box-shadow:none;opacity:1}
+.walkable-interior .room.iso.cafe .wall3d .seam{display:none}
+.walkable-interior .room.iso.cafe .wall3d .win{top:10px;height:96px;border:3px solid #2b2b2b;border-radius:14px 14px 4px 4px;background:linear-gradient(#cfe9f5,#eef7fb 60%,#cfe3c6);box-shadow:inset 0 0 18px #fff}
+.walkable-interior .room.iso.cafe .neon-sign{top:6px;font-size:34px;color:#ff7a59;font-family:"Brush Script MT","Segoe Script",cursive;text-shadow:0 0 2px #ffd2bf,0 0 8px #ff7a59,0 0 18px #ff9a7a}
+.walkable-interior .room.iso.cafe .rug{display:none}
+.walkable-interior .room.iso.cafe .f.table{--h:30px;border-radius:50%;border:0;background:radial-gradient(circle at 34% 30%,#ffffff,#f1eee9 45%,#dcd6cd 80%);box-shadow:0 0 0 2px #c9c2b7}
+.walkable-interior .room.iso.cafe .f.table:after{display:none}
+.walkable-interior .room.iso.cafe .f.table>.fs,.walkable-interior .room.iso.cafe .f.table>.fw,.walkable-interior .room.iso.cafe .f.chair>.fs,.walkable-interior .room.iso.cafe .f.chair>.fw{display:none}
+.walkable-interior .room.iso.cafe .f.chair{--h:18px;border-radius:50%;border:0;box-shadow:0 2px 0 #0002}
+.walkable-interior .room.iso.cafe .f.chair.c0{background:#bcd3c1}.walkable-interior .room.iso.cafe .f.chair.c1{background:#f1c9c0}
+.walkable-interior .room.iso.cafe .f.chair.c2{background:#f3e3b8}.walkable-interior .room.iso.cafe .f.chair.c3{background:#c9cfe6}
+.walkable-interior .room.iso.cafe .leg.table{height:30px;margin-top:-30px;width:8px;margin-left:-4px;background:linear-gradient(90deg,#c9a77b,#e2c49c,#b89268)}
+.walkable-interior .room.iso.cafe .leg.chair{background:linear-gradient(90deg,#c9a77b,#e2c49c)}
+.walkable-interior .room.iso.cafe .f.counter{background:linear-gradient(135deg,#ffffff,#efece6);border:0;box-shadow:0 0 0 2px #e2ddd4}
+.walkable-interior .room.iso.cafe .f.counter>.fs,.walkable-interior .room.iso.cafe .f.counter>.fw{background:repeating-linear-gradient(90deg,#d8b88e 0 8px,#c9a77b 8px 9px);filter:none}
+.walkable-interior .room.iso.cafe .f.counter>.fw{filter:brightness(.88)}
+.walkable-interior .room.iso.cafe .f.shelf{--h:64px;background:repeating-linear-gradient(90deg,#f3efe8 0 14px,#c98a5a 14px 18px,#f3efe8 18px 30px,#9ab06b 30px 36px,#f3efe8 36px 50px,#e8c35a 50px 54px);border:0}
+.walkable-interior .room.iso.cafe .plant b{background:radial-gradient(circle at 35% 35%,#7fb06a,#2f6b3a 60%,#204a28);width:34px;height:36px;left:-3px;top:-6px}
+.walkable-interior .room.iso.cafe .plant i{background:linear-gradient(#f3efe8,#d9d3c9);border-radius:3px 3px 8px 8px}
+.walkable-interior .room.iso.cafe .lamp{opacity:.5}
+.walkable-interior .room.iso.cafe .door{background:linear-gradient(90deg,#d9d3c9,#efebe4 50%,#d9d3c9);border-color:#2b2b2b;box-shadow:none}
 `}</style>
   </div>
 }
