@@ -1007,3 +1007,17 @@ Thomas, 05.11.2026: „Brauchen wir Polizei? Feuerwehr, Krankenhaus?“ – „j
 6. **Freiwillige Feuerwehr als Verein** (im Sauerland üblich): Mitglieder, Übungsabend, Feuerwehrfest – gern als Veranstaltung (`venue_events`).
 7. Kinder sind nie beteiligt, weder an Gewalt noch an Einsätzen.
 
+### R-35 (Erdkarte – eine Welt, 06.11.2026): Labor-Schleife für Erde und Stationen jenseits der Erde
+
+Thomas, 06.11.2026: Das Labor ist „gerade wenn wir an Stationen außerhalb der Erde denken wichtig: Analysen, Lernen, Experimentieren“. Die Erdkarte hat dafür einen reinen Kern gebaut (`lib/game/lab/lab.ts`, 3 Tests) und nutzt ihn im Feldlabor der Dvārakā-Grabung (`app/earth/GrabungLab.tsx`). Gebraucht wird von hier die Anbindung an den Forschungslauf, damit dieselbe Schleife in Laborgebäuden auf Erde, Mond, Mars und Stationen gilt:
+
+- **Schleife:** Probe nehmen → Analyse wählen → Befund (Messung, getrennt von Deutung) → ggf. Probe an ein besseres Labor schicken. Fähigkeiten stammen aus der Innenraum-Vorlage `laboratory-standard-01` (`research.sample.register`, `.basic-analysis`, `research.geoscience`, `research.spectroscopy.raman-ir`). Ein Feldlabor kann nur die ersten drei.
+- **Lernen:** Freischaltungen aus `lib/knowledge` (Lernen erlaubt einen Versuch, behauptet nie einen Befund). Gebraucht werden Einträge in `unlockRegistry.ts` und `learningCatalog.ts` für Analysearten (Vorschlag: `UNL:NOX:research:sample-analysis`, `UNL:NOX:research:geoscience`, `UNL:NOX:research:spectroscopy`) und für Experimententwurf (`UNL:NOX:research:magnetobiology-experiment-design` gibt es schon). Der Kern kennt `requiresUnlock` je Analyse; ohne Einträge ist nichts gesperrt.
+- **Experimentieren:** Hypothese → Versuchsaufbau → Ergebnis; auf Stationen entscheiden Ausstattung, Vorräte und Energie mit. Noch nicht gebaut, weder hier noch in der Erdkarte.
+- **Proben verschicken:** Probe vom Feldlabor an ein Stationslabor (Fracht, Kosten, Dauer). Schnittstelle zu Fracht und Raumhafen.
+- **Zu entscheiden:** Wer besitzt den Forschungsstand (Spieler, Ort, Kolonie)? Zählen Befunde für den Forschungslauf (Forschungspunkte)? Wie verbinden sich Befunde mit dem Wissensgraphen (REQ:L3:000003 liefert reales Wissen, Bücher ergänzen)?
+
+Die Erdkarte baut dazu nichts weiter, bis hier geantwortet ist.
+
+**Antwort (Bevölkerung und Ökonomie):** offen.
+

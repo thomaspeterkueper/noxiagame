@@ -11,6 +11,8 @@ import { municipalityLabel } from './municipality.server'
 import { buildingValue } from './buildingOffer'
 import { acquireItem, locationAt, offerFor, type Supabase } from './buildingOffer.server'
 import { loadTile } from './tileSource.server'
+import { detailCell } from './detailCells'
+import { earthPlaceSlug } from '@/lib/world/spatial/earthPlaceIdentity'
 import { looksLikeStreetParcel, smallestContaining, toLocal, type P } from './landPlot'
 
 export type ParcelRow = { id: string; ring: GeoPoint[]; label: string | null; usage: string | null; area_m2: number | null; centre_lat: number; centre_lon: number }
@@ -94,6 +96,19 @@ export async function buildingsOn(supabase: Supabase, ring: readonly GeoPoint[])
   return [...sources]
 }
 
+/**
+ * Sind für das ganze Flurstück die Gebäudedaten geholt? Gebäude kommen aus Ortsdetail-Zellen
+ * (lib/worldlab/detailCells); eine Zelle gilt erst als fertig, wenn ihr Import durch ist
+ * (enrichment_version ≥ 3). Fehlt eine Zelle, wäre „keine Gebäude“ nur geraten (Thomas, 06.11.2026).
+ */
+export async function buildingsKnownFor(supabase: Supabase, ring: readonly GeoPoint[]): Promise<boolean> {
+  const points = [...ring, { lat: ring.reduce((s, p) => s + p.lat, 0) / ring.length, lon: ring.reduce((s, p) => s + p.lon, 0) / ring.length }]
+  const slugs = [...new Set(points.map(p => earthPlaceSlug(detailCell(p))))]
+  const { data, error } = await supabase.from('celestial_regions').select('slug').eq('body', 'earth').in('slug', slugs).gte('enrichment_version', 3)
+  if (error) return false
+  return new Set((data ?? []).map(row => String(row.slug))).size === slugs.length
+}
+
 export interface ParcelOffer {
   id: string; label: string; areaM2: number; usage: string | null
   /** Quellenvermerk (Kataster des Landes oder „im Spiel vermessen“) */
@@ -112,6 +127,8 @@ export interface ParcelOffer {
   forSale: boolean; reason?: string; price?: number; seller?: string
   /** Ganzes Flurstück nicht mehr zu haben, Teilstücke schon */
   partsOnly?: boolean
+  /** false: Gebäudedaten dieser Gegend noch nicht geholt – „keine Gebäude“ wäre nur geraten */
+  buildingsKnown?: boolean
   buildings: Array<{ source: string; name: string; residents: number }>
   residents: number; rentPerInterval: number
   items?: Array<Awaited<ReturnType<typeof acquireItem>>>
@@ -164,6 +181,7 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
   const { count: parts } = await supabase.from('earth_parcels').select('id', { count: 'exact', head: true }).contains('parent_ids', [parcel.id]).is('retired_at', null)
   if (parts) return { ...base, owned: false, own: false, forSale: false, partsOnly: true, reason: `${parts} Teilstück${parts === 1 ? '' : 'e'} schon verkauft – nur noch weitere Teilstücke` }
 
+  if (!await buildingsKnownFor(supabase, parcel.ring)) return { ...base, owned: false, own: false, forSale: false, buildingsKnown: false, reason: 'Die Gebäudedaten dieser Gegend sind noch nicht geladen – es könnte ein Haus darauf stehen. Bitte gleich noch einmal ansehen.' }
   const sources = await buildingsOn(supabase, parcel.ring)
   const items: NonNullable<ParcelOffer['items']> = []
   let value = 0

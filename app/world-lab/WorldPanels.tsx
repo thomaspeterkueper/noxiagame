@@ -1,8 +1,8 @@
 'use client'
 
 // app/world-lab/WorldPanels.tsx
-// Aktualisiert: 06.11.2026 — Sichtbare Autofahrt zum Ziel (engine.driveTo), Fernfahrt als Sprung; 06.11.2026 — Betriebe (Laden, Werkstatt) aus realen Gewerbe-Häusern mit erfundenem Namen, Personal und Leistungen; Fahrzeugtresen im Autohaus, in der Werkstatt und an der Ladestation; „Hinfahren“ mit eigenem Fahrzeug zu fernen Zielen (onNote); 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd)
-// Version:      1.3.0
+// Aktualisiert: 06.11.2026 — Mitgehen nach Zusage im Gespräch bleibt bei der Person bis zum Ziel (follow); 06.11.2026 — Sichtbare Autofahrt zum Ziel (engine.driveTo), Fernfahrt als Sprung; 06.11.2026 — Betriebe (Laden, Werkstatt) aus realen Gewerbe-Häusern mit erfundenem Namen, Personal und Leistungen; Fahrzeugtresen im Autohaus, in der Werkstatt und an der Ladestation; „Hinfahren“ mit eigenem Fahrzeug zu fernen Zielen (onNote); 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd)
+// Version:      1.3.1
 // Tafeln der Weltkarte: Person, Gebäude, Innenraum.
 //
 // Grundsatz (Thomas, 25.10.2026 – in der alten Szene lagen Tafeln übereinander):
@@ -27,6 +27,7 @@ import { establishmentFor, establishmentKnowledge, establishmentServices } from 
 import { DriveButton, VehicleDesk, vehicleServiceIds } from '@/app/components/VehicleDesk'
 import { peopleAtPlace, type PresenceRow } from '@/lib/game/population/placePresence'
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
+import { chronomapsForPlace } from '@/lib/worldlab/chronomaps'
 import { isResonanceBuilding, meetingPlaces } from '@/lib/worldlab/meetingPlaces'
 import { worshipAt, type WorshipItem } from '@/lib/worldlab/worshipTypes'
 import VenueStatusLine from '@/app/earth/VenueStatusLine'
@@ -113,7 +114,7 @@ function MaterialLine({ item }: { item: { id: string; cost: number; footprint?: 
  */
 type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string; areaM2?: number; levels?: number; listed?: boolean; own?: boolean; entityId?: string; taxRate?: number; /** Reales Lokal (R-13): Lokalart und Ausbauwert im Preis */ venue?: string | null; fitOut?: number }
 /** Angebot für ein Flurstück (/api/game/parcel-offer) */
-type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; land?: { kind: string; label: string; potential: string[]; activity: string | null }; forest?: { stockM3: number; growthM3Year: number; harvestableM3: number; cleared: boolean; replanted: boolean; regrowsAt: string | null; replantFee: number }; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; partsOnly?: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
+type ParcelInfo = { id: string; buildingsKnown?: boolean; label: string; areaM2: number; usage: string | null; source?: string; land?: { kind: string; label: string; potential: string[]; activity: string | null }; forest?: { stockM3: number; growthM3Year: number; harvestableM3: number; cleared: boolean; replanted: boolean; regrowsAt: string | null; replantFee: number }; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; partsOnly?: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
 /** Vermessungsgebühr fürs Teilen und Zusammenlegen (wie app/api/game/parcel-offer) */
 const SURVEY_FEE = 200
 
@@ -141,7 +142,7 @@ export function panelLocation(panel: Panel, sites: WorldSite[], plots: WorldPlot
 type Buildable = { id: string; name: string; cost: number; footprint?: { widthM: number; depthM: number }; requirements?: { canBuild?: boolean; knowledgeOk?: boolean; creditsOk?: boolean; requiredUnlock?: string | null } }
 
 /** Die wichtigsten Gebäude, die alle Einwohner kennen: Eine Person führt den Spieler auch über größere Entfernung dorthin (31.10.2026). */
-const FAR_GUIDE_KINDS = new Set(['job_agency', 'bank', 'travel_agency', 'school', 'admin', 'spaceport_core', 'cafe', 'restaurant', 'bar', 'resonance_place', 'ssf_headquarters_sundern'])
+const FAR_GUIDE_KINDS = new Set(['job_agency', 'bank', 'travel_agency', 'immersion_studio', 'school', 'admin', 'spaceport_core', 'cafe', 'restaurant', 'bar', 'resonance_place', 'ssf_headquarters_sundern'])
 
 export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, onNote, presence = [], worship = [], onPeerGesture }: {
   /** W-16: eigene Geste an Mitspieler in der Nähe (über die Kartenanwesenheit) */
@@ -208,6 +209,23 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     return () => { stale = true }
   }, [parcelId, parcelVersion])
   const parcel = parcelId ? parcelInfo[parcelId] : undefined
+
+  // Gebäudedaten fehlen: Ortsdetail für die angeklickte Stelle holen, danach Angebot neu lesen (höchstens einmal je Flurstück).
+  const loadedFor = useRef(new Set<string>())
+  useEffect(() => {
+    if (!parcelId || !parcel || parcel.buildingsKnown !== false || loadedFor.current.has(parcelId) || panel.kind !== 'parcel') return
+    loadedFor.current.add(parcelId)
+    const at = panel.at
+    void (async () => {
+      try {
+        const { token } = await getSessionInfo()
+        if (!token) return
+        await fetch('/api/world-lab/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(at) })
+        engine?.reloadTiles?.()
+        setParcelVersion(value => value + 1)
+      } catch { /* bleibt gesperrt */ }
+    })()
+  }, [parcelId, parcel, panel])
 
   async function buyParcel() {
     if (!parcelId || buying) return
@@ -530,6 +548,13 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     engine.walkTo(target, withinM, () => setWalking(false))
   }
 
+  /** Mitgehen nach Zusage im Gespräch: bleibt bei der Person, bis sie am Ziel ist (06.11.2026). */
+  function follow(id: string) {
+    if (!engine) return
+    setWalking(true)
+    engine.followPerson(id, 3, () => setWalking(false))
+  }
+
   /**
    * W-15 (03.11.2026): Wer kommt mit hinein? Wer zu diesem Ort unterwegs ist, sonst wer
    * in den letzten fünf Minuten mit dem Spieler losgegangen ist und jetzt dicht bei ihm steht.
@@ -562,7 +587,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   function enter() {
     if (!own || !entry) return
     const companionId = companionFor([own.id, own.source])
-    setPanel({ kind: 'inside', request: { entityId: own.id, buildingTypeId: own.typeId, buildingName: own.name, kind: entry.kind }, companionId })
+    setPanel({ kind: 'inside', request: { entityId: own.id, buildingTypeId: own.typeId, buildingName: own.name, kind: entry.kind, at: { lat: own.lat, lon: own.lon } }, companionId })
   }
 
   async function talk() {
@@ -627,7 +652,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           engine.sendPerson(person.id, target, seconds)
           setVisits(current => ({ ...current, [person.id]: String(action.targetRef) }))
           if (landmark) setVisitNames(current => ({ ...current, [String(action.targetRef)]: landmark.name }))
-          if (action.playerFollows) { walkTo(() => engine.personAt(person.id), 3); setLedAt(current => ({ ...current, [person.id]: Date.now() })) }
+          if (action.playerFollows) { follow(person.id); setLedAt(current => ({ ...current, [person.id]: Date.now() })) }
         }
       } else if (action?.type === 'lead_walk') {
         // Die Person geht wirklich voraus (wie in der bisherigen Erdszene); wer folgt, bleibt dicht dahinter.
@@ -637,7 +662,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         engine.leadPerson(id, metres, seconds)
         setLeading(current => ({ ...current, [id]: true }))
         setLedAt(current => ({ ...current, [id]: Date.now() }))
-        if (action.playerFollows) walkTo(() => engine.personAt(id), 3)
+        if (action.playerFollows) follow(id)
         // Danach geht sie wieder ihrer Wege.
         setTimeout(() => { engine.releasePerson(id); setLeading(current => { const next = { ...current }; delete next[id]; return next }) }, (seconds + 20) * 1000)
       }
@@ -769,6 +794,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           ? <><TravelAgency from={building.at} onBooked={trip => { setShowAgency(false); onTripBooked?.(trip) }} onDrive={(at, note) => { setShowAgency(false); engine?.jump(at); onNote?.(note) }}/><div className="row"><span/><button onClick={() => setShowAgency(false)}>Schließen</button></div></>
           : <div className="row"><span>Bahn und Flug auf der Erde, Linienflüge ins All.</span><button onClick={() => setShowAgency(true)}>Reise buchen …</button></div>)
         : <div className="row"><span>Hier kann man Reisen buchen – auf der Erde und ins All.</span></div>)}
+      {own?.typeId === 'immersion_studio' && <p className="muted">Erlebnis-Studio: Pods für Zeitreisen, Spielwelten wie Endia und Abstraktes.</p>}
       {own && /^spaceport/.test(own.typeId) && (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
         ? (showTickets
           ? <><TicketCounter compact/><div className="row"><span/><button onClick={() => setShowTickets(false)}>Schließen</button></div></>
@@ -840,6 +866,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         ? <><div className="row"><span>{room === 'cemetery' ? 'Du stehst am Friedhof.' : 'Du stehst davor.'}</span><button onClick={() => enterLandmark(room, landmark, landmarkSource)}>{room === 'cemetery' ? 'Friedhof betreten' : 'Betreten'}</button></div>
           {room === 'cemetery' && landmark.tags.chapel_name && <div className="row"><span>Auf dem Friedhof: {landmark.tags.chapel_name}</span><button onClick={() => enterLandmark('worship', { at: { lat: Number(landmark.tags.chapel_lat), lon: Number(landmark.tags.chapel_lon) }, name: landmark.tags.chapel_name, kind: 'place_of_worship', tags: { religion: 'christian', building: 'chapel' } }, landmark.tags.chapel_source || undefined)}>{landmark.tags.chapel_name} betreten</button></div>}</>
         : <div className="row"><span>{landmarkNear ? 'Ein eigener Innenraum für diesen Ort ist noch nicht gebaut.' : away(landmarkDistance, landmark.at)}</span>{!landmarkNear && <button onClick={() => walkTo(() => landmark.at, LANDMARK_ENTER_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button>}</div>}
+      {chronomapsForPlace(landmark.name).map(map => <div className="row" key={map.id}><span>Zeitreise: {map.title} ({map.era})</span><button disabled>{map.status === 'playable' ? 'Im Erlebnis-Studio buchen' : 'In Vorbereitung'}</button></div>)}
       <span className="source">Quelle: OpenStreetMap</span>
     </>}
     {panel.kind === 'travel' && <>
@@ -854,7 +881,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       {parcel && <>
         <dl>
           <dt>Eigentümer</dt><dd>{parcel.own ? 'du' : parcel.owned ? (parcel.seller ?? 'ein anderer Spieler') : (parcel.seller ?? 'Gemeinde')}</dd>
-          <dt>Gebäude</dt><dd>{parcel.buildings.length ? parcel.buildings.map(item => item.name).join(', ') : 'keine'}</dd>
+          <dt>Gebäude</dt><dd>{parcel.buildings.length ? parcel.buildings.map(item => item.name).join(', ') : parcel.buildingsKnown === false ? 'noch unbekannt (Daten werden geladen)' : 'keine'}</dd>
           {parcel.residents > 0 && <><dt>Bewohner</dt><dd>{parcel.residents} – bleiben und zahlen Miete an dich</dd></>}
           {parcel.rentPerInterval > 0 && <><dt>Miete</dt><dd>{credits(parcel.rentPerInterval)} je Abrechnung</dd></>}
           {parcel.forSale && <><dt>Preis</dt><dd><b>{credits(parcel.price ?? 0)}</b></dd></>}

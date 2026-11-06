@@ -8,6 +8,15 @@ export interface PlayerIdentityKnowledge {
   knownName?: string | null
 }
 
+/**
+ * Kennt der Spieler jemanden, kennt er dessen wirklichen Namen – den aktuellen aus `people`,
+ * nicht die beim Kennenlernen gespeicherte Kopie (06.11.2026: „Victor Chen“ war in `people`
+ * längst „Viktor Gellert“, angezeigt wurde weiter der alte Name).
+ */
+export function currentKnownName(storedKnownName: string | null | undefined, personDisplayName: string | null | undefined): string | null {
+  return personDisplayName?.trim() || storedKnownName?.trim() || null
+}
+
 export function perceivedPersonLabel(input: PlayerIdentityKnowledge): string {
   if (input.state === 'known' && input.knownName?.trim()) return input.knownName.trim()
   if (input.state === 'inferred' && input.inferredName?.trim()) return input.inferredName.trim()

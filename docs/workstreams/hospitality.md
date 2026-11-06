@@ -241,6 +241,23 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Bei echten Notfällen verweist das Personal auf 110, 112 und 116 117; keine Diagnosen.
   - Tests; im Browser geprüft. Requests R-34, W-20, P-4.
 
+- **06.11.2026 – Innenräume in 2,5D:**
+  - Thomas: Auf Handys ist das Spiel derzeit praktisch nicht spielbar, deshalb zuerst Browser mit großem Bildschirm. Zum Entwurf (Artefakt „Raumwerkstatt“): „sieht schon super aus, sollten wir so umsetzen, mit Namen, gerne auch etwas futuristischer“.
+  - **Umsetzung:**
+    - Der Innenraum-Motor stellt den Raum mit CSS-3D schräg (orthografisch wie die Karte).
+    - Zwei Rückwände mit Leuchtkante in der Farbe der Raumart (Nachtclub Magenta, Café Bernstein, Polizei Blau, Praxis und Krankenhaus Türkis …), Fenster in der Nordwand.
+    - Möbel mit Höhe und Seiten, dazu Schatten auf dem Boden.
+    - Figuren, Namen, Knöpfe und Pflanzen stehen aufrecht zur Kamera; der Browser sortiert die Tiefe selbst.
+    - Namen stehen jetzt immer über allen Figuren.
+  - **Bedienung:**
+    - Neu: Boden anklicken zum Gehen.
+    - WASD gehen nach Bildschirmrichtung.
+    - Einrichten per Ziehen rechnet über drei Bezugspunkte zurück in Raumkoordinaten.
+  - Die Spiellogik bleibt unverändert. In der Kopfzeile lässt sich auf die Draufsicht zurückschalten (wird im Browser gemerkt).
+  - Gilt für alle Räume des Motors: Lokale, Bank, Agentur, Reisebüro, Wache, Feuerwache, Praxis, Krankenhaus.
+  - Im Browser geprüft (Metropol, Café, Wache; Laufen per Klick, Tasten, Einrichten).
+  - **Später** (Thomas): eine 80er-/90er-Fassung für die Zeitreise in VR.
+
 ## Gestellte Requests
 
 - R-1 an Bevölkerung und Ökonomie: Bar und Restaurant baubar machen.

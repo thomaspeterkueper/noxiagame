@@ -26,9 +26,9 @@ export const CORROBORATION_SOURCES = 2
 const DAY_MS = 86_400_000
 
 const LEARNABLE_TOPICS: ReadonlySet<ConversationTopic> = new Set(['world_news', 'orientation', 'work_money', 'travel', 'other'])
-const QUESTION_START = /^(wer|was|wo|wie|wann|warum|wieso|weshalb|welche\w*|kannst|koennt\w*|hast|habt|gibt es|gibts|ist|sind|bist|weisst|wisst|darf|duerfen|soll|sollen|willst|wollt|magst)\b/
+const QUESTION_START = /^(wer|was|wo|wie|wann|warum|wieso|weshalb|welche\w*|kannst|koennt\w*|hast|habt|gibt es|gibts|ist|sind|bist|weisst|wisst|darf|duerfen|soll|sollen|willst|wollt|magst|who|what|where|how|when|why|which|can|could|do|does|did|is|are|have|has|will|would|should)\b/
 // Aussagen über den Sprecher oder das Gegenüber gehören ins persönliche Gedächtnis, nicht ins Weltwissen.
-const PERSONAL = /\b(ich|mir|mich|mein\w*|du|dir|dich|dein\w*|wir|uns|unser\w*|ihr|euch|euer\w*)\b/
+const PERSONAL = /\b(ich|mir|mich|mein\w*|du|dir|dich|dein\w*|wir|uns|unser\w*|ihr|euch|euer\w*|i|me|my|mine|you|your|yours|we|us|our|ours)\b/
 const PLACEHOLDER = /\[(Kontakt|Link|Nummer|Name) entfernt\]/
 
 export type LearnableClaim = { claim: string; words: string[] }
@@ -36,7 +36,8 @@ export type LearnableClaim = { claim: string; words: string[] }
 /** Wird diese Äußerung zu etwas, das die Figur als Gehörtes behalten darf? */
 export function learnableClaim(text: string, topic: ConversationTopic, risk: RiskAssessment): LearnableClaim | null {
   if (!LEARNABLE_TOPICS.has(topic)) return null
-  if (risk.level !== 'none') return null
+  // Nur aus Sätzen, die der Schutzfilter lesen kann (06.11.2026): Deutsch und Englisch.
+  if (risk.level !== 'none' || (risk.language !== 'de' && risk.language !== 'en' && risk.language !== 'none')) return null
   const stripped = stripContactData(text).replace(/\s+/g, ' ').trim()
   if (PLACEHOLDER.test(stripped)) return null
   if (stripped.includes('?')) return null
