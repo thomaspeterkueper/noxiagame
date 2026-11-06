@@ -101,6 +101,25 @@ Thomas: „ja, auch auf Miete sollte es Steuern geben“ – Antwort auf Frage 2
 - **Ertrag der Mieten:** etwa 750 Cr je Woche auf dem Mars, je etwa 190 Cr auf Mond und Phobos.
 - **Nicht geändert:** Die kostenfreien Wohnungen auf der Erde (15) bleiben, bis Thomas anders entscheidet.
 
+## Entschieden (06.11.2026, zweite Runde) – gebaut, Anwendung in der Datenbank steht aus
+
+- **Frage 1 – Förderabgabe:** „ein flexibler Wert, vielleicht entscheiden manche Orte später anders.“
+  - `colony_settings.extraction_tax_rate` je Ort, Start 15 %.
+  - Gebucht mit dem Erlös der Anlage als Transfer Firma → öffentliche Kasse (`lib/game/tick.ts` 3.12.0).
+- **Frage 3 – Bedienung:** „ja, wobei man statt Menschen auch Roboter kaufen kann, jeder muss selbst entscheiden, was sich mehr lohnt.“
+  - Eisbohrer (je 4), Recycler und Gruben brauchen einen Menschen oder einen Roboter. Unbedient stehen sie still – ab Tick 2968, also mit einer Woche Vorlauf, für Anlagen von Firmen.
+  - Roboter: 4 000 Cr Kauf, 25 Cr Wartung je Tag, beides an die Werkstatt der Siedlung (öffentliche Kasse).
+  - Firmen rechnen über 60 Tage. Bei 75 Cr Lohn ist der Mensch billiger (4 500 gegen 5 500 Cr). Findet sich 7 Tage niemand, kaufen sie einen Roboter.
+  - Datenkorrektur: Firmenanlagen nicht mehr als Spielereigentum geführt.
+  - Gebaut: `lib/game/economy/facilityOperation.ts`, Migration `20261106020000_extraction_tax_and_facility_operation.sql`.
+- **Frage 5 und Miete:** „Wohnungen sollten Miete kosten, die Höhe richtet sich nach dem Kaufpreis des Gebäudes. Bei privaten Objekten legt der Besitzer das fest.“ Dazu die Auswahl „Habitate teurer“.
+  - Mietsatz je Ort `colony_settings.rent_yield_30d`, Start 11 % des Kaufpreises je Wohnung und 30 Tage.
+  - Habitate kosten 16 000 Cr statt 2 000 Cr, also rund 220 Cr Miete je Wohnung.
+  - Die kostenfreien Wohnungen der Erde werden vermietet, mit einer Woche Vorlauf.
+  - Private Besitzer setzen die Miete selbst (`app/api/game/dwelling-rent`, `noxia_set_dwelling_rent`).
+  - Migration `20261106030000_rent_from_purchase_price.sql`.
+- **Noch offen:** Spieler-Anlagen (Wahl Mensch/Roboter im Spiel) und eine Oberfläche, in der Besitzer die Miete setzen.
+
 ## Nachtrag zum Befund (06.11.2026)
 
 - **Die Erde gerät selbst ins Minus.** In der letzten Woche nahm ihre öffentliche Kasse 786 Cr ein und zahlte 9 955 Cr Lohn. Die Kasse fiel von 20 500 auf 11 357 Cr; in etwa neun Tagen ist sie leer. Ein Fiskaltransfer von der Erde in die Kolonien (Frage 4, zweite Möglichkeit) scheidet damit aus. Die Erde braucht selbst eine Antwort.
@@ -108,12 +127,12 @@ Thomas: „ja, auch auf Miete sollte es Steuern geben“ – Antwort auf Frage 2
 
 ## Entscheidungsfragen an Thomas
 
-1. **Förderabgabe (A1):** ja? Satz 15 % oder anders?
+1. ~~Förderabgabe (A1)~~ – **entschieden 06.11.2026:** je Ort einstellbar, Start 15 %.
 2. ~~Miete in staatlichen Wohnungen (A2) und Konsumsteuer 19 % (A3)~~ – **entschieden 06.11.2026**, dazu Mietsteuer 10 %.
-3. **Private Stellen an Förderanlagen (B1)** und **Datenkorrektur (B2):** ja?
+3. ~~Private Stellen an Förderanlagen (B1/B2)~~ – **entschieden 06.11.2026:** Mensch oder Roboter, der Eigentümer entscheidet.
 4. **Anlaufhilfe (C):** ja? Höhe und Dauer wie vorgeschlagen? Emittent Solar Central Bank – die Kasse der Erde kommt nicht mehr in Frage (Nachtrag). Und: Soll die Anlaufhilfe auch die Erde einschließen?
 5. **Wasser ohne Käufer (D):** zuerst ausweisen (Weg 1)?
-6. **Neu – kostenfreie Wohnungen auf der Erde:** auch dort 200 Cr Miete?
+6. ~~Kostenfreie Wohnungen auf der Erde~~ – **entschieden 06.11.2026:** Miete nach Kaufpreis, private Besitzer legen sie fest.
 7. **Neu – Frachten:** Die Handelsfirma liefert seit 13 Tagen nichts. Soll ich klären, warum, und eine Mindestverbindung vorschlagen (zum Beispiel eine Fracht je Woche zu Mond und Mars)? Daran hängen Mitflug und Zuzug.
 
 ## Umsetzung nach Freigabe

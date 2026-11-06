@@ -1,5 +1,6 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
+// Aktualisiert: 06.11.2026 — Miete nach Kaufpreis, einmal am Tag angepasst (noxia_refresh_rents)
 // Aktualisiert: 06.11.2026 — Förderabgabe je Ort; Förderanlagen brauchen Bedienung (Mensch oder Roboter), run_facility_operation
 // Aktualisiert: 29.10.2026 — Zuzug in die Kolonien mit der Fracht (run_colony_immigration)
 // Aktualisiert: 29.10.2026 — Mitflug: wer angeheuert hat, geht an Bord, wenn eine Fracht ausläuft (noxia_crew_board_due)
@@ -835,10 +836,12 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const immigration = await runColonyImmigrationTick(supabase, tickNumber)
   // Bedienung der Förderanlagen (06.11.2026): Wartung, Menschen am Ort, sonst nach 7 Tagen Roboter
   const facilityOperation = await runFacilityOperationTick(supabase, tickNumber)
+  // Miete nach Kaufpreis (06.11.2026): laufende Verträge einmal am Tag an die Regel anpassen
+  const rents = tickNumber % 24 === 0 ? await supabase.rpc('noxia_refresh_rents', { p_tick: tickNumber }).then(r => r.error ? { ok: false } : r.data) : { skipped: true }
   const landValues = await runLandValueTick(supabase, locationSnapshot ?? [])
   // Wünsche und Gebete (29.10.2026): einordnen, Figuren wünschen sich, was fehlt
   const wishes = await runWishTick(supabase, tickNumber)
-  return { tickNumber, crew, immigration, facilityOperation, wishes, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
+  return { tickNumber, crew, immigration, facilityOperation, rents, wishes, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {
