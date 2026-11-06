@@ -1,8 +1,8 @@
 'use client'
 
 // app/world-lab/WorldLab.tsx
-// Aktualisiert: 06.11.2026 — Buslinien mit Fahrplan laden (/api/world-lab/bus); Eigenes Auto geparkt auf der Karte (useVehicle → setOwnVehicle); Personen mit Auto fahren ihren Arbeitsweg sichtbar; 06.11.2026 — Fahrzeug: Ankunftsmeldung nach „Hinfahren“ (onNote an WorldPanels)
-// Version:      1.2.0
+// Aktualisiert: 06.11.2026 — Auto in der Präsenz an Mitspieler (fahrend/geparkt); Buslinien mit Fahrplan laden (/api/world-lab/bus); Eigenes Auto geparkt auf der Karte (useVehicle → setOwnVehicle); Personen mit Auto fahren ihren Arbeitsweg sichtbar; 06.11.2026 — Fahrzeug: Ankunftsmeldung nach „Hinfahren“ (onNote an WorldPanels)
+// Version:      1.3.0
 // Weltkarte „eine Welt“ mit PixiJS – eigene Seite /world-lab und im Spiel
 // neben der bisherigen Erdszene. Personen, Ansprechen und Betreten in
 // WorldPanels.tsx (immer nur eine Tafel offen).
@@ -807,9 +807,10 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const myLook = useMyLook().look
   useEffect(() => { engineReady?.setPlayerLook(myLook) }, [engineReady, myLook])
   // W-16: andere Spieler in der Nähe (Realtime je Kartenzelle, nichts gespeichert); während einer Reise nicht
-  const mapPresence = useMapPresence(hud && !trip ? { lat: hud.lat, lon: hud.lon } : null, me, myLook)
+  const myVehicle = useMemo(() => ownVehicle ? { driving: hud?.driving === true, at: ownVehicleAt } : null, [ownVehicle, hud?.driving, ownVehicleAt])
+  const mapPresence = useMapPresence(hud && !trip ? { lat: hud.lat, lon: hud.lon } : null, me, myLook, myVehicle)
   useEffect(() => {
-    engineReady?.setPeers(mapPresence.peers.map(peer => ({ id: peer.profileId, name: peer.name, at: { lat: peer.lat, lon: peer.lon }, look: peer.look, emote: peer.emote?.text ?? null })))
+    engineReady?.setPeers(mapPresence.peers.map(peer => ({ id: peer.profileId, name: peer.name, at: { lat: peer.lat, lon: peer.lon }, look: peer.look, emote: peer.emote?.text ?? null, vehicle: peer.vehicle })))
   }, [engineReady, mapPresence.peers])
   const peerGesture = useCallback((text: string) => { mapPresence.gesture(text); engineReady?.playerEmote(text) }, [mapPresence, engineReady])
   // W-18: Zeichen über Lokalen mit laufender oder heute beginnender Veranstaltung (minütlich neu)

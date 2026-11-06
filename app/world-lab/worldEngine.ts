@@ -1,6 +1,6 @@
 // app/world-lab/worldEngine.ts
-// Aktualisiert: 06.11.2026 — Busse nach Fahrplan auf OSM-Buslinien (setBusLines, busAt); Echter Verkehr: Personen mit Auto fahren ihren Arbeitsweg sichtbar über die Straßen; eigene Fahrt als Fahrt (driveTo) statt Sprung; geparktes eigenes Auto (setOwnVehicle)
-// Version:      1.2.0
+// Aktualisiert: 06.11.2026 — Autos anderer Spieler (fahrend und geparkt) aus der Präsenz; Busse nach Fahrplan auf OSM-Buslinien (setBusLines, busAt); Echter Verkehr: Personen mit Auto fahren ihren Arbeitsweg sichtbar über die Straßen; eigene Fahrt als Fahrt (driveTo) statt Sprung; geparktes eigenes Auto (setOwnVehicle)
+// Version:      1.3.0
 // Prototyp „eine Welt“ mit PixiJS – die Zeichenmaschine ohne React.
 //
 // WorldLab.tsx stellt nur Bühne und Anzeige; Kacheln, NOXIA-Gebäude und Bilder
@@ -43,7 +43,9 @@ export type WorldRailLine = { points: GeoPoint[]; lengthM: number; station: { na
 export type WorldPlot = { source: string; own: boolean; name: string; lat: number; lon: number; w: number; d: number; rotation: number; /** Zeitpunkt des Abrisses (Zeitregler) */ clearedAt?: string }
 export type Hud = { frame: FrameSummary; rebuildsPerS: number; here: { loaded: boolean; blocks: number; built: boolean }; tiles: number; loading: number; blocks: number; lat: number; lon: number; near: string; zoom: number
   /** Gezeigter Weg zum Ziel: Länge und ob er dem Straßennetz folgt. */
-  route: { lengthM: number; viaRoads: boolean } | null }
+  route: { lengthM: number; viaRoads: boolean } | null
+  /** Spielfigur sitzt gerade im eigenen Auto (für die Präsenz an Mitspieler). */
+  driving: boolean }
 
 export interface WorldSettings {
   /** Kantenglättung (MSAA). Messschalter: ?aa=0 */
@@ -198,7 +200,7 @@ export interface WorldEngine {
   /** W-17: Aussehen der eigenen Figur (Kiesel, wie in den Innenräumen). */
   setPlayerLook: (look: KieselLook) => void
   /** W-16: Mitspieler in der Nähe (ersetzt die bisherige Liste); `emote` erscheint als kurze Blase. */
-  setPeers: (peers: Array<{ id: string; name: string; at: GeoPoint; look: KieselLook | null; emote?: string | null }>) => void
+  setPeers: (peers: Array<{ id: string; name: string; at: GeoPoint; look: KieselLook | null; emote?: string | null; /** Auto des Mitspielers: fährt gerade, oder steht geparkt bei `at`. */ vehicle?: { driving: boolean; at: GeoPoint | null } | null }>) => void
   /** Wo ein Mitspieler gerade steht. */
   peerAt: (id: string) => GeoPoint | null
   /** Kurze Blase über der eigenen Figur (eigene Geste, z. B. „winkt“), verschwindet nach 4 s. */
@@ -1756,7 +1758,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
 
   // ── Mitspieler (W-16) ───────────────────────────────────────────────
   // Lage kommt über Realtime etwa jede Sekunde; die Figur gleitet dorthin, statt zu springen.
-  type Peer = { id: string; name: string; figure: Container; kiesel: KieselState; label: InstanceType<typeof PIXI.Text>; x: number; y: number; tx: number; ty: number; bubble?: Container; emote?: string | null }
+  type Peer = { id: string; name: string; figure: Container; kiesel: KieselState; label: InstanceType<typeof PIXI.Text>; x: number; y: number; tx: number; ty: number; bubble?: Container; emote?: string | null; /** Auto: fährt (dann Auto statt Figur) oder steht geparkt an carAt */ driving?: boolean; carAt?: { x: number; y: number } | null; car?: PixiGraphics; heading?: { ux: number; uy: number } }
   const peers = new Map<string, Peer>()
   function emoteBubble(text: string) {
     const words = new PIXI.Text({ text, style: { fontFamily: 'system-ui, sans-serif', fontSize: 24, fontStyle: 'italic', fill: 0x14324a } })
@@ -1771,9 +1773,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     labels.addChild(bubble)
     return bubble
   }
-  function setPeers(list: Array<{ id: string; name: string; at: GeoPoint; look: KieselLook | null; emote?: string | null }>) {
+  function setPeers(list: Array<{ id: string; name: string; at: GeoPoint; look: KieselLook | null; emote?: string | null; vehicle?: { driving: boolean; at: GeoPoint | null } | null }>) {
     const keep = new Set(list.map(peer => peer.id))
-    for (const [id, peer] of peers) if (!keep.has(id)) { peer.figure.destroy({ children: true }); peer.label.destroy(); peer.bubble?.destroy(); peers.delete(id) }
+    for (const [id, peer] of peers) if (!keep.has(id)) { peer.figure.destroy({ children: true }); peer.label.destroy(); peer.bubble?.destroy(); peer.car?.destroy(); peers.delete(id) }
     for (const spec of list) {
       const target = toWorld(spec.at)
       let peer = peers.get(spec.id)
@@ -1795,6 +1797,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       if (peer.name !== spec.name) { peer.name = spec.name; peer.label.text = spec.name; (peer.figure as unknown as { pick: WorldPick }).pick = { type: 'peer', id: spec.id, name: spec.name } }
       const emote = spec.emote ?? null
       if (emote !== (peer.emote ?? null)) { peer.bubble?.destroy(); peer.bubble = emote ? emoteBubble(emote) : undefined; peer.emote = emote }
+      peer.driving = spec.vehicle?.driving === true
+      peer.carAt = spec.vehicle?.at ? toWorld(spec.vehicle.at) : null
     }
   }
   function movePeers(now: number, dt: number) {
@@ -1809,7 +1813,23 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       stepKiesel(peer.kiesel, foot, now)
       peer.label.position.set(foot.x, foot.y - 12)
       const near = Math.hypot(peer.x - player.x, peer.y - player.y) < 400
-      peer.figure.visible = near
+      // Auto des Mitspielers: fahrend an seiner Stelle (Auto statt Figur), sonst geparkt am Straßenrand
+      if (peer.driving || peer.carAt) {
+        if (!peer.car) { peer.car = new PIXI.Graphics(); peer.car.eventMode = 'none' }
+        let cx: number, cy: number, h = peer.heading ?? { ux: 0.71, uy: 0.71 }
+        if (peer.driving) {
+          if (d > 0.3) h = { ux: dx / d, uy: dy / d }
+          peer.heading = h
+          cx = peer.x; cy = peer.y
+        } else {
+          const side = roadsidePoint(peer.carAt!)
+          if (side) { h = { ux: side.ux, uy: side.uy }; cx = side.x + -side.uy * 2.6; cy = side.y + side.ux * 2.6 } else { cx = peer.carAt!.x; cy = peer.carAt!.y }
+        }
+        const carNear = Math.hypot(cx - player.x, cy - player.y) < 450
+        peer.car.visible = carNear
+        if (carNear) { drawVehicle(peer.car, cx, cy, h.ux, h.uy, PRIVATE_CAR, 0x3d7cc9, 0xd0ccc4, Boolean(peer.driving)); placeDepth(peer.car, cx + cy + 2) }
+      } else if (peer.car) { peer.car.destroy(); peer.car = undefined }
+      peer.figure.visible = near && !peer.driving
       peer.label.visible = near && zoom >= 1.6
       if (peer.bubble) { peer.bubble.position.set(foot.x, foot.y - 16); peer.bubble.visible = near }
     }
@@ -2580,7 +2600,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       hudRebuilds = rebuilds
       const hereTile = loaded.get(tileKey(tileAt(geoToMerc(geo))))
       const here = { loaded: Boolean(hereTile?.done), blocks: hereTile?.data.blocks.length ?? 0, built: Boolean(hereTile?.data.areas.some(area => area.k === 'built' || area.k === 'garden')) }
-      options.onHud({ frame: stats.summary(), rebuildsPerS, here, tiles: loaded.size, loading: inFlight.size + building.length, blocks, lat: geo.lat, lon: geo.lon, near, zoom, route: routeInfo })
+      options.onHud({ frame: stats.summary(), rebuildsPerS, here, tiles: loaded.size, loading: inFlight.size + building.length, blocks, lat: geo.lat, lon: geo.lon, near, zoom, route: routeInfo, driving: autoWalk?.drive === true })
     }
     logicMs = performance.now() - logicStart
   })

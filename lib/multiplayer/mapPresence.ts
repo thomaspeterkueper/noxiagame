@@ -1,6 +1,8 @@
 'use client'
 
 // lib/multiplayer/mapPresence.ts
+// Aktualisiert: 06.11.2026 — Auto des Spielers in der Präsenz (fahrend/geparkt)
+// Version:      1.1.0
 // Andere Spieler auf der Weltkarte (W-16 Punkt 1, Thomas 04.11.2026: „andere Spieler
 // sollten gleichzeitig in der gleichen Welt … sein können“).
 // Wie `roomPresence.ts` über Supabase Realtime Presence, aber je Kartenzelle
@@ -25,6 +27,8 @@ export interface MapPeer {
   lon: number
   look: KieselLook | null
   emote: { text: string; at: number } | null
+  /** Auto: fährt gerade (Auto statt Figur) oder steht geparkt bei `at`; null ohne Auto. */
+  vehicle: { driving: boolean; at: { lat: number; lon: number } | null } | null
   at: number
 }
 
@@ -60,6 +64,7 @@ export function mapPeersFrom(states: Array<Record<string, Array<Partial<MapPeer>
         profileId: key, name: String(e.name ?? 'Spieler').slice(0, 24), lat: e.lat, lon: e.lon,
         look: e.look ? cleanPlayerLook(e.look, key) : null,
         emote: e.emote && typeof e.emote.at === 'number' && nowMs - e.emote.at < 8000 ? { text: String(e.emote.text ?? '').slice(0, 30), at: e.emote.at } : null,
+        vehicle: e.vehicle && typeof e.vehicle === 'object' ? { driving: e.vehicle.driving === true, at: e.vehicle.at && Number.isFinite(e.vehicle.at.lat) && Number.isFinite(e.vehicle.at.lon) ? { lat: Number(e.vehicle.at.lat), lon: Number(e.vehicle.at.lon) } : null } : null,
         at,
       })
     }
@@ -105,13 +110,13 @@ function adapter(): MapPresenceAdapter {
  * Mitspieler auf der Karte um `here`. Die eigene Lage geht höchstens jede Sekunde und
  * nur bei mehr als 1 m Bewegung hinaus, sonst alle 30 s zum Erneuern.
  */
-export function useMapPresence(here: { lat: number; lon: number } | null, me: { profileId: string; name: string } | null, look: KieselLook | null) {
+export function useMapPresence(here: { lat: number; lon: number } | null, me: { profileId: string; name: string } | null, look: KieselLook | null, vehicle: MapPeer['vehicle'] = null) {
   const [peers, setPeers] = useState<MapPeer[]>([])
   const states = useRef(new Map<string, Record<string, Array<Partial<MapPeer>>>>())
   const handle = useRef<ReturnType<MapPresenceAdapter['join']> | null>(null)
   const emote = useRef<MapPeer['emote']>(null)
-  const latest = useRef({ here, look })
-  useEffect(() => { latest.current = { here, look } }, [here, look])
+  const latest = useRef({ here, look, vehicle })
+  useEffect(() => { latest.current = { here, look, vehicle } }, [here, look, vehicle])
   const sent = useRef<{ lat: number; lon: number; at: number } | null>(null)
   const ownCell = here ? cellKey(presenceCell(here.lat, here.lon)) : null
 
@@ -136,10 +141,11 @@ export function useMapPresence(here: { lat: number; lon: number } | null, me: { 
     const last = sent.current, now = Date.now()
     if (!force && last && now - last.at < 1000) return
     if (!force && last && metres(last, position) < 1 && now - last.at < 30_000) return
-    handle.current.track({ profileId: me.profileId, name: me.name, lat: Math.round(position.lat * 1e5) / 1e5, lon: Math.round(position.lon * 1e5) / 1e5, look: latest.current.look, emote: emote.current, at: now })
+    handle.current.track({ profileId: me.profileId, name: me.name, lat: Math.round(position.lat * 1e5) / 1e5, lon: Math.round(position.lon * 1e5) / 1e5, look: latest.current.look, emote: emote.current, vehicle: latest.current.vehicle, at: now })
     sent.current = { lat: position.lat, lon: position.lon, at: now }
   }, [me?.profileId, me?.name]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => { send(true) }, [vehicle?.driving, vehicle?.at?.lat, vehicle?.at?.lon]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { send() }, [here?.lat, here?.lon, look, send, ownCell]) // eslint-disable-line react-hooks/exhaustive-deps
   // Erneuern, Abstände neu rechnen und alte Gesten ausblenden
   useEffect(() => { const id = setInterval(() => { send(); recompute() }, 5000); return () => clearInterval(id) }, [send, recompute])

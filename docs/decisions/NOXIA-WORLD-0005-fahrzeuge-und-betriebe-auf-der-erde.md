@@ -1,6 +1,6 @@
 # NOXIA-WORLD-0005 – Fahrzeuge und Betriebe auf der Erde
 
-Aktualisiert: 06.11.2026 · Version 1.2.0
+Aktualisiert: 06.11.2026 · Version 1.3.0
 
 ## Entscheidung (Thomas, 26.10.2026 und 06.11.2026)
 
@@ -39,9 +39,11 @@ Hintergrundverkehr.
 - Das eigene Auto steht sichtbar geparkt am Straßenrand, wo es zuletzt abgestellt wurde (Kauf: vor dem Autohaus).
 - Busse fahren nach Fahrplan auf echten Buslinien aus OpenStreetMap (relation route=bus, mit Haltestellen): Aufenthalt an den Endhaltestellen (3 min), 15 s Halt je Haltestelle, rund 32 km/h, eigener Versatz je Linie. Linien werden je Gegend (0,1°-Raster) einmal geholt (`earth_bus_routes`, `earth_bus_cells`, Migration 20261106020000) und über `/api/world-lab/bus` geladen.
 
+- Autos anderer Spieler kommen über die Kartenpräsenz (Realtime, nichts gespeichert): wer fährt, ist als Auto statt Figur zu sehen; ein geparktes Auto steht am Straßenrand, wo es sein Besitzer abgestellt hat.
+
 ## Offen
 
-- Autos anderer Spieler über die Präsenz.
+- Fahrzeuge der Personensimulation aus der Datenbank statt aus der Kennung (Platzhalter).
 
 - Tiere (Tierbedarf, Tierarzt) als zweiter Betriebszweig.
 - Fahrzeug auf der Karte zeichnen; Fahrt als Bewegung statt Sprung.
