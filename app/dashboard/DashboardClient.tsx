@@ -416,6 +416,11 @@ function DashboardClientInner({ locations: initialLocations, prices, orders: ini
           <button onClick={() => setJourneyOpen(true)} style={{ background: 'transparent', color: T.blueDeep, border: `1px solid ${T.line}`, borderRadius: T.radius, padding: '0.45rem 0.8rem', fontSize: '0.74rem', fontWeight: 700, cursor: 'pointer', letterSpacing: '0.02em' }}>☰ Einweisung</button>
         </div>
         <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
+          <div data-testid="noxia-simulation-time" title="NOXIA ist eine Simulation mit realen und fiktiven Inhalten. Der Core-Tick ist kein Kalenderdatum." style={{ color: T.inkSoft, fontSize: '0.68rem', whiteSpace: 'nowrap', lineHeight: 1.35 }}>
+            <div style={{ fontWeight: 700, color: T.gold }}>Simulierte Welt</div>
+            <div>{Number.isSafeInteger(stats?.tickNumber) && stats.tickNumber >= 0 ? `Core-Tick ${stats.tickNumber.toLocaleString('de-DE')}` : 'Spielzeit nicht verfügbar'}</div>
+            <div style={{ fontSize: '0.59rem' }}>Reale & fiktive Inhalte</div>
+          </div>
           {([['Credits', `${credits.toLocaleString('de')} Cr`], [shipId ? 'Frachter' : 'Fracht (Spediteur)', `${used} / ${cargoMax} t`], ['Standort', `${LOC_ICON[location] ?? '🪐'} ${LOC_NAME[location] ?? location}`], ['Bevölkerung', totalPop.toLocaleString('de')]] as [string,string][]).map(([l, v], i) => <div key={i}><div style={{ fontSize: '0.58rem', color: T.inkFaint, textTransform: 'uppercase', letterSpacing: '0.12em', fontWeight: 600 }}>{l}</div><div style={{ fontWeight: 700, color: T.blue, fontSize: '0.88rem', marginTop: '2px' }}>{v}</div></div>)}
           <button onClick={() => setFoundingOpen(true)} style={{ background: 'none', border: `1px solid ${T.line}`, borderRadius: 8, padding: '0.3rem 0.75rem', cursor: 'pointer', color: T.inkSoft, fontSize: '0.78rem' }}>
             🚀 Gründen
