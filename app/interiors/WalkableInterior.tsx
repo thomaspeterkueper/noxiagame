@@ -46,6 +46,7 @@ import {
   entryAllows,
   companionPlace,
   type VenueLayout,
+  type VenueFurniture,
   type VenueSpot,
   type VenueService,
   type GuestMoment,
@@ -107,6 +108,8 @@ export interface InteriorContext {
   say:(text:string)=>void
   /** Wer mit dem Spieler gekommen ist und was draußen zuletzt ausgemacht wurde. */
   companion:{id:string;label:string;plan:string|null}|null
+  /** Hinsetzen: auf einen bestimmten Platz (Kennung) oder den nächsten freien. */
+  sit:(spotId?:string)=>void
 }
 /** Eine Tür an der Eingangswand neben dem Ausgang (z. B. WC): gehen, benutzen. */
 export interface SideDoor { x:number; y:number; label:string; goLabel:string; useLabel:string; use:(ctx:InteriorContext)=>void }
@@ -182,6 +185,31 @@ export interface InteriorFitting {
   floorMood?:string|null
   /** Zusätzliche Figuren ohne Personeneintrag, z. B. ein Roboter (Kennung „robot:…“). */
   extraResidents?:ColonyResident[]
+  // ── Ein Motor für alle Räume (06.11.2026): was Bibliothek, Gotteshaus, Friedhof … brauchen ──
+  /** Zusätzliche CSS-Klasse des Raums (z. B. „lm“ für Orte mit eigener Möbelart). */
+  roomClass?:string
+  /** Draußen (Friedhof): keine Rückwände. */
+  outdoor?:boolean
+  /** Name des Bereichs in der Tafel statt des Raums aus der Vorlage. */
+  roomName?:string
+  /** Bodenflächen und Lichtkegel unter den Möbeln. */
+  floorLayer?:ReactNode
+  /** Was in einem Möbel liegt oder steht (Buchrücken, Zettel, Kerzen). */
+  furnitureDressing?:(item:VenueFurniture)=>ReactNode
+  /** Über den Figuren: Flammen, Sprechblasen, getragene Dinge. */
+  overlay?:(ctx:InteriorContext)=>ReactNode
+  /** Feste Stelle einer Figur (geht, holt, sitzt in der Bank) – vor der Platzvergabe des Motors. */
+  figureAt?:(id:string)=>{x:number;y:number;posture:'sitting'|'standing';label?:string;spotId?:string}|null
+  /** Feste Begrüßung statt einer erzeugten Eröffnung. */
+  greeting?:(resident:ColonyResident)=>string|null
+  /** Nach jeder Antwort (Versprochenes ausführen, vorlesen lassen). */
+  onReply?:(resident:ColonyResident,reply:string,data:Record<string,any>,ctx:InteriorContext)=>void
+  /** Zusätze im Gespräch (Buchtipp, Leistungen, Tresen). */
+  talkPanel?:(ctx:InteriorContext)=>ReactNode
+  /** Knöpfe in der Kopfzeile (Ton, Musik). */
+  headerTools?:ReactNode
+  /** Ziele im Raum, zu denen die Person gehen kann (Gesprächs-API, worldAction). */
+  nearbyPlaces?:(self:VenueFigure)=>unknown[]
 }
 
 export type Props = {
@@ -499,7 +527,8 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
     return figures.filter(f=>f.roomRole==='staff'&&f.visibleToPlayer).map(f=>({id:f.id,d:Math.hypot(f.spot.x-seat.x,f.spot.y-seat.y)})).sort((a,b)=>a.d-b.d)[0]?.id??null
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[seat?.id,tablePhase,figures.length])
-  const served=useMemo(()=>waiterId&&seat?figures.map(f=>f.id===waiterId?{...f,spot:tableServiceSpot(layout,seat,tablePhase,seatedForS,f.spot)}:f):figures,[figures,waiterId,seat,tablePhase,seatedForS,layout])
+  const servedBase=useMemo(()=>waiterId&&seat?figures.map(f=>f.id===waiterId?{...f,spot:tableServiceSpot(layout,seat,tablePhase,seatedForS,f.spot)}:f):figures,[figures,waiterId,seat,tablePhase,seatedForS,layout])
+  const served=fitting.figureAt?servedBase.map(f=>{const at=fitting.figureAt!(f.id);return at?{...f,visibleToPlayer:true,spot:{...f.spot,id:at.spotId??f.spot.id,x:at.x,y:at.y,posture:at.posture,kind:at.posture==='sitting'?'seat' as const:f.spot.kind,label:at.label??f.spot.label}}:f}):servedBase
   const atTable=tablePhase==='at-table'
   const closed=loaded&&service==='closed'
   const shown=useMemo<ShownFigure[]>(()=>{
@@ -652,7 +681,7 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
   }
   const companionInfo=companion?{id:companion.id,label:personSceneLabel(companion),plan:[...companionHistory].reverse().find(line=>line.role==='assistant')?.content??null}:null
   const lastPlayerText=[...historyState].reverse().find(entry=>entry.role==='user')?.content??null
-  const ctx:InteriorContext={pos,seat,atTable,nearService,closed,service,selected,shown,figures:served,moments,joined,waiterId,tablePhase,nowMs,setStatus,setSelected,gates,openLearning,talkTo:resident=>{select(resident);if(!histories.current.get(resident.id)?.length)void converse(resident,true)},history:historyState,lastPlayerText,dancing:dancing&&onFloor,walkTo,say:text=>{if(selected)void converse(selected,false,text)},companion:companionInfo}
+  const ctx:InteriorContext={pos,seat,atTable,nearService,closed,service,selected,shown,figures:served,moments,joined,waiterId,tablePhase,nowMs,setStatus,setSelected,gates,openLearning,talkTo:resident=>{select(resident);if(!histories.current.get(resident.id)?.length)void converse(resident,true)},history:historyState,lastPlayerText,dancing:dancing&&onFloor,walkTo,say:text=>{if(selected)void converse(selected,false,text)},companion:companionInfo,sit:spotId=>{const s=spotId?layout.spots.find(x=>x.id===spotId):nearestFreeSeat(layout,figures,posRef.current);if(s)sitAt(s)}}
   const ctxRef=useRef<InteriorContext|null>(null)
   ctxRef.current=ctx
   useEffect(()=>{onContext?.(ctx)})
@@ -713,6 +742,8 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
     if(!self)return
     const text=opening?'':(said??message).trim().slice(0,400)
     const history=opening?[]:historyState
+    const fixed=opening?fitting.greeting?.(target)??null:null
+    if(fixed){setHistory([{role:'assistant' as const,content:fixed}]);fitting.onReply?.(target,fixed,{},ctxRef.current??ctx);return}
     setSending(true)
     try{
       const{token}=await getSessionInfo()
@@ -728,15 +759,17 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
           placeKnowledge:fitting.placeKnowledge,
           hearsay:fitting.hearsay(self),
           introduction:fitting.introduction(self),
+          nearbyPlaces:fitting.nearbyPlaces?.(self),
           history,
         }),
       })
       const data=await response.json().catch(()=>({}))
-      if(opening){if(response.ok&&data.reply)setHistory([{role:'assistant' as const,content:String(data.reply)}]);return}
+      if(opening){if(response.ok&&data.reply){setHistory([{role:'assistant' as const,content:String(data.reply)}]);fitting.onReply?.(target,String(data.reply),data,ctxRef.current??ctx)}return}
       const reply=response.ok&&data.reply?String(data.reply):'Die Person antwortet gerade nicht.'
       if(data.conversationEnded){setEndedBy(target.id);setStatus(personSceneLabel(target)+' will gerade nicht weiterreden.')}
       setHistory(current=>[...current,{role:'user' as const,content:text},{role:'assistant' as const,content:reply}].slice(-10))
       setMessage('')
+      if(response.ok)fitting.onReply?.(target,reply,data,ctxRef.current??ctx)
     }finally{setSending(false)}
   }
 
@@ -781,23 +814,24 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
 
   return <div className="walkable-interior">
     <NpcVisualStyles/>
-    <header><div><small>INNENRAUM · {fitting.noun.toUpperCase()}</small><b>{buildingName}</b><span>{iso?'Boden anklicken oder WASD':'WASD bewegen'} · Platz anklicken zum Hinsetzen · Person anklicken · ESC verlassen{fitting.headerNote?' · '+fitting.headerNote:''}</span></div><div className="head-actions"><button className="view-toggle" onClick={toggleView} title="Ansicht wechseln">{iso?'Draufsicht':'2,5D'}</button><button onClick={onClose}>← Verlassen</button></div></header>
+    <header><div><small>INNENRAUM · {fitting.noun.toUpperCase()}</small><b>{buildingName}</b><span>{iso?'Boden anklicken oder WASD':'WASD bewegen'} · Platz anklicken zum Hinsetzen · Person anklicken · ESC verlassen{fitting.headerNote?' · '+fitting.headerNote:''}</span></div><div className="head-actions">{fitting.headerTools}<button className="view-toggle" onClick={toggleView} title="Ansicht wechseln">{iso?'Draufsicht':'2,5D'}</button><button onClick={onClose}>← Verlassen</button></div></header>
     <main>
       <div ref={stageRef} className={iso?'iso-stage':'flat-stage'} onWheel={iso?e=>{if(e.ctrlKey)return;setZoom(zoom*(e.deltaY<0?1.08:1/1.08))}:undefined}>
       {iso&&<div className="zoom-ctl"><button onClick={()=>setZoom(zoom*1.15)} aria-label="Näher heran">+</button><button onClick={()=>setZoom(zoom/1.15)} aria-label="Weiter weg">−</button><button onClick={()=>setZoom(zoom>1.1?1:1.35)} aria-label="Ganzer Raum">{zoom>1.1?'Raum':'Nah'}</button></div>}
-      <div ref={roomRef} className={'room '+fitting.kind+(iso?' iso':'')+(fitting.furnish?.editing?' editing':'')} style={iso?{transform:isoTransform}:undefined} onPointerMove={fitting.furnish?.editing?moveDrag:undefined} onPointerUp={endDrag} onPointerCancel={endDrag}
+      <div ref={roomRef} className={'room '+fitting.kind+(fitting.roomClass?' '+fitting.roomClass:'')+(iso?' iso':'')+(fitting.furnish?.editing?' editing':'')} style={iso?{transform:isoTransform}:undefined} onPointerMove={fitting.furnish?.editing?moveDrag:undefined} onPointerUp={endDrag} onPointerCancel={endDrag}
         onClick={e=>{if((e.target as HTMLElement).closest('.npc,.peer,.player,.f,.seat-hit,.context,.item,.deco,.drag-table,.task-marker,button')||fitting.furnish?.editing||closed)return;const q=roomPoint(e);if(q.x>6&&q.y>6&&q.x<layout.width-6&&q.y<layout.height-6&&!isVenueBlocked(layout,q,VENUE_PLAYER_RADIUS))walkTo(q)}}>
         <div ref={el=>{pins.current[0]=el}} className="pin" style={{left:0,top:0}}/><div ref={el=>{pins.current[1]=el}} className="pin" style={{left:layout.width,top:0}}/><div ref={el=>{pins.current[2]=el}} className="pin" style={{left:0,top:layout.height}}/>
-        {iso&&<><div className="wall3d n"><i className="seam"/>{layout.windows.map((win,index)=><div key={index} className="win" style={{left:win.x,width:win.w}}/>)}{fitting.wallSign&&<div className="neon-sign" style={{left:signSpot(layout.windows)}}>{fitting.wallSign}</div>}</div><div className="wall3d e"><i className="seam"/></div></>}
+        {fitting.floorLayer}
+        {iso&&!fitting.outdoor&&<><div className="wall3d n"><i className="seam"/>{layout.windows.map((win,index)=><div key={index} className="win" style={{left:win.x,width:win.w}}/>)}{fitting.wallSign&&<div className="neon-sign" style={{left:signSpot(layout.windows)}}>{fitting.wallSign}</div>}</div><div className="wall3d e"><i className="seam"/></div></>}
         {layout.windows.map((win,index)=><div key={index} className="window" style={{left:win.x,width:win.w}}><i/><em/></div>)}
-        <div className="door"><small>AUSGANG</small></div>
+        <div className="door" style={{left:layout.exit.x-45}}><small>AUSGANG</small></div>
         {fitting.sideDoor&&<div className="door side" style={{left:fitting.sideDoor.x-30}}><small>{fitting.sideDoor.label}</small></div>}
         {decor?.rug&&<div className="rug" style={{left:decor.rug.x,top:decor.rug.y,width:decor.rug.w,height:decor.rug.h}}/>}
         {layout.entry&&!gateOpen&&!closed&&<><div className="rope" style={{left:layout.entry.zone.x,top:layout.entry.zone.y-3,width:layout.entry.zone.w,height:6}}/><div className="rope" style={{left:layout.entry.zone.x+layout.entry.zone.w-3,top:layout.entry.zone.y,width:6,height:layout.entry.zone.h}}/></>}
         {layout.danceFloor&&<div className={'dancefloor'+(closed?' off':'')+(fitting.floorMood?' mood-'+fitting.floorMood:'')} style={{left:layout.danceFloor.x,top:layout.danceFloor.y,width:layout.danceFloor.w,height:layout.danceFloor.h}}><i/></div>}
         {layout.furniture.filter(item=>item.kind==='table'||item.kind==='high-table').map(item=><div key={'lamp:'+item.id} className="lamp" style={{left:item.x+item.w/2-70,top:item.y+item.h/2-70}}/>)}
         {iso&&layout.furniture.filter(item=>item.kind!=='board').map(item=><div key={'sh:'+item.id} className="fshadow" style={{left:item.x-3,top:item.y-3,width:item.w+6,height:item.h+6}}/>)}
-        {layout.furniture.map((item,index)=><div key={item.id} className={'f '+item.kind+(item.kind==='chair'||item.kind==='stool'?' c'+(index%4):'')+(/^shelf-[a-z]+$/.test(item.id)?' '+item.id:'')} style={{left:item.x,top:item.y,width:item.w,height:item.h}}>{item.kind==='counter'&&fitting.counterDressing}{iso&&item.kind==='board'&&fitting.furnitureLabel(item.kind,service)&&<span className="board-text">{fitting.furnitureLabel(item.kind,service)}</span>}{iso&&item.kind!=='board'&&<><b className="fs"/><b className="fw"/></>}</div>)}
+        {layout.furniture.map((item,index)=><div key={item.id} className={'f '+item.kind+(item.kind==='chair'||item.kind==='stool'?' c'+(index%4):'')+(/^shelf-[a-z]+$/.test(item.id)?' '+item.id:'')} style={{left:item.x,top:item.y,width:item.w,height:item.h}}>{item.kind==='counter'&&fitting.counterDressing}{fitting.furnitureDressing?.(item)}{iso&&item.kind==='board'&&fitting.furnitureLabel(item.kind,service)&&<span className="board-text">{fitting.furnitureLabel(item.kind,service)}</span>}{iso&&item.kind!=='board'&&<><b className="fs"/><b className="fw"/></>}</div>)}
         {iso&&layout.furniture.filter(item=>item.kind==='table'||item.kind==='high-table'||item.kind==='chair'||item.kind==='stool').map(item=><div key={'leg:'+item.id} className={'leg '+item.kind} style={{left:item.x+item.w/2,top:item.y+item.h/2}}/>)}
         {iso&&!closed&&layout.furniture.filter(item=>item.kind==='table'||item.kind==='high-table').map(item=><div key={'pend:'+item.id} className="pendant" style={{left:item.x+item.w/2,top:item.y+item.h/2}}><i/><b/></div>)}
         {iso&&robot&&<div className={'serve-robot'+(robot.flip?' flip':'')+(robot.carrying?' carrying':'')} style={{left:robot.x,top:robot.y}} onClick={e=>{e.stopPropagation();setStatus('Der Servierroboter bringt Bestellungen vom Tresen an die Tische. Er weicht dir aus – einfach vorbeigehen.')}} title="Servierroboter"><span>Servierroboter</span><ServeRobotSVG/></div>}
@@ -829,15 +863,16 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
         {openSeats.map(spot=><button key={spot.id} className="seat-hit" style={{left:spot.x-11,top:spot.y-11}} title={'Hier hinsetzen – '+spot.label} aria-label={'Hinsetzen '+spot.label} onClick={()=>sitAt(spot)}/>)}
         {(fitting.markers??[]).map(marker=><div key={marker.key} className="task-marker" style={{left:marker.x-9,top:marker.y-30}} title={marker.label}><b>!</b><span>{marker.label}</span></div>)}
         {(()=>{const m=motion('me',pos.x,pos.y);return <div className={'player kiesel-player'+(seat?' sitting':'')+(dancing&&onFloor?' dancing':'')+(fitting.playerTag?' working':'')} style={{left:pos.x-19,top:pos.y-50}}><KieselFigure look={lookAtWork(myLook,me?.profileId??'player',fitting.playerTag?workKey:null)} dir={(()=>{const w=myPose?.with;if(!poseNow(myPose,nowMs)||!w)return m.dir;if(FOLLOW_JOINTS.has(myPose!.name))return m.moving?m.dir:'se';const q=w==='me'?null:peers.find(o=>o.profileId===w)??served.find(f=>f.id===w)?.spot;return q?faceTowards(pos,q):m.dir})()} pose={myPose&&FOLLOW_JOINTS.has(myPose.name)&&poseNow(myPose,nowMs)?sidePose(myPose.name as KieselPose,m.moving?m.dir:'se',pos,peers.find(o=>o.profileId===myPose.with)??served.find(f=>f.id===myPose.with)?.spot??null):!m.moving&&poseNow(myPose,nowMs)?poseNow(myPose,nowMs)!:seat?'sitzen':dancing&&onFloor?'tanzen':(fitting.playerTag&&!closed?(m.moving?(workPose(fitting.playerTag,'me',true)==='tragen'?'tragen':null):(nearService||/putz|reinig/i.test(fitting.playerTag)?workPose(fitting.playerTag,'me-',false):null)):null)??(m.moving?'gehen':'stehen')} moving={m.moving} title="Du"/><span>{fitting.playerTag?'Du · '+fitting.playerTag:'Du'}</span></div>})()}
+        {fitting.overlay?.(ctx)}
         {nearService&&!closed&&<div className="context hint" style={{left:layout.servicePoint.x-34,top:layout.servicePoint.y+14}}>{service==='self-service'?'AM AUTOMATEN':layout.servicePoint.label} · RECHTS</div>}
-        {(nearExit||closed)&&<button className="context exit" style={{left:42,top:420}} onClick={onClose}>{fitting.noun.toUpperCase()} VERLASSEN</button>}
+        {(nearExit||closed)&&<button className="context exit" style={{left:layout.exit.x-48,top:Math.min(layout.height-50,layout.exit.y+10)}} onClick={onClose}>{fitting.noun.toUpperCase()} VERLASSEN</button>}
         {fitting.sideDoor&&!closed&&nearSide&&<button className="context exit" style={{left:fitting.sideDoor.x-40,top:398}} onClick={()=>fitting.sideDoor!.use(ctx)}>{fitting.sideDoor.useLabel}</button>}
       </div>
       {iso&&closedInfo&&!fitting.furnish?.editing&&<div className="closed iso-closed"><b>{closedInfo.headline}</b><span>{closedInfo.detail}</span></div>}
       </div>
       <aside>
         <small>{fitting.noun.toUpperCase()} · {fitting.sectionLabel}</small>
-        {selected?<div className="portrait">{isRobot(selected)?<RobotPortrait size={64} title={selected.displayName}/>:<PersonPortrait id={selected.id} role={selected.assignments.find(item=>item.type==='work')?.roleCode??selected.activityState} appearance={selected.appearance} size={64} title={personSceneLabel(selected)}/>}<div><h3>{personSceneLabel(selected)}</h3>{selected.identityState==='known'&&<small>{selected.assignments.find(item=>item.type==='work')?.roleCode??selected.activityState}</small>}</div></div>:<h3>{layout.template.rooms.find(r=>r.id===layout.playerRoomId)?.name??'Raum'}</h3>}
+        {selected?<div className="portrait">{isRobot(selected)?<RobotPortrait size={64} title={selected.displayName}/>:<PersonPortrait id={selected.id} role={selected.assignments.find(item=>item.type==='work')?.roleCode??selected.activityState} appearance={selected.appearance} size={64} title={personSceneLabel(selected)}/>}<div><h3>{personSceneLabel(selected)}</h3>{selected.identityState==='known'&&<small>{selected.assignments.find(item=>item.type==='work')?.roleCode??selected.activityState}</small>}</div></div>:<h3>{fitting.roomName??layout.template.rooms.find(r=>r.id===layout.playerRoomId)?.name??'Raum'}</h3>}
         {selected&&selected.identityState!=='known'&&selected.observableDescription&&selected.observableDescription!==personSceneLabel(selected)&&<p className="desc">{selected.observableDescription}</p>}
         {!selected&&closedInfo&&<p>{closedInfo.detail}</p>}
         {!selected&&!closed&&!nearService&&<p>Du kannst dich frei im Raum bewegen. Personen im Raum wissen nur, was sie von ihrem Platz aus sehen und was du ihnen erzählst.{fitting.idleText?' '+fitting.idleText:''}</p>}
@@ -869,10 +904,10 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
             ?<div className="chat give"><input type="number" min={1} max={10000} value={giveAmount} onChange={e=>setGiveAmount(e.target.value)} aria-label="Credits geben"/><button disabled={giving} onClick={()=>void giveCredits()}>{giving?'…':'Geben'}</button><button onClick={()=>setGiveOpen(false)}>×</button></div>
             :<button className="give-open" onClick={()=>setGiveOpen(true)}>Credits geben …</button>)}
           {!isRobot(selected)&&(()=>{const f=served.find(x=>x.id===selected.id);if(!f||Math.hypot(f.spot.x-pos.x,f.spot.y-pos.y)>150)return null;const extra=fitting.jointContext?.(selected.id);return <div className="moves joint"><small>GEMEINSAM</small>{(Object.keys(JOINTS) as JointName[]).filter(a=>(a!=='paartanz'||layout.danceFloor)&&(a!=='troesten'||extra?.mourning)).map(a=><button key={a} onClick={()=>jointWithNpc(selected,a)}>{JOINTS[a].label}</button>)}</div>})()}
-          <div className="chat"><input value={message} maxLength={400} disabled={endedBy===selected.id} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder={endedBy===selected.id?'Gespräch beendet':'Kurze Antwort …'}/><button disabled={sending||!message.trim()||endedBy===selected.id} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div><ConversationReport npcId={selected.id} compact/>
+          <div className="chat"><input value={message} maxLength={400} disabled={endedBy===selected.id} onChange={e=>setMessage(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void talk()}} placeholder={endedBy===selected.id?'Gespräch beendet':'Kurze Antwort …'}/><button disabled={sending||!message.trim()||endedBy===selected.id} onClick={()=>void talk()}>{sending?'…':'Sprechen'}</button></div>{fitting.talkPanel?.(ctx)}<ConversationReport npcId={selected.id} compact/>
         </>}
         {!closed&&<div className="moves">
-          {!gateOpen&&layout.entry?<button onClick={()=>walkTo(layout.entry!.payAt)}>Zum Türsteher</button>:!nearService&&<button onClick={()=>walkTo(layout.servicePoint)}>{fitting.goToServiceLabel(service)}</button>}
+          {!gateOpen&&layout.entry?<button onClick={()=>walkTo(layout.entry!.payAt)}>Zum Türsteher</button>:!nearService&&fitting.goToServiceLabel(service)&&<button onClick={()=>walkTo(layout.servicePoint)}>{fitting.goToServiceLabel(service)}</button>}
           {fitting.sideDoor&&!nearSide&&entryAllows(layout,fitting.sideDoor,gateOpen)&&<button onClick={()=>walkTo({x:fitting.sideDoor!.x,y:fitting.sideDoor!.y},()=>fitting.sideDoor!.use(ctxRef.current??ctx))}>{fitting.sideDoor.goLabel}</button>}
           {onFloor&&!seat&&<button onClick={()=>{const next=!dancing;setDancing(next);setStatus(next?'Du tanzt.':'Du hörst auf zu tanzen.')}}>{dancing?'Aufhören':'Tanzen'}</button>}
           {seat?<button onClick={()=>setSeat(null)}>Aufstehen</button>:nextSeat&&<button onClick={()=>sitAt(nextSeat)}>Hinsetzen</button>}

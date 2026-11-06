@@ -15,6 +15,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: [
+      'lib/game/landmarks/venueLayout.test.ts',
       'lib/game/rounds/bubbles.test.ts',
       'lib/game/cognition/nightDreams.test.ts',
       'lib/game/worldNewsFeed.test.ts',

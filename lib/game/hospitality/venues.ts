@@ -32,6 +32,10 @@ export type VenueFurnitureKind =
   | 'table' | 'high-table' | 'counter' | 'chair' | 'stool' | 'shelf' | 'desk' | 'wall' | 'pass' | 'kitchen' | 'stairs' | 'lectern' | 'board' | 'dj-booth' | 'sofa'
   // Öffentliche Dienste (05.11.2026): Löschfahrzeug, Krankenbett, Spinde.
   | 'vehicle' | 'bed' | 'locker'
+  // Orte aus dem früheren Landmark-Raum (06.11.2026: ein Motor für alle Räume)
+  | 'shelf-low' | 'pew' | 'altar' | 'font' | 'candles' | 'armchair' | 'plant' | 'globe' | 'pinboard' | 'goods' | 'lift' | 'bench' | 'gate' | 'crate' | 'piano' | 'artwork'
+  | 'grave' | 'tap' | 'tree' | 'memorial'
+  | 'mihrab' | 'minbar' | 'ablution' | 'shoerack' | 'ark' | 'bimah' | 'eternal-light' | 'shrine' | 'bell' | 'diya' | 'buddha' | 'cushion' | 'incense' | 'gong' | 'stage'
 
 export interface VenueFurniture {
   id: string

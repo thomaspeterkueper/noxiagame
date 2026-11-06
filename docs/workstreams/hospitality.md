@@ -277,7 +277,22 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - Regale je nach Haus: Ordner auf Wache, Bank und Agentur, Zeitschriften im Wartezimmer der Praxis.
   - Löschfahrzeug mit Fahrerhaus, Scheiben, weißem Streifen, Rädern und Blaulicht.
   - Helle Empfangstresen in Praxis, Krankenhaus und Wache.
-  - **Offen:** Bibliothek, Laden, Gotteshäuser und die anderen Orte aus `LandmarkWalkableInterior` laufen noch über den alten, flachen Raum-Motor; sie in 2,5D zu bringen, ist ein eigener Schritt.
+- **06.11.2026 – Ein Motor für alle Räume:**
+  - Thomas: „wir sollten den älteren Raum oder generell unterschiedliche Raum-Motoren vermeiden und nur auf einer Version aufbauen, d. h. alles Alte umziehen“.
+  - **Umgezogen** auf `app/interiors/WalkableInterior.tsx`: Bibliothek, Kirche, Moschee, Synagoge, Hindu-Tempel, buddhistischer Tempel, Gemeindesaal, Begegnungsstätte, Laden, Werkstatt, ArtLounge (drei Geschosse), Gastraum und Friedhof.
+    - Damit gibt es dort jetzt auch 2,5D, Kiesel-Figuren, Mitspieler, Gesten, Raum-Chat, Zoom und Kamera.
+    - `app/earth/LandmarkWalkableInterior.tsx` ist nur noch die Einrichtung; Aufrufer und Props sind unverändert.
+  - **Erhalten:**
+    - Bibliothek: Stöbern an jedem Regal, Mitnehmen, Buchtipp. Die Bibliothekarin bringt Bücher an den Platz, liest mit, liest vor und sortiert ein; dazu der Lesegast.
+    - Gotteshäuser und Treffpunkte: Fürbitte, Bittgebet und Anliegen, Gottesdienstablauf nach echter Uhr, Predigt hören, offene Runde mit Sprechblasen, Kerzen.
+    - Friedhof: Gedenkort mit eigenen Kerzen, ruhige Gesprächsregeln mit Telefonseelsorge.
+    - Außerdem Stockwerke, Leistungen und Tresen-Einschub, „Gehe zu …“, Sprachausgabe und Musik.
+  - **Neue allgemeine Anschlüsse im Motor:**
+    - `figureAt` (feste oder gehende Figuren), `greeting` (feste Begrüßung), `onReply` (Versprochenes ausführen).
+    - `talkPanel`, `floorLayer`, `furnitureDressing`, `overlay`, `outdoor`, `roomName`, `roomClass`, `headerTools`, `nearbyPlaces`, `ctx.sit()`.
+    - Der Ausgang richtet sich nach `layout.exit`.
+  - Die Grundrisse werden umgerechnet (`lib/game/landmarks/venueLayout.ts`, mit Test: Start frei, alle Sitz- und Bereichspunkte erreichbar).
+  - **Nicht umgezogen:** Das Immersionsstudio (Dvārakā-Szenen) ist eine Erlebnisszene, kein begehbarer Raum; es bleibt, wie es ist.
   - Gilt für alle Räume des Motors: Lokale, Bank, Agentur, Reisebüro, Wache, Feuerwache, Praxis, Krankenhaus.
   - Im Browser geprüft (Metropol, Café, Wache; Laufen per Klick, Tasten, Einrichten).
   - **Später** (Thomas): eine 80er-/90er-Fassung für die Zeitreise in VR.
