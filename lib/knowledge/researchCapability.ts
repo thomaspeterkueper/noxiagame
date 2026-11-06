@@ -5,11 +5,17 @@ import type { KnowledgeProgress, UnlockId } from './types';
 import { getUnlockLabel } from './unlockRegistry';
 
 export type ResearchCapabilityId =
-  | 'ACT:NOX:RESEARCH:MAGNETOBIOLOGY-EXPERIMENT-DESIGN';
+  | 'ACT:NOX:RESEARCH:MAGNETOBIOLOGY-EXPERIMENT-DESIGN'
+  | 'ACT:NOX:RESEARCH:GOLD-TRANSMUTATION-DESIGN'
+  | 'ACT:NOX:RESEARCH:OPTOMECHANICS-EXPERIMENT-DESIGN';
 
 const REQUIRED_UNLOCK: Record<ResearchCapabilityId, UnlockId> = {
   'ACT:NOX:RESEARCH:MAGNETOBIOLOGY-EXPERIMENT-DESIGN':
     'UNL:NOX:research:magnetobiology-experiment-design',
+  'ACT:NOX:RESEARCH:GOLD-TRANSMUTATION-DESIGN':
+    'UNL:NOX:research:gold-transmutation-design',
+  'ACT:NOX:RESEARCH:OPTOMECHANICS-EXPERIMENT-DESIGN':
+    'UNL:NOX:research:optomechanics-experiment-design',
 };
 
 export type ResearchCapabilityCheck = {
