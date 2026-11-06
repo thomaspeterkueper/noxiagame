@@ -10,6 +10,7 @@ import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, 
 import { heightTint, terrainShade, type TileTerrainPart } from '@/lib/worldlab/terrain'
 import { shouldReanchor } from '@/lib/worldlab/reanchor'
 import { kieselDirFrom, kieselSVG, type KieselDir, type KieselLook } from '@/lib/figures/kiesel'
+import { hasSpires, roofRegion, ROOF_FACTOR } from '@/lib/worldlab/roofRegion'
 import { effectivePlaceKind, isTravelPlace } from '@/lib/worldlab/landmarks'
 import { DEFAULT_VIEW, placeHasFunction, type ViewOptions } from '@/lib/worldlab/viewOptions'
 import { ANCHOR_VISIBLE_MAX, COMMUTE_THRESHOLD_M, anchorSpread, commuteSeconds, distanceToNearestVertex, pathLength, shouldCommute, VISIBLE_WALK_MAX_M } from '@/lib/game/population/visibleMovement'
@@ -646,10 +647,12 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
           : { ...NOXIA_DEFAULT_LOOK, ...NOXIA_LOOKS[owner.typeId] }
     const eave = (look?.levels ?? block.l) * style.storeyM
     // Warme Breiten (Gujarat, Sahel, Tropen): Flachdächer statt roter Satteldächer, Tempel und Moscheen ohne Kirchturm (02.11.2026).
-    const warm = Math.abs(toGeo({ x: cx, y: cy }).lat) < 36
+    const geo = toGeo({ x: cx, y: cy })
+    const region = roofRegion(geo.lat, geo.lon)
+    const warm = !hasSpires(region)
     // Moschee: Nutzung b:mosque oder Wahrzeichen im Haus mit religion=muslim (Istanbul hat daneben echte Kirchen).
     const mosque = block.k === 'church' && (block.u === 'b:mosque' || landmarkIn({ cx, cy, hw, hd, cos, sin })?.tags.religion === 'muslim')
-    const roofM = mosque ? 0 : warm ? (block.k === 'church' ? 1.2 : 0) : style.roofM
+    const roofM = mosque ? 0 : warm ? (block.k === 'church' ? 1.2 : 0) : style.roofM * ROOF_FACTOR[region]
     // Solaranlagen, Schornstein (05.11.2026): nur auf realen Häusern ohne NOXIA-Dach.
     const ambientKey = block.i ?? (() => { const geo = toGeo({ x: cx, y: cy }); return geo.lat.toFixed(5) + ',' + geo.lon.toFixed(5) })()
     const plainRoof = !look?.roof && !mosque

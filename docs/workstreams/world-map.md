@@ -846,3 +846,8 @@ Thomas, 05.11.2026: „Brauchen wir Polizei? Feuerwehr, Krankenhaus?“ – „j
 3. Einsatzfahrzeuge auf der Karte, wenn Population Einsätze meldet (R-34): Streifenwagen, Löschfahrzeug, Rettungswagen auf dem Weg zum Ort.
 4. Auf Kolonie, Mars und Raumschiff statt Wache und Feuerwehr ein Sicherheitszentrum und eine Medizinstation.
 
+
+## Regionale Dachformen (06.11.2026)
+
+- `lib/worldlab/roofRegion.ts`: `roofRegion(lat, lon)` → flat | low | normal | steep. Flach: warme Breiten unter 36° (Gujarat, Sahel, Tropen), ohne Kirchturm. Flach geneigt (Faktor 0,45): Mittelmeerraum 35,5–46° N, 10° W–45° O (Spanien bis Istanbul). Normal: gemäßigte Breiten. Steil (1,2): ab 58°.
+- Moscheen unverändert (Flachdach, Kuppel, Minarette). Offen: Dachfarbe/Material je Region (Ziegel, Lehm, Schiefer).
