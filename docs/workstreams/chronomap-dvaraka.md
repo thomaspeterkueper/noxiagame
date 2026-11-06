@@ -217,3 +217,13 @@ Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?)
 - Eintritt: Gebäudeart `immersion_studio` hat jetzt einen Eintrag (`kind: 'immersion'`, „Studio betreten"); die Anfrage trägt die Lage (`at`), damit das Studio die Zeitreisen der Gegend kennt.
 - `app/earth/ImmersionStudioInterior.tsx`: Empfangshalle mit den Erlebnissen aus dem Register (Zeitreise / Spielwelt / Abstrakte Erfahrung) und „Pod beziehen". Im Pod dunkler Raum mit Einführungstext je Kategorie und „Aufwachen". Erlebnisse mit Status `planned` zeigen „In Vorbereitung"; sobald eines `playable` ist, startet der Pod dort die Welt (Übergabepunkt in dieser Datei).
 - Noch nicht: Personal am Empfang, Preis/Zeitverbrauch, Begleiter im Pod.
+
+## Studio: Empfang, Preise, gemeinsames Erleben (06.11.2026)
+
+- **Empfang:** Im Studio sitzt eine stabile Mitarbeiterfigur (Name aus `landmarkStaffName`), die mit einem Satz begrüßt (`receptionGreeting`). Noch ohne Dialog und ohne Laufweg.
+- **Preise** (`lib/game/immersion.ts`, Server rechnet): Zeitreise 90 Cr / 30 Min, Spielwelt 60 Cr / 45 Min, Abstraktes 30 Cr / 15 Min je Person. Zu zweit 15 % und ab drei Personen 25 % Rabatt je Kopf, höchstens 6 Pods je Gruppe.
+- **Gemeinsames Erleben:** Wer ein Erlebnis bucht, öffnet eine Gruppe (`party_id`). Andere im selben Studio sehen sie unter dem Erlebnis („Gemeinsam erleben mit …") und legen sich dazu; der Preis richtet sich nach der Gruppengröße zum Zeitpunkt der Buchung. Eine offene Sitzung je Spieler. Im Pod: „Aufwachen" beendet.
+- **Technik:** Tabelle `immersion_sessions`, Funktionen `noxia_start_immersion` / `noxia_end_immersion` (Migration `20261106110000_immersion_sessions.sql`, live, Trockenlauf ok), Route `/api/game/immersion`. Erlös geht als Studioerlös in die Koloniekasse der Erde (colony_ledger `payout`); die Weitergabe an öffentliche Dienste wie bei Tickets ist noch nicht verdrahtet.
+- **Bewusst gesperrt:** Gebucht werden kann nur, was `playable` ist; bis dahin gibt es kostenlos nur „Pod ansehen". Damit wird nichts verkauft, was es noch nicht gibt.
+- Nicht geprüft: die Buchung im echten Spiel (kein spielbares Erlebnis, daher keine Livebuchung); getestet sind Preislogik (Vitest), Typen und das SQL im Trockenlauf.
+- Noch offen: Begleiter-NPCs im Pod, Treffpunkt im Erlebnis selbst (gemeinsame Anwesenheit in der Welt), Weitergabe des Erlöses.

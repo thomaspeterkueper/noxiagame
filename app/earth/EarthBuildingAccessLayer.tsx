@@ -335,7 +335,7 @@ export default function EarthBuildingAccessLayer({
   }
 
   if (request.kind === 'immersion') {
-    return <ImmersionStudioInterior name={request.buildingName} at={request.at} onClose={onClose} />
+    return <ImmersionStudioInterior entityId={request.entityId} name={request.buildingName} at={request.at} onClose={onClose} />
   }
 
   if (request.kind === 'hospitality') {
