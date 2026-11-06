@@ -23,9 +23,9 @@ export interface Chronomap {
 
 export const CHRONOMAPS: Chronomap[] = [
   {
-    id: 'dvaraka-1600-bc', category: 'chronotrip', title: 'Dvārakā – die Stadt vor dem Bruch', era: 'um 1600 v. Chr.',
+    id: 'dvaraka-1600-bc', category: 'chronotrip', title: 'Dvārakā – die Stadt vor dem Bruch', era: 'um 1600 v. Chr. · erste Szene: die dritte Nacht',
     start: { lat: 22.2394, lon: 68.9678 }, placeNames: ['dvaraka', 'dwarka', 'hafen dvaraka'],
-    agencyArea: { center: { lat: 22.2394, lon: 68.9678 }, radiusM: 4000 }, status: 'planned',
+    agencyArea: { center: { lat: 22.2394, lon: 68.9678 }, radiusM: 4000 }, status: 'playable',
   },
   {
     id: 'dvaraka-grabung', category: 'site', title: 'Dvārakā – die Grabung', era: 'Gegenwart (2086)',

@@ -254,3 +254,12 @@ Thomas: Das Labor ist wichtig, besonders für Stationen jenseits der Erde: **Ana
 - **Geprüft** im Headless-Browser: Labor betreten, Basisanalyse zeigt Messung und Deutung, Raman im Feldlabor wird abgelehnt.
 - **Nicht gebaut:** Experimente, Proben an Stationslabors schicken, echte Freischaltungen (es gibt noch keine Einträge für Analysearten), Speichern der Befunde (sie gelten nur für die Sitzung).
 - **Request R-35** an „Bevölkerung und Ökonomie" (`population-economy.md`): Anbindung an den Forschungslauf, Freischaltungen, Experimente, Probenversand.
+
+## Erste Szene der Chronomap: die dritte Nacht (06.11.2026)
+
+Gebaut: `lib/worldlab/dvarakaNacht.ts` (+Test), `app/earth/DvarakaNachtScene.tsx`. Einstieg über das Erlebnis-Studio (Pod buchen, Kategorie Zeitreise); der Button am Ort verweist auf das Studio.
+
+- **Umfang:** Nur die dritte Nacht, Einstieg in der Pilgerherberge an der Südpforte. Elf Orte aus dem Lageplan (Kap. 3): Herberge, Bauholzlager, Wartungsgebäude, Gopals Werkstatt, Kristall-Schrein, Gasse der Weber, Werkstatt Kasyapa, Quergasse mit Brunnenreihe, Bäckergasse, Dhruvas Schreibstube, Stadtrat. Begehbar zu Fuß, in Gruppe mit sichtbaren Mitspielern.
+- **Kennzeichnung:** [F] „Rekonstruktion nach dem Buch“, [R] zeigt zusätzlich den Fundzettel der Grabung (G7, G9).
+- **Grundsatz:** Die Tafeln erzählen nur, was im Konzept aus dem Buch steht. Es gibt noch keine Gespräche und keine erfundenen Dialoge.
+- **Nicht gebaut:** Bruchtag, Bruch, Ende am Kai, Figuren mit Fahrplan, Eingreifen (Kap. 4), Spuren in der Gegenwart (Kap. 5), Fischerviertel, Hafen und die Orte östlich von x = 1020. Der Lageplan ist vorläufig, bis die Fakten aus dem Wissensgraphen (REQ-L3-000003) und der Buchtext-Aufarbeitung vorliegen.

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import { landmarkStaffName } from '@/lib/game/landmarks/interiors'
 import { immersionPrice, partyLabel, receptionGreeting } from '@/lib/game/immersion'
+import DvarakaNachtScene from './DvarakaNachtScene'
 import DvarakaGrabungScene from './DvarakaGrabungScene'
 import { experiencesAt, type Chronomap } from '@/lib/worldlab/chronomaps'
 
@@ -109,6 +110,7 @@ export default function ImmersionStudioInterior({ entityId, name, at, onClose }:
           <strong style={{ display: 'block', fontSize: 16, margin: '3px 0 8px' }}>{preview?.title ?? lyingOffer?.title ?? lying?.experience_id}</strong>
           <p>{INTRO[category]}</p>
           {lying?.experience_id === 'dvaraka-grabung' && <DvarakaGrabungScene partyId={lying.party_id} me={data?.me ?? null} onLeave={() => void post({ action: 'end' })} />}
+          {lying?.experience_id === 'dvaraka-1600-bc' && <DvarakaNachtScene partyId={lying.party_id} me={data?.me ?? null} onLeave={() => void post({ action: 'end' })} />}
           {preview && <p style={{ color: '#d8bd68' }}>Dieses Erlebnis ist noch in Vorbereitung. Der Pod bleibt dunkel, bis die Welt fertig ist.</p>}
           {lying && <p style={{ color: '#9fc6b2' }}>Sitzung läuft bis {new Date(lying.ends_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr{(data?.parties.find(party => party.partyId === lying.party_id)?.names.length ?? 1) > 1 ? ' · ihr liegt gemeinsam in einer Gruppe' : ''}.</p>}
           {error && <p style={{ color: '#e0a0a0' }}>{error}</p>}
