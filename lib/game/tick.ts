@@ -1,5 +1,6 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
+// Aktualisiert: 06.11.2026 — Linienfracht jede Woche (run_liner_sailings) und Anlaufhilfe für die Kolonien (run_colony_fund)
 // Aktualisiert: 06.11.2026 — Miete nach Kaufpreis, einmal am Tag angepasst (noxia_refresh_rents)
 // Aktualisiert: 06.11.2026 — Förderabgabe je Ort; Förderanlagen brauchen Bedienung (Mensch oder Roboter), run_facility_operation
 // Aktualisiert: 06.11.2026 — Träume im Nachtlauf (runDreamTick, NOXIA-LIVING-0016)
@@ -14,7 +15,7 @@
 //               zählt nicht mehr als Firmenbestand (wurde ein zweites Mal verkauft); Bau wird nur
 //               gebucht, wenn das Gebäude auf einer freien Kachel wirklich entsteht
 // Vorher:       09.10.2026 — Lagergrenzen (lib/game/storageCapacity.ts)
-// Version:      3.13.0
+// Version:      3.14.0
 
 import { gateProduction } from './production/inputGate'
 import {
@@ -718,6 +719,28 @@ export async function runFacilityOperationTick(supabase: SB, tickNumber: number)
   return data ?? { ok: true }
 }
 
+// Linienfracht (06.11.2026): Epona fährt einmal je Woche und Richtung, auch ohne Handelsware
+// (Migration 20261106140000). Muss vor dem Anheuern laufen, damit Crew an Bord geht.
+export async function runLinerSailingsTick(supabase: SB, tickNumber: number) {
+  const { data, error } = await supabase.rpc('run_liner_sailings', { p_tick: tickNumber })
+  if (error) {
+    console.error('runLinerSailingsTick failed', { tick: tickNumber, code: error.code })
+    return { sailings: 0 }
+  }
+  return data ?? { sailings: 0 }
+}
+
+// Anlaufhilfe (06.11.2026): Koloniegründungsfonds zahlt höchstens einmal je Woche die Lücke
+// im öffentlichen Haushalt, 8 Wochen abnehmend, mit Obergrenze (Migration 20261106150000).
+export async function runColonyFundTick(supabase: SB, tickNumber: number) {
+  const { data, error } = await supabase.rpc('run_colony_fund', { p_tick: tickNumber })
+  if (error) {
+    console.error('runColonyFundTick failed', { tick: tickNumber, code: error.code })
+    return { paid: 0 }
+  }
+  return data ?? { paid: 0 }
+}
+
 export async function runCrewBoardingTick(supabase: SB, tickNumber: number) {
   const { data, error } = await supabase.rpc('noxia_crew_board_due', { p_tick: tickNumber })
   if (error) {
@@ -834,6 +857,10 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const prices = await runPriceTick(supabase, tickNumber, locationSnapshot ?? [])
   const orders  = await runOrderTick(supabase, locationSnapshot ?? [])
   const bank      = await runBankInterestTick(supabase, tickNumber)
+  // Linienfracht (06.11.2026): vor dem Mitflug, damit die Linie Crew mitnimmt
+  const liner = await runLinerSailingsTick(supabase, tickNumber)
+  // Anlaufhilfe (06.11.2026): vor dem Zuzug, damit die öffentliche Kasse Stellen tragen kann
+  const colonyFund = await runColonyFundTick(supabase, tickNumber)
   // Mitflug (29.10.2026): nach dem Handel, damit frisch auslaufende Frachten Crew mitnehmen
   const crew = await runCrewBoardingTick(supabase, tickNumber)
   // Zuzug (29.10.2026): mit ankommender Fracht, wenn Wohnung und bezahlte Stelle frei sind
@@ -845,7 +872,7 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const landValues = await runLandValueTick(supabase, locationSnapshot ?? [])
   // Wünsche und Gebete (29.10.2026): einordnen, Figuren wünschen sich, was fehlt
   const wishes = await runWishTick(supabase, tickNumber)
-  return { tickNumber, crew, immigration, facilityOperation, rents, wishes, dreams, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
+  return { tickNumber, liner, colonyFund, crew, immigration, facilityOperation, rents, wishes, dreams, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {
