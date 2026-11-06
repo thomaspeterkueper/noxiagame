@@ -41,6 +41,10 @@
     {
       "path": "/api/cron/world-terrain",
       "schedule": "17 3 * * *"
+    },
+    {
+      "path": "/api/cron/player-presence",
+      "schedule": "* * * * *"
     }
   ]
 }
