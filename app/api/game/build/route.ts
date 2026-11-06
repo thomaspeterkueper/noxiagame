@@ -331,7 +331,11 @@ export async function GET(req: NextRequest) {
 
   if (action === 'sell') {
     const entityId = searchParams.get('entityId')
-    const mode = (searchParams.get('mode') ?? 'normal') as SaleMode
+    const requestedMode = searchParams.get('mode') ?? 'normal'
+    if (requestedMode !== 'normal' && requestedMode !== 'instant') {
+      return NextResponse.json({ error: 'Ungültiger Verkaufsmodus' }, { status: 400 })
+    }
+    const mode: SaleMode = requestedMode
     if (!entityId) return NextResponse.json({ error: 'Fehlende Entity ID' }, { status: 400 })
     const { data: entity } = await serviceClient.from('tile_entities').select('*').eq('id', entityId).eq('profile_id', user.id).in('entity_type', ['building', 'module']).single()
     if (!entity) return NextResponse.json({ error: 'Gebäude nicht gefunden oder gehört dir nicht' }, { status: 404 })
