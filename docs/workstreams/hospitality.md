@@ -495,6 +495,17 @@ Anlass: Thomas hat den Eindruck, dass Grok direkter antwortet und zu den Gesprä
 
 **Zu klären (Thomas):** xAI-Konto und Schlüssel anlegen; Inhaltsrahmen für Beleidigungen festlegen (z. B. bis wohin die Figur zurückgibt, ab wann sie das Gespräch beendet).
 
+### G-9 (Schauplatz-Chat „Der Duft der bleibt“, 06.11.2026): Innenraum für ein Wohnhaus – WG Krokusweg 10
+
+Ortskonzept mit Belegung: `docs/world/earth/friedrichsdorf-krokusweg-10-duft.md`. Gebraucht wird eine neue Raumart für ein privates, mehrgeschossiges Wohnhaus (Vorschlag `shared_house`), nach NOXIA-INTERIOR-0001 als Daten auf dem gemeinsamen Motor, mit Treppen wie bei der ArtLounge (`toLevel`).
+
+1. **Geschosse:** Keller (Kellerraum), EG (große Küche, Wohn- und Esszimmer, Gartenterrasse, Garten), 1. OG (drei Zimmer, innenliegendes Bad), DG (drei Zimmer, innenliegendes Bad, Dachterrasse). Terrasse im 1. OG am Zimmer der Chinesin auf der Gartenseite, Priyas Zimmer daneben ohne Terrasse, Zimmer des Deutschen zur Spielplatzseite.
+2. **Bäder ohne Fenster** mit Dusche und Wanne; eigene Möbelarten nötig (Dusche, Wanne, Waschbecken, Bett, Schrank, Herd, Kühlschrank, Esstisch) – heute gibt es sie nicht.
+3. **Privat:** Zimmer der Bewohner nur mit Einladung oder in Begleitung; Küche, Wohnzimmer und Garten auf Einladung ins Haus.
+4. **Ortsfakten für die Figuren** (Abschnitt „Was der Ort im Spiel tragen soll“ im Ortskonzept): Gerüche, Geräusche, Sichtbereiche. Keine Plotdetails des Romans.
+5. Kein Personal, keine Karte, kein Bedienplatz – ein Wohnhaus ist kein Lokal.
+
+
 ## Offene Aufgaben
 
 2. „Geschlossen“ an anwesendes Personal binden statt an die Arbeitszuweisung, sobald `person_interior_presence` verlässlich geschrieben wird. Stand 28.10.2026: Die Tabelle wird stündlich geschrieben, aber nur für 34 Personen in 18 Häusern. Das Personal von Metropol (2) und Balkan Grill (3) fehlt darin, deshalb noch nicht umstellbar.

@@ -483,6 +483,17 @@ Auf Wunsch von Thomas im Philosophie/NPC-Chat gebaut (Details: `docs/architectur
 - `WorldPanels.tsx`: Resonanzplätze öffnen den begehbaren Raum `resonance_place` mit den Personen der Simulation, für alle Spieler; Zeichen in `LandmarkGlyph.tsx`.
 - Reales Haus Hauptstraße 87, Sundern, über den Flurstückskauf (McKnight) erworben und umgebaut.
 
+### W-21 (Schauplatz-Chat „Der Duft der bleibt“, 06.11.2026): Krokusweg 10 in Friedrichsdorf als Schauplatz
+
+Thomas, 06.11.2026: „genau dieses Haus in noxiagame integrieren, als Schauplatz“ – die WG aus dem Roman „Der Duft der bleibt“. Ortskonzept: `docs/world/earth/friedrichsdorf-krokusweg-10-duft.md`.
+
+1. **Friedrichsdorf laden:** Kartendaten für die Zelle um Krokusweg 10, 61381 Friedrichsdorf nachladen (`POST /api/world-lab/refresh`). Stand 06.11.: kein Grundriss mit `addr:street` Krokusweg in `region_features`.
+2. **Landmark anlegen:** `earth-de-friedrichsdorf-krokusweg-10` in `lib/world/spatial/earthLandmarks.ts`, Tag `cross-universe`, `sourceProjects` mit Projekt „Der Duft der bleibt“, Relation `setting`, `references` leer. Kein öffentlicher Ort – im Register als privates Wohnhaus kennzeichnen.
+3. **Reihenhaus mit Versatz:** Das Haus ist Mittelhaus, vorn und hinten etwa 1 m gegenüber dem rechten Nachbarn vorgesetzt, links bündig. Falls OSM die Reihe als einen Block liefert, bitte die Einzelhäuser erhalten, damit der Versatz sichtbar bleibt.
+4. **Betreten:** „Klingeln“ an der Haustür für alle; „Betreten“ nur mit Einladung (aus R-37). Der Innenraum kommt aus G-9.
+5. Umgebung bleibt wie OSM (Wohnwege, Spielplatz vor dem Haus); nichts dazuerfinden.
+
+
 ## Nicht in diesem Teilprojekt
 
 - Innenräume (Teilprojekt Gastronomie für Café, Bar, Restaurant).

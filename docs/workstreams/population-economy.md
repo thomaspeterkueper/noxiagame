@@ -1030,3 +1030,14 @@ Thomas: „Können wir das Laden von Gebäuden noch beschleunigen?“ Jeder Inne
   2. `verifiedBearerUserId(req)` kann parallel zur Einsatzabfrage laufen.
   3. Die Zählungen könnten als `count`/`head` oder über eine Sicht je Person kommen, statt alle Zeilen zu holen.
 - Das Ergebnis bleibt gleich; es geht nur um die Wartezeit. Das Gastronomie-Teilprojekt hat auf seiner Seite schon nachgezogen: Ortsdaten im Zwischenspeicher, begehbare Räume öffnen sofort, keine Abfrage für Räume ohne Gebäudekennung.
+
+### R-37 (Schauplatz-Chat „Der Duft der bleibt“, 06.11.2026): Bewohner der WG Krokusweg 10, Friedrichsdorf
+
+Ortskonzept mit Belegung: `docs/world/earth/friedrichsdorf-krokusweg-10-duft.md`. Nach dem Muster Samira Haddad (Migration `20261028141500`): gestelltes Wohnen im realen, nicht gekauften Haus.
+
+1. **Sieben Bewohner** mit Wohnzuweisung an den Grundriss Krokusweg 10 (sobald W-21 ihn geladen hat; Migration bricht sonst ab wie bisher): Priya (Inderin), Chinesin 1, Deutscher (1. OG); Chinesin 2, Russin, Tunesier (DG). Mietverhältnis `provided`, Vermieter unbekannt.
+2. **Kellergast:** Russe, Freund des Deutschen, ohne Wohnverhältnis; zeitweise anwesend als Besuch (Beziehung zum Deutschen nach NOXIA-LIVING-0008).
+3. **Romanfiguren, keine realen Mieter.** Namen und Biografien aus dem Manuskript (`buecherwelten`), nicht erfinden; bis dahin keine Migration für die unbenannten Figuren.
+4. **Sprachen aus der Herkunft** (NOXIA-LIVING-0014). Priya teilt mit niemandem im Haus ihre Sprache.
+5. **Tagesrhythmus im Haus:** ein Bad je Etage für drei Personen (Reihenfolge am Morgen), gemeinsame Küche im EG als Begegnungsort (LIVING-0007, 0009).
+6. **Einladung:** Bewohner können Spieler ins Haus einladen (für W-21 Punkt 4 und G-9 Punkt 3).
