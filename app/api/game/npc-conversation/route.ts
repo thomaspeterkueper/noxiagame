@@ -1,8 +1,9 @@
 // app/api/game/npc-conversation/route.ts
+// Aktualisiert: 06.11.2026 — Erinnerter Traum der letzten Nacht als Gesprächsstoff (npc_dreams, NOXIA-LIVING-0016)
 // Aktualisiert: 29.10.2026 — Wege zu Vorhandenem (gameGuide: Toilette, Lokal, Bücher, Akademie, Tanz, Raumhafen, Arbeit)
 // Aktualisiert: 29.10.2026 — Hinweise auf fehlende Funktionen im Protokoll (wish_kind, wish_object)
 // Aktualisiert: 28.10.2026 — Gesprächsende mit Wartezeit (retryAfterMs) für die Fenster; zuvor: Figur kennt Namen und Gefälligkeiten des Spielers (R-12) und ihr Alter (R-11), Abbruch beim dritten Grenztest
-// Version:      1.8.0
+// Version:      1.9.0
 
 import { chatComplete, chatProviderAvailable } from '@/lib/ai/chatProvider.server'
 import { NextRequest, NextResponse, after } from 'next/server'
@@ -32,6 +33,8 @@ import { languageDevelopmentCapacity, languagePromptConstraint } from '@/lib/gam
 import { loadPersonLanguageProfile, selectConversationLanguage } from '@/lib/game/cognition/languagePersistence'
 import { assessRealWorldRisk, riskFlags, stripContactData } from '@/lib/game/safety/realWorldRisk'
 import { secureSuspicion } from '@/lib/game/safety/secureSuspicion'
+import { dreamConversationLines } from '@/lib/game/cognition/nightDreams'
+import { WORLD_AWARENESS_SOURCES } from '@/lib/game/worldAwareness'
 import { heardClaimLines, learnableClaim, selectHeardClaims, CORROBORATED_DAYS, type StoredClaim } from '@/lib/game/knowledge/playerClaims'
 
 const MAX_PLAYER_CHARS = 500
@@ -226,6 +229,7 @@ export async function POST(request: NextRequest) {
   let canonicalNpc: any = null
   let socialContextLines: string[] = []
   let livedMemoryLines: string[] = []
+  let dreamLines: string[] = []
   let knownPlayerName: string | null = null
   let favorLines: string[] = []
   let npcAge: number | null = null
@@ -267,6 +271,25 @@ export async function POST(request: NextRequest) {
     ])
     persistedMemory = memoryData ?? null
     canonicalNpc = personData ?? null
+    // Träume (NOXIA-LIVING-0016): nur ein erinnerter Traum der letzten 30 Stunden; die meisten bleiben unterbewusst.
+    if (!sermonRequest) {
+      const { data: dreamRow } = await serviceClient
+        .from('npc_dreams')
+        .select('recall, motifs, created_at, world_news_items(title, source_id)')
+        .eq('person_id', npcId)
+        .neq('recall', 'none')
+        .gte('created_at', new Date(Date.now() - 30 * 3600000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      const newsRow: any = Array.isArray((dreamRow as any)?.world_news_items) ? (dreamRow as any).world_news_items[0] : (dreamRow as any)?.world_news_items
+      dreamLines = dreamConversationLines(dreamRow ? {
+        recall: (dreamRow as any).recall,
+        motifs: ((dreamRow as any).motifs ?? []).map((m: unknown) => clean(m, 80)).filter(Boolean),
+        newsTitle: newsRow?.title ? clean(newsRow.title, 180) : null,
+        newsSource: newsRow?.source_id ? clean(WORLD_AWARENESS_SOURCES.find(src => src.id === newsRow.source_id)?.name ?? newsRow.source_id, 60) : null,
+      } : null)
+    }
     if (canonicalNpc?.display_name) npcName = clean(canonicalNpc.display_name, 48)
     if (canonicalNpc?.public_role) npcRole = clean(canonicalNpc.public_role, 48)
     identityState = identityData?.identity_state === 'known'
@@ -477,6 +500,7 @@ export async function POST(request: NextRequest) {
     canonicalNpc?.bio_short ? `Eigene biografische Basis: ${clean(canonicalNpc.bio_short, 260)}` : '',
     socialContextLines.length ? `Dein gewachsenes soziales Umfeld:\n- ${socialContextLines.join('\n- ')}` : '',
     livedMemoryLines.length ? `Jüngste eigene Erinnerungsspuren:\n- ${livedMemoryLines.join('\n- ')}` : '',
+    ...dreamLines,
     livedMemoryLines.length ? 'Diese Erinnerungsspuren belegen nur, dass eine Begegnung oder ein Konflikt stattfand. Erfinde keinen Gesprächsinhalt, Anlass oder Ausgang, der dort nicht steht.' : '',
     identityState === 'known'
       ? `Der Spieler kennt deinen Namen bereits als ${npcName}.`

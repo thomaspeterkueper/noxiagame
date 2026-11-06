@@ -1,6 +1,6 @@
 # NOXIA-LIVING-0016 – Träume und Einsicht aus übergeordnetem Wissen
 
-Stand: 06.11.2026 · Status: **Entwurf – Entscheidungen von Thomas offen** (Abschnitt „Zu entscheiden“)
+Stand: 06.11.2026 · Status: **Schritte 1 und 2 umgesetzt** (regionale Meldungen, Träume); Schritte 3–5 offen
 
 ## Vorgabe (Thomas, 06.11.2026)
 
@@ -73,7 +73,22 @@ Neue Region = Eintrag in `WORLD_AWARENESS_SOURCES` mit `region` und `ingestEnabl
 
 Jeder Schritt ist für sich nutzbar; die tägliche Auswertung bekommt je Schritt einen Befund-Bereich („Traum“, „Einsicht“).
 
-## Zu entscheiden (Thomas)
+## Entscheidungen (Thomas, 06.11.2026)
+
+1. **Quellen zum Start:** WDR, Deutschlandfunk und tagesschau. tagesschau ist damit freigegeben (nur Titel, Link, ein Satz).
+2. **Knowledge Graph:** KG oder SSF stellen die lesende Schnittstelle bereit. SSF ist besonders interessant, wenn ein Thema gerade ohnehin dran ist (z. B. ein Modul, das der Spieler oder die Figur gerade lernt) – dann kommt der Fremdimpuls bevorzugt aus diesem Thema. (Im Vercel-Team gibt es dafür die Projekte `kueper-knowledge-graph` und `solarsciencefoundation`.)
+3. **Wer träumt:** Jede Figur träumt, mehr oder weniger intensiv. Nur wenige können sich ein bisschen erinnern oder werden sogar erleuchtet.
+4. **Sichtbarkeit:** Manche Träume kann man erzählen, die meisten sind unterbewusst.
+
+## Umgesetzt (06.11.2026)
+
+- **Meldungen:** `world_news_items`, `world_news_source_status`; Cron `/api/cron/world-news` alle zwei Stunden (`50 */2 * * *`). Quellen mit `region` in `lib/game/worldAwareness.ts`: tagesschau und Deutschlandfunk (`de`), WDR (`de-nrw`), ESA/NASA/JPL (`space`). Die WDR-Feed-Adresse ist noch ungeprüft; ob sie stimmt, steht nach dem ersten Lauf in `world_news_source_status`. Traumtauglich (`dream_ok`) nur ohne Gewalt, Tod, Unglück, Krieg, Missbrauch, Suizid und ohne Verdacht des Schutzfilters (`lib/game/worldNewsFeed.ts`). Löschen nach 14 Tagen.
+- **Träume:** `npc_dreams` (ein Traum je Figur und Nacht, `canonical = false`, Löschen nach 30 Tagen). `runDreamTick` (`lib/game/cognition/dreamRuntime.ts`) läuft in jedem Tick nach der Bevölkerung für alle Figuren, die gerade schlafen. Stoff: Begegnungen der letzten 24 Ticks (fiktive Namen), Arbeit, manchmal eine Meldung der Region – Namen aus Meldungen fallen weg (`newsMotifs`).
+- **Erinnern:** Fest je Figur (`dreamRecallAbility`, Trait `dream_recall` geht vor), schief verteilt. Zusammen mit der Intensität der Nacht: `none` (unterbewusst, die meisten), `fragment` (Bruchstück), `clear` (deutlich, wenige). Im Test mit 400 Figuren: über 55 % unterbewusst, unter 20 % deutlich.
+- **Gespräch:** Nur ein erinnerter Traum der letzten 30 Stunden kommt ins Gespräch (`dreamConversationLines`), mit der Regel „nur wenn es passt, kein Ausschmücken, keine Vorhersage“. Hing er an einer Meldung, wird die Meldung als belegt, der Traum als Traum genannt.
+- **Noch nicht:** Unterbewusste Träume wirken bisher nicht weiter. Vorschlag für Schritt 3: Sie färben Stimmung und Einsichts-Chance leicht; Erleuchtung nur für die wenigen mit deutlicher Erinnerung.
+
+## Ursprünglich offene Fragen
 
 1. **Quellenliste:** Reichen WDR und Deutschlandfunk für Sundern zum Start? Darf tagesschau verwendet werden (Lizenz)?
 2. **Knowledge Graph:** Wer baut die lesende Schnittstelle in SSF – oder gibt es schon einen anderen Zugang zu den Knoten?
