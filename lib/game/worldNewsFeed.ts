@@ -1,8 +1,10 @@
 // lib/game/worldNewsFeed.ts
 // Erstellt: 06.11.2026 — RSS/Atom lesen und Meldungen einordnen (aus app/api/game/world-awareness herausgelöst),
 //                        Traumtauglichkeit je Meldung (NOXIA-LIVING-0016)
-// Version:      1.0.0
+// Aktualisiert: 06.11.2026 — Meldungs-ID aus vollem Hash (Kollisionen bei WDR und NASA)
+// Version:      1.0.1
 
+import { createHash } from 'node:crypto'
 import { assessRealWorldRisk } from './safety/realWorldRisk'
 import { WORLD_AWARENESS_SOURCES, type AwarenessTopic, type NewsRegion, type WorldAwarenessItem } from './worldAwareness'
 
@@ -62,7 +64,8 @@ export function parseFeed(sourceId: string, xml: string, limit = 8): WorldAwaren
     const publishedAt = Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString()
     const idSeed = xmlValue(block, ['guid', 'id']) || url || `${sourceId}:${publishedAt}:${index}`
     return {
-      id: `${sourceId}:${Buffer.from(idSeed).toString('base64url').slice(0, 28)}`,
+      // Voller Hash statt abgeschnittener Base64-Anfang: WDR- und NASA-Links begannen gleich und kollidierten (06.11.2026).
+      id: `${sourceId}:${createHash('sha1').update(idSeed).digest('base64url').slice(0, 22)}`,
       sourceId,
       title,
       summary: summary.slice(0, 320),

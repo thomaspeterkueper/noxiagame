@@ -815,7 +815,7 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const interoception = await runInteroceptionTick(supabase, tickNumber)
   const socialLife = await runSocialLifeTick(supabase, tickNumber)
   // Träume (NOXIA-LIVING-0016): wer in diesem Tick schläft, träumt einmal je Nacht. Fehler bremsen den Tick nicht.
-  const dreams = await runDreamTick(supabase, tickNumber).catch((error: any) => ({ sleepers: 0, dreams: 0, remembered: 0, error: String(error?.message ?? error) }))
+  const dreams = await runDreamTick(supabase, tickNumber).catch((error: any) => ({ sleepers: 0, dreams: 0, remembered: 0, insights: 0, error: String(error?.message ?? error) }))
 
   // Aggregate population may update location population/capacity. Load one
   // fresh post-population snapshot and share it across the remaining readers.

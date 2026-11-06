@@ -1,9 +1,9 @@
 // app/api/game/npc-conversation/route.ts
-// Aktualisiert: 06.11.2026 — Erinnerter Traum der letzten Nacht als Gesprächsstoff (npc_dreams, NOXIA-LIVING-0016)
+// Aktualisiert: 06.11.2026 — Erinnerter Traum der letzten Nacht und seltene Einsicht als Gesprächsstoff (npc_dreams, npc_insights, NOXIA-LIVING-0016)
 // Aktualisiert: 29.10.2026 — Wege zu Vorhandenem (gameGuide: Toilette, Lokal, Bücher, Akademie, Tanz, Raumhafen, Arbeit)
 // Aktualisiert: 29.10.2026 — Hinweise auf fehlende Funktionen im Protokoll (wish_kind, wish_object)
 // Aktualisiert: 28.10.2026 — Gesprächsende mit Wartezeit (retryAfterMs) für die Fenster; zuvor: Figur kennt Namen und Gefälligkeiten des Spielers (R-12) und ihr Alter (R-11), Abbruch beim dritten Grenztest
-// Version:      1.9.0
+// Version:      1.10.0
 
 import { chatComplete, chatProviderAvailable } from '@/lib/ai/chatProvider.server'
 import { NextRequest, NextResponse, after } from 'next/server'
@@ -33,7 +33,7 @@ import { languageDevelopmentCapacity, languagePromptConstraint } from '@/lib/gam
 import { loadPersonLanguageProfile, selectConversationLanguage } from '@/lib/game/cognition/languagePersistence'
 import { assessRealWorldRisk, riskFlags, stripContactData } from '@/lib/game/safety/realWorldRisk'
 import { secureSuspicion } from '@/lib/game/safety/secureSuspicion'
-import { dreamConversationLines } from '@/lib/game/cognition/nightDreams'
+import { dreamConversationLines, insightConversationLines } from '@/lib/game/cognition/nightDreams'
 import { WORLD_AWARENESS_SOURCES } from '@/lib/game/worldAwareness'
 import { heardClaimLines, learnableClaim, selectHeardClaims, CORROBORATED_DAYS, type StoredClaim } from '@/lib/game/knowledge/playerClaims'
 
@@ -289,6 +289,17 @@ export async function POST(request: NextRequest) {
         newsTitle: newsRow?.title ? clean(newsRow.title, 180) : null,
         newsSource: newsRow?.source_id ? clean(WORLD_AWARENESS_SOURCES.find(src => src.id === newsRow.source_id)?.name ?? newsRow.source_id, 60) : null,
       } : null)
+      // Seltene Einsicht nach einem Traum (vermutet, höchstens 7 Tage alt).
+      const { data: insightRow } = await serviceClient
+        .from('npc_insights')
+        .select('hypothesis')
+        .eq('person_id', npcId)
+        .eq('status', 'vermutet')
+        .gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      dreamLines.push(...insightConversationLines(insightRow?.hypothesis ? { hypothesis: clean(insightRow.hypothesis, 200) } : null))
     }
     if (canonicalNpc?.display_name) npcName = clean(canonicalNpc.display_name, 48)
     if (canonicalNpc?.public_role) npcRole = clean(canonicalNpc.public_role, 48)
