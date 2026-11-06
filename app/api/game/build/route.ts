@@ -220,9 +220,10 @@ export async function GET(req: NextRequest) {
   if (action === 'start') {
     const buildableId = searchParams.get('buildableId')
     const locationSlug = searchParams.get('location')
-    const tileRow = parseInt(searchParams.get('tileRow') ?? '0')
-    const tileCol = parseInt(searchParams.get('tileCol') ?? '0')
-    const tileLevel = parseInt(searchParams.get('tileLevel') ?? '0')
+    // Reject partial numeric strings (e.g. "1oops", "0.5") instead of truncating them.
+    const tileRow = Number(searchParams.get('tileRow') ?? '0')
+    const tileCol = Number(searchParams.get('tileCol') ?? '0')
+    const tileLevel = Number(searchParams.get('tileLevel') ?? '0')
 
     if (!buildableId || !locationSlug) return NextResponse.json({ error: 'Fehlende Parameter' }, { status: 400 })
     if (BUILDINGS[buildableId]?.stateOnlyLocations?.some((slug) => slug === locationSlug)) {
@@ -231,8 +232,8 @@ export async function GET(req: NextRequest) {
     if (buildableId === 'admin') {
       return NextResponse.json({ error: 'Verwaltung wird als staatliche Grundinfrastruktur bereitgestellt und ist nicht regulär baubar.' }, { status: 403 })
     }
-    if (tileLevel < -3 || tileLevel > 0) return NextResponse.json({ error: 'Ungültige Ebene' }, { status: 400 })
-    if (tileRow < 0 || tileRow >= WORLD_ROWS || tileCol < 0 || tileCol >= WORLD_COLS || Number.isNaN(tileRow) || Number.isNaN(tileCol)) {
+    if (!Number.isInteger(tileLevel) || tileLevel < -3 || tileLevel > 0) return NextResponse.json({ error: 'Ungültige Ebene' }, { status: 400 })
+    if (!Number.isInteger(tileRow) || !Number.isInteger(tileCol) || tileRow < 0 || tileRow >= WORLD_ROWS || tileCol < 0 || tileCol >= WORLD_COLS) {
       return NextResponse.json({ error: 'Ungültige Kachel-Koordinate' }, { status: 400 })
     }
 
