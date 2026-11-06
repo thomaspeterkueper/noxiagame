@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
   if (!place) return NextResponse.json({ error: 'Dieses Studio gibt es nicht.' }, { status: 404 })
   const [parties, { data: wallet }, { data: mine }] = await Promise.all([
     openParties(supabase, place.id),
-    supabase.from('profiles').select('credits').eq('id', profileId).maybeSingle(),
+    supabase.from('profiles').select('credits,username').eq('id', profileId).maybeSingle(),
     supabase.from('immersion_sessions').select('*').eq('profile_id', profileId).is('ended_at', null).gt('ends_at', new Date().toISOString()).maybeSingle(),
   ])
   const offers = experiencesAt(place.at).map(map => ({
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
     price: immersionPrice(map.category), minutes: immersionSeconds(map.category) / 60,
     priceInGroup: { 2: immersionPrice(map.category, 2), 3: immersionPrice(map.category, 3) },
   }))
-  return NextResponse.json({ ok: true, studio: place, offers, parties, session: mine ?? null, credits: Number(wallet?.credits ?? 0) }, { headers: noStore })
+  return NextResponse.json({ ok: true, studio: place, offers, parties, session: mine ?? null, credits: Number(wallet?.credits ?? 0), me: { profileId, name: String(wallet?.username ?? 'Gast') } }, { headers: noStore })
 }
 
 export async function POST(req: NextRequest) {

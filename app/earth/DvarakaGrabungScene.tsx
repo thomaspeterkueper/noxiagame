@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { iso } from '@/lib/worldlab/facade'
+import { useSitePresence, type SitePeer } from '@/lib/multiplayer/sitePresence'
 import { BOUNDS, CAMP, FINDS, LAB, LABEL_TEXT, START, findNear, groundAt, stepTo, type Find, type Pt } from '@/lib/worldlab/dvarakaGrabung'
 
 const SCALE = 0.9           // Bildpunkte je Meter
@@ -14,7 +15,12 @@ const COLORS = { land: '#c9b98a', shallow: '#7fb4b8', deep: '#2e6e86', mole: '#a
  * Hafenbecken, Molen, Flachwasser, Fundpunkte G1–G14 mit Fundzettel, Camp und Labor.
  * Steuerung: Pfeiltasten/WASD oder Klick. Der Hintergrund ist bewusst schlicht; die Funde tragen die Szene.
  */
-export default function DvarakaGrabungScene({ onLeave }: { onLeave: () => void }) {
+export default function DvarakaGrabungScene({ partyId, me, onLeave }: { partyId?: string | null; me?: { profileId: string; name: string } | null; onLeave: () => void }) {
+  const { peers, share } = useSitePresence(partyId ?? null, me ?? null)
+  const peersRef = useRef<SitePeer[]>([])
+  const shareRef = useRef(share)
+  useEffect(() => { peersRef.current = peers }, [peers])
+  useEffect(() => { shareRef.current = share }, [share])
   const canvas = useRef<HTMLCanvasElement>(null)
   const state = useRef({ pos: { ...START } as Pt, target: null as Pt | null, keys: new Set<string>() })
   const [near, setNear] = useState<Find | null>(null)
@@ -87,6 +93,13 @@ export default function DvarakaGrabungScene({ onLeave }: { onLeave: () => void }
         ctx.strokeStyle = seen.current.has(find.id) ? '#1b7a4a' : '#33424a'; ctx.lineWidth = 1.5; ctx.stroke()
         ctx.fillStyle = '#10222c'; ctx.font = 'bold 8px system-ui'; ctx.textAlign = 'center'; ctx.fillText(find.id, p.x, p.y + 2.8)
       }
+      // Mitspieler der Gruppe
+      for (const peer of peersRef.current) {
+        const p = toScreen({ x: peer.x, y: peer.y })
+        ctx.beginPath(); ctx.arc(p.x, p.y - 5, 4, 0, Math.PI * 2); ctx.fillStyle = '#2e86c1'; ctx.fill(); ctx.fillRect(p.x - 3, p.y - 2, 6, 8)
+        ctx.fillStyle = '#eaf2f6'; ctx.font = '9px system-ui'; ctx.textAlign = 'center'; ctx.fillText(peer.name, p.x, p.y - 12)
+      }
+      shareRef.current(s.pos.x, s.pos.y)
       // Spielfigur
       ctx.beginPath(); ctx.arc(centre.x, centre.y - 5, 4, 0, Math.PI * 2); ctx.fillStyle = '#c0392b'; ctx.fill()
       ctx.fillRect(centre.x - 3, centre.y - 2, 6, 8)
@@ -112,7 +125,7 @@ export default function DvarakaGrabungScene({ onLeave }: { onLeave: () => void }
     <div style={{ position: 'relative', width: '100%', height: 'min(70vh,520px)', borderRadius: 10, overflow: 'hidden', border: '1px solid #3d5b6a' }}>
       <canvas ref={canvas} style={{ width: '100%', height: '100%', display: 'block', cursor: 'crosshair' }} aria-label="Grabungsfeld Dvārakā" />
       <div style={{ position: 'absolute', left: 10, top: 8, color: '#d7e6ee', font: '11px/1.4 system-ui', textShadow: '0 1px 2px #000' }}>
-        Pfeiltasten / WASD oder Klick · gefundene Stellen: {seenCount} von {FINDS.length}
+        Pfeiltasten / WASD oder Klick · gefundene Stellen: {seenCount} von {FINDS.length}{peers.length ? ` · mit dir hier: ${peers.map(p => p.name).join(', ')}` : ''}
       </div>
       <button onClick={onLeave} style={{ position: 'absolute', right: 10, top: 8, border: '1px solid #476b79', background: '#183e4d', color: '#fff', borderRadius: 7, padding: '6px 10px', fontWeight: 800, fontSize: 11, cursor: 'pointer' }}>Aufwachen</button>
       {near && !shown && (

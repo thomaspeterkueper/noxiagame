@@ -236,3 +236,11 @@ Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?)
 - **Geprüft:** Szene in einem Headless-Browser: zeichnet, Laufen per Taste und Klick, Wasser sperrt/bremst, Fundzettel öffnet. Nicht geprüft: Buchung und Pod im echten Spiel.
 - **Datenbank:** Migration `20261106120000_immersion_category_site.sql` (Constraint um `site` erweitert, Trockenlauf ok, live).
 - **Noch nicht:** Gemeinsame Anwesenheit mehrerer Spieler in der Szene (Gruppen buchen schon zusammen, sehen sich aber noch nicht), Begleiter-NPCs, Grabungsbuch, Labor als eigener Raum, Gebäude/Gelände jenseits des Rasters (Himmel/Boote), Etikett F erst in der Chronomap.
+
+## Gemeinsame Anwesenheit in der Grabung (06.11.2026)
+
+- Wer mit einer Gruppe (gleiche `party_id`) in der Grabung liegt, sieht die anderen als blaue Figuren mit Namen; die Kopfzeile nennt, wer mit dir hier ist. Die Lage geht über Supabase Realtime Presence (Kanal `noxia:site:<party_id>`), nichts wird gespeichert; höchstens alle 400 ms, ohne Bewegung alle 10 s, Einträge älter als 20 s fallen weg, höchstens 8 Mitspieler (`lib/multiplayer/sitePresence.ts`, 2 Tests).
+- Nur Gruppenmitglieder sehen sich, nicht alle im selben Studio. Wer allein bucht, ist allein in der Szene (die Gruppe wird beim Buchen oder Dazulegen gebildet).
+- API: `GET /api/game/immersion` liefert jetzt `me` (Profilkennung, Name) für die Präsenz.
+- Geprüft im Headless-Browser mit zwei Szenen und einer Speicher-Präsenz (beide sehen sich, keine Fehler). Nicht geprüft: echtes Supabase Realtime mit zwei Konten.
+- Noch offen: Begleiter-NPCs im Pod, Sprechen/Gesten zwischen Mitspielern, Labor als eigener Raum, Grabungsbuch.

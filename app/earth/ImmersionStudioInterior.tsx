@@ -19,7 +19,7 @@ const INTRO: Record<Category, string> = {
 interface Offer { id: string; title: string; era: string; category: Category; playable: boolean; price: number; minutes: number; priceInGroup: Record<string, number> }
 interface Party { partyId: string; experienceId: string; category: Category; names: string[]; endsAt: string }
 interface Session { id: string; experience_id: string; category: Category; party_id: string; ends_at: string }
-interface Data { offers: Offer[]; parties: Party[]; session: Session | null; credits: number }
+interface Data { offers: Offer[]; parties: Party[]; session: Session | null; credits: number; me?: { profileId: string; name: string } }
 
 /**
  * Innenraum des Erlebnis-Studios (immersion_studio): Empfang mit Mitarbeiter, Preisen und Pods.
@@ -108,7 +108,7 @@ export default function ImmersionStudioInterior({ entityId, name, at, onClose }:
           <small style={{ color: '#d8bd68', fontWeight: 900, letterSpacing: '.08em' }}>POD · {CATEGORY_LABEL[category].toUpperCase()}</small>
           <strong style={{ display: 'block', fontSize: 16, margin: '3px 0 8px' }}>{preview?.title ?? lyingOffer?.title ?? lying?.experience_id}</strong>
           <p>{INTRO[category]}</p>
-          {lying?.experience_id === 'dvaraka-grabung' && <DvarakaGrabungScene onLeave={() => void post({ action: 'end' })} />}
+          {lying?.experience_id === 'dvaraka-grabung' && <DvarakaGrabungScene partyId={lying.party_id} me={data?.me ?? null} onLeave={() => void post({ action: 'end' })} />}
           {preview && <p style={{ color: '#d8bd68' }}>Dieses Erlebnis ist noch in Vorbereitung. Der Pod bleibt dunkel, bis die Welt fertig ist.</p>}
           {lying && <p style={{ color: '#9fc6b2' }}>Sitzung läuft bis {new Date(lying.ends_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr{(data?.parties.find(party => party.partyId === lying.party_id)?.names.length ?? 1) > 1 ? ' · ihr liegt gemeinsam in einer Gruppe' : ''}.</p>}
           {error && <p style={{ color: '#e0a0a0' }}>{error}</p>}
