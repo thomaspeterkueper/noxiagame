@@ -703,6 +703,12 @@ Thomas, 04.11.2026: „Andere Spieler sollten gleichzeitig in der gleichen Welt,
 
 **Bewusst noch nicht gebaut: freier Text-Chat zwischen Spielern.** Mit dem Schulpilot in Sundern braucht er Schutzregeln (Filter, Melden, Sperren, keine privaten Nachrichten an Minderjährige). Entscheidung bei Thomas.
 
+**Karte – Punkt 1 umgesetzt (Erdkarte, 06.11.2026):**
+- `lib/multiplayer/mapPresence.ts` (`useMapPresence`, getestet: `cellsAround`, `mapPeersFrom`): Kanal je Kartenzelle `noxia:cell:<i>:<j>` (0,01° × 0,015°, rund 1,1 × 1,0 km). Man meldet sich in der eigenen Zelle und hört die acht Nachbarzellen mit; gemeldet werden Name, Lage (auf ~1 m gerundet), Figur und eine kurze Geste, höchstens jede Sekunde und nur bei Bewegung (sonst alle 30 s). Mitspieler weiter als 1,5 km oder älter als 2 min erscheinen nicht. Während einer Reise meldet man sich ab.
+- Karte (`setPeers` in `worldEngine.ts`): Mitspieler als Kiesel mit blauem Namen, die Figur gleitet zur gemeldeten Lage; ihre Geste erscheint 8 s als Blase.
+- Anklicken öffnet die Tafel „Mitspieler“: Abstand, „Winken“, „Grüßen“ (für alle in der Nähe sichtbar, auch über der eigenen Figur), „Gehe hin“. Credits und gemeinsame Bewegungen bleiben drinnen (Hinweis auf der Tafel).
+- Offen: Punkte 2–5 (Folgen, Auto, Raumschiff, Begegnungsstätten).
+
 **Nicht geprüft:** echte Realtime-Verbindung von zwei Browsern. Die Testumgebung lässt keine Websockets zu Supabase durch. Geprüft sind die Darstellung mit nachgestellter Anwesenheit und die Buchung.
 
 ### W-17 (Gastronomie, 04.11.2026): Kiesel-Figuren auf der Karte – auf der Weltkarte erledigt (05.11.2026)
@@ -734,7 +740,7 @@ Thomas, 04.11.2026: Figuren „zwischen Habbo Hotel, Playmobil und Lego“, „g
 - Die Kolonie-Karte und die Landmarken (Gotteshaus, Bibliothek, Friedhof) laufen über `NpcFigure`, das jetzt Kiesel zeichnet.
 - Die eigene Figur sieht überall gleich aus (Profil-Kennung).
 - **Offen für die Erdkarte:**
-  - Arbeit auf der Karte sichtbar machen (Posen `haemmern`, `hacken`, `schaufeln`, `tragen` an Arbeitsorten, `pose`-Eigenschaft von `WalkableActor`);
+  - ~~Arbeit auf der Karte sichtbar machen~~ Erledigt (06.11.2026): Wer vor seinem Arbeitsort steht, zeigt die Arbeit des Hauses (`lib/figures/workPose.ts`, getestet): Mine hacken, Garten/Park/Friedhof schaufeln, Werkstatt/Fabrik hämmern, Lager/Laden tragen, Café/Restaurant/Bar wischen; die Figur wiegt dann nicht, sie arbeitet animiert. Drinnen Arbeitende bleiben unsichtbar.
   - Leistung messen, wenn viele Figuren gleichzeitig laufen; bei Bedarf Bilder zwischenspeichern.
 
 ### W-18 (Gastronomie, 05.11.2026): „Was ist los?“ auf der Karte – erledigt (05.11.2026)
