@@ -271,6 +271,13 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
     - Neue Posen: trinken, plaudern (stehend und sitzend).
     - Sitzende Gäste wechseln zwischen Sitzen, Trinken und Plaudern; Stehende plaudern.
     - Leichtes Atmen der Figuren; Bewohner gleiten weich zu ihrem Platz.
+- **06.11.2026 – Übrige Räume in 2,5D nachgezogen** (Thomas: „ja mach das“):
+  - Tafeln (Kurse, Stellen, Hinweise, Übungsplan, Stationen) hängen an der Wand; die Beschriftung steht auf der Tafel statt am Boden.
+  - Trennwände sind Milchglas: Büro, Halle und Behandlungsraum dahinter bleiben sichtbar.
+  - Regale je nach Haus: Ordner auf Wache, Bank und Agentur, Zeitschriften im Wartezimmer der Praxis.
+  - Löschfahrzeug mit Fahrerhaus, Scheiben, weißem Streifen, Rädern und Blaulicht.
+  - Helle Empfangstresen in Praxis, Krankenhaus und Wache.
+  - **Offen:** Bibliothek, Laden, Gotteshäuser und die anderen Orte aus `LandmarkWalkableInterior` laufen noch über den alten, flachen Raum-Motor; sie in 2,5D zu bringen, ist ein eigener Schritt.
   - Gilt für alle Räume des Motors: Lokale, Bank, Agentur, Reisebüro, Wache, Feuerwache, Praxis, Krankenhaus.
   - Im Browser geprüft (Metropol, Café, Wache; Laufen per Klick, Tasten, Einrichten).
   - **Später** (Thomas): eine 80er-/90er-Fassung für die Zeitreise in VR.
