@@ -11,6 +11,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { insideRing, parcelOffer } from '@/lib/worldlab/parcelOffer.server'
+import { forestFigures, landUseKind } from '@/lib/worldlab/landUse'
+import { FORESTRY } from '@/lib/game/construction/materials'
 import { areaM2, boundsOf, centreOf, mergeRings, splitRing, type GeoPoint } from '@/lib/worldlab/parcelGeometry'
 
 /** Vermessungsgebühr für Teilen und Zusammenlegen – geht an die Gemeinde. */
@@ -30,6 +32,10 @@ const ERRORS: Record<string, [number, string]> = {
   NOXIA_PRICE_INVALID: [400, 'Ungültiger Preis.'],
   NOXIA_CONSTRUCTION_RUNNING: [409, 'Auf dem Flurstück wird noch gebaut.'],
   NOXIA_SHAPE_INVALID: [400, 'Die neue Grenze passt nicht.'],
+  NOXIA_FOREST_CLEARED: [409, 'Der Wald ist geschlagen – erst aufforsten, dann nach zehn Spieljahren wieder.'],
+  NOXIA_FOREST_NOT_GROWN: [409, 'Seit dem letzten Einschlag ist noch kein Kubikmeter nachgewachsen.'],
+  NOXIA_FOREST_EMPTY: [409, 'Hier steht kein Holz mehr.'],
+  NOXIA_FOREST_NOT_CLEARED: [409, 'Hier muss nicht aufgeforstet werden.'],
 }
 
 function failure(message: string, fallback: string) {
@@ -64,6 +70,25 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient()
   const id = String(body.id ?? '').slice(0, 64)
   if (!id) return NextResponse.json({ error: 'Flurstück fehlt.' }, { status: 400 })
+
+  // Holz schlagen (NOXIA-MAT-0001): nur eigener Wald; Startwerte aus Fläche und Waldart
+  if (body.action === 'harvest' || body.action === 'replant') {
+    const { data: row } = await supabase.from('earth_parcels').select('id,usage,area_m2,props').eq('id', id).is('retired_at', null).maybeSingle()
+    if (!row) return NextResponse.json({ error: 'Flurstück nicht gefunden.' }, { status: 404 })
+    const detail = typeof (row.props as Record<string, unknown> | null)?.nutzbez === 'string' ? String((row.props as Record<string, unknown>).nutzbez) : null
+    if (landUseKind(row.usage, detail) !== 'forest') return NextResponse.json({ error: 'Hier ist kein Wald.' }, { status: 400 })
+    const figures = forestFigures(detail, Number(row.area_m2 ?? 0))
+    if (body.action === 'replant') {
+      const fee = Math.max(10, Math.round(figures.areaHa * FORESTRY.replantFeePerHa))
+      const { data, error } = await supabase.rpc('replant_earth_forest', { p_profile_id: profileId, p_parcel_id: id, p_fee: fee })
+      if (error) return failure(error.message, 'Aufforsten fehlgeschlagen.')
+      return NextResponse.json(data)
+    }
+    const mode = (body as { mode?: string }).mode === 'clear' ? 'clear' : 'sustainable'
+    const { data, error } = await supabase.rpc('harvest_earth_forest', { p_profile_id: profileId, p_parcel_id: id, p_mode: mode, p_area_ha: figures.areaHa, p_stock_m3: figures.stockM3, p_growth_m3_year: figures.growthM3Year })
+    if (error) return failure(error.message, 'Holzeinschlag fehlgeschlagen.')
+    return NextResponse.json(data)
+  }
 
   if (body.action === 'list' || body.action === 'unlist') {
     const price = body.action === 'list' ? Math.round(Number(body.price)) : null

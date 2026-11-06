@@ -49,3 +49,8 @@ Preise der Credits-Anteile nicht ändern, bis Marktpreise feststehen; der Zukauf
 - Katalog, Stückliste und Preisaufteilung als reine Regel: `lib/game/construction/materials.ts` (+ Test). Werte vorläufig, Spielpreise relativ (Beton 3 Cr/t, Stahl 25 Cr/t, Schnittholz 10 Cr/m³ …), Material höchstens 80 % des heutigen Baupreises.
 - Anzeige in der Bautafel der Weltkarte. Noch kein Verbrauch aus einem Lager, keine Migration.
 - Nächster Schritt: Güter im Inventar (`resource_type` bzw. `logistics_inventory_items`), Baustelle reserviert und verbraucht.
+
+## Zwischenstand (06.11.2026, Erdkarte) – Teil 2
+
+- Güter im Inventar, Baustofflager je Spieler (Erde), Bau nimmt zuerst aus dem Lager (`take_construction_materials`), Rest Zukauf wie bisher. Details in NOXIA-MAT-0001 „Stand der Umsetzung“.
+- Offen: Reservierung beim Start und Verbrauch über die Bauzeit, Warten bei fehlendem Material, Zukauf mit Lieferzeit, Recycling, andere Orte als die Erde.

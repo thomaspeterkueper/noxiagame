@@ -6,7 +6,7 @@
 import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileOrigin, TILE_SIZE_MERC, type GeoPoint } from './mercator'
 import { cadastreAttribution, landRate, parcelNotForSale } from './alkis'
 import { mergeRings } from './parcelGeometry'
-import { landUse, type LandUse } from './landUse'
+import { forestFigures, GAME_YEAR_DAYS, landUse, REGROW_DAYS, type LandUse } from './landUse'
 import { municipalityLabel } from './municipality.server'
 import { buildingValue } from './buildingOffer'
 import { acquireItem, locationAt, offerFor, type Supabase } from './buildingOffer.server'
@@ -100,6 +100,8 @@ export interface ParcelOffer {
   source: string
   /** Nutzung und was das Flurstück hergibt (NOXIA-MAT-0001) */
   land: LandUse
+  /** Eigener Wald: Vorrat, Zuwachs, was sich gerade schlagen lässt */
+  forest?: { stockM3: number; growthM3Year: number; harvestableM3: number; cleared: boolean; replanted: boolean; regrowsAt: string | null; replantFee: number }
   owned: boolean; own: boolean
   /** von einem Spieler zum Verkauf angeboten */
   listed?: boolean
@@ -138,6 +140,18 @@ export async function parcelOffer(supabase: Supabase, id: string, profileId: str
       if (entity) base.buildings.push({ source: ref, name: String(entity.display_name ?? 'Gebäude'), residents: 0 })
     }
     const neighbours = own ? await ownNeighbours(supabase, parcel, profileId!) : undefined
+    if (own && land.kind === 'forest') {
+      const start = forestFigures(typeof props.nutzbez === 'string' ? props.nutzbez : null, areaM2)
+      const { data: forest } = await supabase.from('earth_parcel_forest').select('stock_m3,growth_m3_year,last_harvest_at,cleared_at,replanted_at').eq('parcel_id', parcel.id).maybeSingle()
+      const { data: ownerRow } = await supabase.from('earth_parcel_owners').select('bought_at').eq('parcel_id', parcel.id).maybeSingle()
+      const stock = Number(forest?.stock_m3 ?? start.stockM3), growth = Number(forest?.growth_m3_year ?? start.growthM3Year)
+      const cleared = Boolean(forest?.cleared_at), replanted = Boolean(forest?.replanted_at)
+      const since = Date.parse(String(forest?.last_harvest_at ?? forest?.replanted_at ?? ownerRow?.bought_at ?? new Date().toISOString()))
+      const years = Math.min(2, Math.max(0, (Date.now() - since) / 86_400_000 / GAME_YEAR_DAYS))
+      const regrowsAt = cleared && replanted ? new Date(Date.parse(String(forest!.replanted_at)) + REGROW_DAYS * 86_400_000).toISOString() : null
+      const blocked = cleared && (!replanted || (regrowsAt !== null && Date.parse(regrowsAt) > Date.now()))
+      Object.assign(base, { forest: { stockM3: Math.round(stock), growthM3Year: growth, harvestableM3: blocked ? 0 : Math.floor(Math.min(stock, growth * years)), cleared, replanted, regrowsAt, replantFee: Math.max(10, Math.round(start.areaHa * 40)) } })
+    }
     const district = String(props.gemeinde ?? '') || null
     const { data: rate } = await supabase.rpc('earth_property_tax_rate', { p_district: district ?? '*' })
     Object.assign(base, { taxRate: Number(rate ?? 0.05), district })
