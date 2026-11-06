@@ -27,7 +27,7 @@ import { establishmentFor, establishmentKnowledge, establishmentServices } from 
 import { DriveButton, VehicleDesk, vehicleServiceIds } from '@/app/components/VehicleDesk'
 import { peopleAtPlace, type PresenceRow } from '@/lib/game/population/placePresence'
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
-import { chronomapsForPlace, experiencesAt } from '@/lib/worldlab/chronomaps'
+import { chronomapsForPlace } from '@/lib/worldlab/chronomaps'
 import { isResonanceBuilding, meetingPlaces } from '@/lib/worldlab/meetingPlaces'
 import { worshipAt, type WorshipItem } from '@/lib/worldlab/worshipTypes'
 import VenueStatusLine from '@/app/earth/VenueStatusLine'
@@ -570,7 +570,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   function enter() {
     if (!own || !entry) return
     const companionId = companionFor([own.id, own.source])
-    setPanel({ kind: 'inside', request: { entityId: own.id, buildingTypeId: own.typeId, buildingName: own.name, kind: entry.kind }, companionId })
+    setPanel({ kind: 'inside', request: { entityId: own.id, buildingTypeId: own.typeId, buildingName: own.name, kind: entry.kind, at: { lat: own.lat, lon: own.lon } }, companionId })
   }
 
   async function talk() {
@@ -777,10 +777,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           ? <><TravelAgency from={building.at} onBooked={trip => { setShowAgency(false); onTripBooked?.(trip) }} onDrive={(at, note) => { setShowAgency(false); engine?.jump(at); onNote?.(note) }}/><div className="row"><span/><button onClick={() => setShowAgency(false)}>Schließen</button></div></>
           : <div className="row"><span>Bahn und Flug auf der Erde, Linienflüge ins All.</span><button onClick={() => setShowAgency(true)}>Reise buchen …</button></div>)
         : <div className="row"><span>Hier kann man Reisen buchen – auf der Erde und ins All.</span></div>)}
-      {own?.typeId === 'immersion_studio' && <>
-        <div className="row"><span>Erlebnis-Studio: du legst dich in einen Pod und erlebst die Vergangenheit, Spielwelten wie Endia oder ganz Abstraktes.</span></div>
-        {experiencesAt(building.at).map(map => <div className="row" key={map.id}><span>{map.title} · {map.era}</span><button disabled={map.status !== 'playable'}>{map.status === 'playable' ? 'In den Pod' : 'In Vorbereitung'}</button></div>)}
-      </>}
+      {own?.typeId === 'immersion_studio' && <p className="muted">Erlebnis-Studio: Pods für Zeitreisen, Spielwelten wie Endia und Abstraktes.</p>}
       {own && /^spaceport/.test(own.typeId) && (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
         ? (showTickets
           ? <><TicketCounter compact/><div className="row"><span/><button onClick={() => setShowTickets(false)}>Schließen</button></div></>

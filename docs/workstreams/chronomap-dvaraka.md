@@ -211,3 +211,9 @@ Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?)
 
 - Live (Migration `20261106100000_immersion_studios_sundern_frankfurt.sql`, Trockenlauf ok): Erlebnis-Studio Sundern (osm:way:246885862, 27,4 × 24,6 m, Region earth-sauerland) und Frankfurt (osm:way:174512109, 20,9 × 16 m). Beide in unbenannten, nicht als Wohnhaus eingetragenen Häusern nahe der Ortsmitte; die Häuser sind Vorschläge und lassen sich per Migration umsetzen.
 - Dort gibt es noch keine Zeitreise der Gegend (Chronomaps liegen in Dvārakā und Konstantinopel); das Studio zeigt Endia und Abstraktes, alle „In Vorbereitung".
+
+## Innenraum Erlebnis-Studio (06.11.2026)
+
+- Eintritt: Gebäudeart `immersion_studio` hat jetzt einen Eintrag (`kind: 'immersion'`, „Studio betreten"); die Anfrage trägt die Lage (`at`), damit das Studio die Zeitreisen der Gegend kennt.
+- `app/earth/ImmersionStudioInterior.tsx`: Empfangshalle mit den Erlebnissen aus dem Register (Zeitreise / Spielwelt / Abstrakte Erfahrung) und „Pod beziehen". Im Pod dunkler Raum mit Einführungstext je Kategorie und „Aufwachen". Erlebnisse mit Status `planned` zeigen „In Vorbereitung"; sobald eines `playable` ist, startet der Pod dort die Welt (Übergabepunkt in dieser Datei).
+- Noch nicht: Personal am Empfang, Preis/Zeitverbrauch, Begleiter im Pod.
