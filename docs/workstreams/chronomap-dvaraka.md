@@ -1,6 +1,6 @@
-# Chronomap Dvaraka – zweiter Entwurf (06.11.2026)
+# Chronomap Dvaraka – zweiter Entwurf (06.11.2026, ergänzt am selben Tag)
 
-Entwurf für Thomas' Korrektur, noch nichts gebaut. Grundlage ist jetzt die **Neue Fassung Mai 2026** von „Das Lied von Dvārakā“ (Claude-Projekt „Dvaraka Kapitel Verbesserungen“, vollständig gelesen, Stand 06.11.2026). Der erste Entwurf (02.11.) stützte sich teils auf die ältere v2.0 (Krishnan, Arjun, Tonscherben-Lager, Doppelaxt-Siegel in Kap. 1.2) und ist hiermit ersetzt.
+Entwurf für Thomas' Korrektur, noch nichts gebaut. Grundlage ist jetzt die **Neue Fassung Mai 2026** von „Das Lied von Dvārakā“, Authoring-Quelle seit 06.11.2026: Repo `buecherwelten`, `works/das-lied-von-dvaraka/manuscript/neue-fassung-2026-05.md` (Kopien im Claude-Projekt und auf Google Drive). Der erste Entwurf (02.11.) stützte sich teils auf die ältere v2.0 (Krishnan, Arjun, Tonscherben-Lager, Doppelaxt-Siegel in Kap. 1.2) und ist hiermit ersetzt.
 
 Vorgabe Thomas: Alles ist fiktiv und muss **nur zu den gerade laufenden Ausgrabungen passen**; sonst freie Hand. Ort: das versunkene Dvaraka, um 1600 v. Chr., am Arabischen Meer. Nicht das echte Dwarka (Gujarat).
 
@@ -46,7 +46,7 @@ Nur das bindet die Karte. Alles andere ist Buchwelt.
 | G10 | **Leere Kristalle** als Fundserie: Lampensteine, zu leicht, innen leer. Ihre Fundstellen häufen sich im 300-m-Umkreis um G9 – die Grabung rekonstruiert damit Priyas Liste | [R] / Häufung [S] | Szene B, Kap. 1.0 |
 | G11 | **Osmium-Siegel** im Hafenschlick unterhalb des Felsens | [R] | Kap. 1.4.2 |
 | G12 | **Fischerviertel**: Hausfundamente im Flachwasser südlich des Hafens, Teerreste der Werft, ein trockener Brunnen mit stumpfer Kristallkrone | [R] | Kap. 1.0.6, 1.3 |
-| G13 | **Kalksteinbehälter mit Dhruvas Chronik-Fragment**, in der Schicht der zweiten Untergangsphase | [R] | Fragment nach Kap. 1.4.2 |
+| G13 | **Kalksteinbehälter mit Dhruvas Chronik-Fragment** vor Kasyapas Werkstatt, wo Dhruva am Bruchtag auf dem Pflaster schrieb – aber in der Schicht der *zweiten* Untergangsphase. Dass er im Westbezirk über der Flutschicht des Bruchtags liegt, ist das Rätsel des Fundes: Kam Dhruva zurück? (Das Fragment sagt selbst: „vor oder nach dem Bruchtag – nicht feststellbar“.) | [R] | Fragment nach Kap. 1.4.2 (Fundort: Thomas, 06.11.2026) |
 | G14 | **Zwei Flutschichten**: Phase 1 (Bruchtag) über Fischerviertel und Westbezirk, Phase 2 (Generationen später) über der Felsstadt | [S] | Prolog, 1.4, 1.4.2 |
 
 Streitfall für die Grabung im Spiel: **Eisen um 1600 v. Chr.** an dieser Küste (G9) ist ein Fremdkörper. Daran kann sich eine Forschungs-Questkette aufhängen.
@@ -75,7 +75,7 @@ Eigene Koordinatenebene, Meter. Ursprung = Mitte des inneren Hafenbeckens, x nac
 | Platz hinter der Bäckergasse | (400, 170) | 20 × 20 | Westbezirk | [F] | Radha und Rohan klatschen; trockener Brunnen, drei schiefe Bäume |
 | Gasse der Weber | (520, 40) | 70 lang | Westbezirk | [F] | Priyas erste Lampen (Nr. 4 bis 7) |
 | Quergasse mit Brunnenreihe | (420, −40) bis (420, −120) | 80 lang | Westbezirk | [R] G7 | Govind, Rajan, Ketan; Haris Riss |
-| Werkstatt Kasyapa (Svaraṭi) | (450, 0) | 30 × 20 | Westbezirk | [R] G9 | Maschine, Ritual, Dhruva auf dem Pflaster davor |
+| Werkstatt Kasyapa (Svaraṭi) | (450, 0) | 30 × 20 | Westbezirk | [R] G9, G13 (davor, bei (450, −15)) | Maschine, Ritual, Dhruva auf dem Pflaster davor |
 | Kristall-Schrein des Westbezirks | (560, −20) | 10 × 10 | Westbezirk | [F] | Pandey, Pilgerinnen |
 | Gopals Werkstatt | (580, 90) | 15 × 12 | Westbezirk | [F] | Priya, Devraj |
 | Wartungsgebäude (Bikram) | (650, −70) | 25 × 15 | Westbezirk | [F] | Stufen, auf denen Priya und Devraj sitzen |
@@ -87,7 +87,7 @@ Eigene Koordinatenebene, Meter. Ursprung = Mitte des inneren Hafenbeckens, x nac
 | Stadtrat-Gebäude | (950, 0) | 30 × 20 | Felsstadt | [F] | Sitzung der Meister, Priyas Audienz |
 | Mittlerer Markt | (1050, −80) | 60 × 40 | Felsstadt | [F] | Prem, Suresh, Chandan, der Lautenspieler (dienstags) |
 | Tempel am Marktrand | (1100, −30) | 15 × 15 | Felsstadt | [F] | Kinder warten auf Brahmananda |
-| Dhruvas Schreibstube (Fundort G13) | (870, 60) | 10 × 8 | Felsstadt | [R] G13 | Chronik-Fragment im Kalksteinbehälter |
+| Dhruvas Schreibstube | (870, 60) | 10 × 8 | Felsstadt | [F] | Tagebuch, Notizhefte |
 | Turm Soma (Bewusstsein) | (1000, 120) | Ø 16, Höhe 45 | Felsstadt | [F] | steht nach dem Bruch |
 | Turm Ākāśa (Raum) | (1150, 160) | Ø 16, Höhe 45 | Felsstadt | [F] | steht nach dem Bruch |
 | Tempelbezirk | (1250, 20) | 100 × 80 | Felsstadt | [F] | – |
@@ -105,13 +105,23 @@ Dabei gestrichen: der „Hügel mit Sternenritual“ (das Ritual findet in der W
   - 35 Min. – der Bruchtag: Stadtrat am Morgen, Markt, Fischerviertel, Gang der Meister zur Werkstatt, Kasyapa zieht den Hebel.
   - 15 Min. – der Bruch: Türme fallen, Wasserwand, Abfahrt am Kai.
 - **Figuren folgen dem Tag:** Sie stehen nicht fest, sondern sind zu jeder Stunde dort, wo das Buch sie hat (Priya nachts in der Gasse der Weber, morgens im Stadtrat; Varuna Turm → Bäckergasse → Stadtrat → Werkstatt). Dafür reicht ein Fahrplan pro Figur, keine Simulation.
+- **Der Spieler darf eingreifen (Thomas, 06.11.2026).** Vorschlag für die Grenzen:
+  - **Fest bleibt der Bruch:** Kasyapa zieht den Hebel, die vier Türme fallen, die Wasserwand kommt, Fischerviertel und Westbezirk gehen unter. Die Grabungsfunde G1–G14 bleiben Kanon.
+  - **Veränderbar ist, wer und was gerettet wird.** Beispiele aus dem Buch:
+    - Priyas Liste früher zum Wartungsrat bringen (Bikrams Bericht liegt unter Punkt sieben von acht).
+    - Babus Warnung im Fischerviertel weitertragen, damit mehr Familien ihre Boote ziehen.
+    - Jayas Wasserkrüge, Meenas Gewürzvorrat, Velus Jüngsten aus dem Westbezirk holen.
+    - Ketans Warnung an Brunnen 24 an andere Brunnen bringen.
+    - Kasyapa in der dritten Nacht ansprechen (er wird trotzdem ziehen, aber vielleicht anders reden).
+  - **Folge in der Gegenwart:** Am Ende zeigt die Grabung, was der Spieler verändert hat, ohne die Funde zu ändern. Etwa als Liedzeile der Fischer, als zusätzlicher Name in einer Überlieferung oder als Boot mehr auf dem Weg nach Süden.
+  - Mehrfach spielbar: Jede Reise beginnt wieder in der dritten Nacht.
 - **Fundzettel:** An Orten mit [R] zeigt eine Tafel den Fundzettel der Grabung mit Datum; bei [S] „aus Funden erschlossen“, bei [F] „Rekonstruktion nach dem Buch“.
 - **Ende:** Der Spieler steht am Kai oder auf dem Fels über dem Hafen. Das letzte Dach des Fischerviertels verschwindet unter Wasser. Dann blendet die Szene in die Grabung über: Wo das Dach war, liegt heute das Grabungsfeld G12. Die Felsstadt steht in der Chronomap noch; in der Gegenwart liegt auch sie unter Wasser (Phase 2).
 
 ## 5. Offene Punkte für Thomas
 
-1. Passen die 14 Fundpunkte (Kap. 2)? Vor allem: Dhruvas Kalksteinbehälter in seiner Schreibstube in der Felsstadt (G13) – oder lieber dort, wo er am Bruchtag vor der Werkstatt schrieb?
+1. Passen die 14 Fundpunkte (Kap. 2)? (G13 liegt jetzt vor der Werkstatt, entschieden 06.11.2026.)
 2. Passt die Verteilung: Wasserturm, Heilgarten und Manus Haus im Westbezirk (innerhalb der 300 m), Stadtrat und Markt in der Felsstadt?
 3. Einstieg in der dritten Nacht als Pilger – oder doch am frühen Morgen des Bruchtags?
-4. Darf der Spieler eingreifen (z. B. Priyas Liste zum Wartungsrat tragen), oder ist er nur Zeuge? Vorschlag: nur Zeuge, die Geschichte ändert sich nicht.
+4. Eingreifen ist entschieden (06.11.2026). Offen: Passen die Grenzen in Kap. 4 (Bruch fest, Rettung veränderbar)? Wie zeigt die Gegenwart die Folgen?
 5. Kap. 1.4 ff. (die Wege der Träger nach Iberien, Ḫattuša, Himalaya, Ajanta) gehören nicht in diese Chronomap; das wären eigene Chronomaps.
