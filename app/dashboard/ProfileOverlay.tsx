@@ -489,6 +489,7 @@ export default function ProfileOverlay({ username, avatar, credits, onClose }: P
               {credits.toLocaleString('de')} Cr · {freigeschaltet}/{gesamt} Fähigkeiten
             </div>
             <button onClick={() => { setFigureNote(null); setFigureOpen(true) }} style={{ marginTop: 6, padding: '3px 9px', borderRadius: 5, border: `1px solid ${C.gold}`, background: 'transparent', color: '#fff', fontSize: '0.7rem', cursor: 'pointer' }}>Figur gestalten …</button>
+            <button onClick={() => window.location.assign('/auth/logout')} style={{ marginTop: 6, marginLeft: 6, padding: '3px 9px', borderRadius: 5, border: '1px solid #8ab0d0', background: 'transparent', color: '#cfe3f2', fontSize: '0.7rem', cursor: 'pointer' }}>↪ Abmelden</button>
             {figureNote && <div style={{ fontSize: '0.65rem', color: '#cfe3f2', marginTop: 3 }}>{figureNote}</div>}
           </div>
           <button onClick={() => setFigureOpen(true)} title="Deine Figur im Spiel" style={{ background: '#e9e2d2', border: 'none', borderRadius: 8, padding: '2px 6px', cursor: 'pointer', flexShrink: 0 }}><KieselFigure look={mine.look} dir="sw" width={30} title="Deine Figur" /></button>

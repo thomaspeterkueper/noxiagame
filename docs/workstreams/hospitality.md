@@ -337,6 +337,7 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
     - „Alle Bewegungen …“: alle Posen nach Stufen (Grundbewegungen, Gesten, Zu zweit, Tanz, Arbeit, Rangelei, Kampf), mit Blickrichtung und Hinweis, wann sie im Spiel vorkommen.
     - Ein Klick zeigt die Pose groß an der eigenen Figur; dazu der Knopf „Zufällig“.
     - Stilvergleich und Leistungsprobe der Werkstatt waren für die Entscheidung gedacht und bleiben im Artefakt.
+- **06.11.2026 – Abmelden im Profil** (Thomas: „Abmelden sollte auch beim Figurenprofil sein, nicht unten bei Aktionen“): „↪ Abmelden“ steht im Kopf des Profilfensters neben „Figur gestalten …“; unter „Aktionen“ in der unteren Leiste ist es entfernt. Der Eintrag im Reiter „Einstellungen“ bleibt.
   - Gilt für alle Räume des Motors: Lokale, Bank, Agentur, Reisebüro, Wache, Feuerwache, Praxis, Krankenhaus.
   - Im Browser geprüft (Metropol, Café, Wache; Laufen per Klick, Tasten, Einrichten).
   - **Später** (Thomas): eine 80er-/90er-Fassung für die Zeitreise in VR.

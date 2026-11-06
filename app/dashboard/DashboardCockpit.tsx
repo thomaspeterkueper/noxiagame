@@ -210,7 +210,9 @@ export default function DashboardCockpit() {
     targets.actions[id]?.click()
   }
 
-  const hasActions = (Object.keys(ACTION_META) as ActionId[]).some(id => Boolean(targets.actions[id]))
+  // Abmelden steht im Profil bei der eigenen Figur, nicht unter „Aktionen“ (06.11.2026).
+  const MENU_ACTIONS = (Object.keys(ACTION_META) as ActionId[]).filter(id => id !== 'logout')
+  const hasActions = MENU_ACTIONS.some(id => Boolean(targets.actions[id]))
 
   return <>
     <style>{cockpitStyles}</style>
@@ -218,7 +220,7 @@ export default function DashboardCockpit() {
     {utilityOpen === 'actions' && <aside className="noxia-cockpit-utility noxia-actions-panel" aria-label="NOXIA Aktionen">
       <div className="noxia-utility-head"><div><small>NOXIA</small><strong>Aktionen</strong></div><button type="button" onClick={() => setUtilityOpen(null)} aria-label="Aktionen schließen">×</button></div>
       <div className="noxia-actions-grid">
-        {(Object.keys(ACTION_META) as ActionId[]).map(id => {
+        {MENU_ACTIONS.map(id => {
           if (!targets.actions[id]) return null
           const item = ACTION_META[id]
           return <button key={id} type="button" onClick={() => invokeAction(id)}>
