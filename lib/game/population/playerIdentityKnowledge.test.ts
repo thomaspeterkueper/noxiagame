@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { perceivedIdentityState, perceivedPersonLabel } from './playerIdentityKnowledge'
+import { currentKnownName, perceivedIdentityState, perceivedPersonLabel } from './playerIdentityKnowledge'
 
 describe('player identity knowledge', () => {
   it('shows only an observable description while identity is unknown', () => {
@@ -23,6 +23,12 @@ describe('player identity knowledge', () => {
       observableDescription: 'Mann, ca. 60',
       knownName: 'Arven Adams',
     })).toBe('Arven Adams')
+  })
+
+  it('uses the current name of a known person, not the stored copy', () => {
+    expect(currentKnownName('Victor Chen', 'Viktor Gellert')).toBe('Viktor Gellert')
+    expect(currentKnownName('Victor Chen', null)).toBe('Victor Chen')
+    expect(currentKnownName(null, '  ')).toBeNull()
   })
 
   it('treats missing knowledge as unknown', () => {

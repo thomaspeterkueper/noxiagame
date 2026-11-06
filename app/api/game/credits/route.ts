@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
+import { currentKnownName } from '@/lib/game/population/playerIdentityKnowledge'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
@@ -28,9 +29,10 @@ export async function GET(req: NextRequest) {
     supabase.from('profiles').select('credits').eq('id', profileId).maybeSingle(),
     supabase.from('credit_transfers').select('created_at,channel,amount,note,place,from_profile_id,from_person_id,to_profile_id,to_person_id')
       .or(`from_profile_id.eq.${profileId},to_profile_id.eq.${profileId}`).order('created_at', { ascending: false }).limit(20),
-    supabase.from('player_person_identity_knowledge').select('person_id,known_name').eq('profile_id', profileId).eq('identity_state', 'known').limit(200),
+    supabase.from('player_person_identity_knowledge').select('person_id,known_name,people(display_name)').eq('profile_id', profileId).eq('identity_state', 'known').limit(200),
   ])
-  const knownName = new Map((known ?? []).map((row: any) => [String(row.person_id), String(row.known_name ?? '')]))
+  const nameOf = (row: any) => currentKnownName(row.known_name, (Array.isArray(row.people) ? row.people[0] : row.people)?.display_name) ?? ''
+  const knownName = new Map((known ?? []).map((row: any) => [String(row.person_id), nameOf(row)]))
   const profileIds = [...new Set((rows ?? []).flatMap((r: any) => [r.from_profile_id, r.to_profile_id]).filter((id: any) => id && id !== profileId))]
   const { data: names } = profileIds.length ? await supabase.from('profiles').select('id,username').in('id', profileIds) : { data: [] as any[] }
   const username = new Map((names ?? []).map((row: any) => [String(row.id), String(row.username ?? 'ein Spieler')]))
@@ -42,7 +44,7 @@ export async function GET(req: NextRequest) {
     const who = otherProfile ? username.get(String(otherProfile)) ?? 'ein Spieler' : (otherPerson && knownName.get(String(otherPerson))) || 'jemand aus dem Ort'
     return { at: r.created_at, direction: out ? 'out' : 'in', channel: r.channel, amount: r.amount, who, note: r.note, place: r.place }
   })
-  return NextResponse.json({ credits: Number(profile?.credits ?? 0), transfers, known: (known ?? []).filter((r: any) => r.known_name).map((r: any) => ({ id: String(r.person_id), name: String(r.known_name) })) }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({ credits: Number(profile?.credits ?? 0), transfers, known: (known ?? []).filter((r: any) => nameOf(r)).map((r: any) => ({ id: String(r.person_id), name: nameOf(r) })) }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
 export async function POST(req: NextRequest) {
