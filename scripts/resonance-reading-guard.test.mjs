@@ -33,3 +33,8 @@ test('Leseproben werden auf dem Server gekürzt', () => {
   assert.match(releases, /sections\.slice\(0, readable\)/)
   assert.match(releases, /mode === 'hidden'\) return null/)
 })
+
+test('NPC cannot move player without explicit UI confirmation', () => {
+  assert.match(interior, /playerFollows && window\.confirm/)
+  assert.equal((interior.match(/window\.confirm\(/g) || []).length, 2)
+})
