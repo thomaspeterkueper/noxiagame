@@ -198,7 +198,7 @@ export default function BodyWorld({ locationSlug, body, residents = [], corridor
         const target = buildings.find(item => item.id === action.targetRef)
         if (target) {
           engine.sendPerson(person.id, { lat: target.lat, lon: target.lon }, Math.max(4, Math.min(120, Number(action.durationSeconds ?? 8))))
-          if (action.playerFollows) engine.walkTo(() => engine.personAt(person.id), 3)
+          if (action.playerFollows) engine.followPerson(person.id, 3)
         }
       }
     } finally { setSending(false) }

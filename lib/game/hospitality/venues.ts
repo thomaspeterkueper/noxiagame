@@ -1144,6 +1144,10 @@ export function venueConversationFacts(input: ConversationFactsInput): string[] 
     facts.push(menuFact(layout, menu))
   } else if (venueService(layout, input.figures) === 'self-service') {
     facts.push(`Hier bedient kein Personal; bestellt und bezahlt wird am Automaten ${layout.servicePoint.locative}`)
+  } else if (layout.kind !== 'hotel') {
+    // Bedienung am Platz (06.11.2026): Ein Gast sagte „Ich hole uns was am Tresen“ und blieb
+    // sitzen – die Angabe „bestellt wird am Tresen“ passte nicht zum Lokal mit Tischbedienung.
+    facts.push(`Wer sitzt, wird vom Personal am Tisch bedient; du holst nichts selbst ${layout.servicePoint.locative}. Die Preise hast du nicht im Kopf`)
   } else {
     facts.push(`Bestellt und bezahlt wird ${layout.servicePoint.locative} beim Personal; die Preise hast du nicht im Kopf`)
   }

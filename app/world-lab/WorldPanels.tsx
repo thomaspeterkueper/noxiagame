@@ -1,8 +1,8 @@
 'use client'
 
 // app/world-lab/WorldPanels.tsx
-// Aktualisiert: 06.11.2026 — Sichtbare Autofahrt zum Ziel (engine.driveTo), Fernfahrt als Sprung; 06.11.2026 — Betriebe (Laden, Werkstatt) aus realen Gewerbe-Häusern mit erfundenem Namen, Personal und Leistungen; Fahrzeugtresen im Autohaus, in der Werkstatt und an der Ladestation; „Hinfahren“ mit eigenem Fahrzeug zu fernen Zielen (onNote); 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd)
-// Version:      1.3.0
+// Aktualisiert: 06.11.2026 — Mitgehen nach Zusage im Gespräch bleibt bei der Person bis zum Ziel (follow); 06.11.2026 — Sichtbare Autofahrt zum Ziel (engine.driveTo), Fernfahrt als Sprung; 06.11.2026 — Betriebe (Laden, Werkstatt) aus realen Gewerbe-Häusern mit erfundenem Namen, Personal und Leistungen; Fahrzeugtresen im Autohaus, in der Werkstatt und an der Ladestation; „Hinfahren“ mit eigenem Fahrzeug zu fernen Zielen (onNote); 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd)
+// Version:      1.3.1
 // Tafeln der Weltkarte: Person, Gebäude, Innenraum.
 //
 // Grundsatz (Thomas, 25.10.2026 – in der alten Szene lagen Tafeln übereinander):
@@ -531,6 +531,13 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     engine.walkTo(target, withinM, () => setWalking(false))
   }
 
+  /** Mitgehen nach Zusage im Gespräch: bleibt bei der Person, bis sie am Ziel ist (06.11.2026). */
+  function follow(id: string) {
+    if (!engine) return
+    setWalking(true)
+    engine.followPerson(id, 3, () => setWalking(false))
+  }
+
   /**
    * W-15 (03.11.2026): Wer kommt mit hinein? Wer zu diesem Ort unterwegs ist, sonst wer
    * in den letzten fünf Minuten mit dem Spieler losgegangen ist und jetzt dicht bei ihm steht.
@@ -628,7 +635,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           engine.sendPerson(person.id, target, seconds)
           setVisits(current => ({ ...current, [person.id]: String(action.targetRef) }))
           if (landmark) setVisitNames(current => ({ ...current, [String(action.targetRef)]: landmark.name }))
-          if (action.playerFollows) { walkTo(() => engine.personAt(person.id), 3); setLedAt(current => ({ ...current, [person.id]: Date.now() })) }
+          if (action.playerFollows) { follow(person.id); setLedAt(current => ({ ...current, [person.id]: Date.now() })) }
         }
       } else if (action?.type === 'lead_walk') {
         // Die Person geht wirklich voraus (wie in der bisherigen Erdszene); wer folgt, bleibt dicht dahinter.
@@ -638,7 +645,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         engine.leadPerson(id, metres, seconds)
         setLeading(current => ({ ...current, [id]: true }))
         setLedAt(current => ({ ...current, [id]: Date.now() }))
-        if (action.playerFollows) walkTo(() => engine.personAt(id), 3)
+        if (action.playerFollows) follow(id)
         // Danach geht sie wieder ihrer Wege.
         setTimeout(() => { engine.releasePerson(id); setLeading(current => { const next = { ...current }; delete next[id]; return next }) }, (seconds + 20) * 1000)
       }

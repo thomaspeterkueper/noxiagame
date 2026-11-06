@@ -1,8 +1,8 @@
 'use client'
 
 // app/interiors/WalkableInterior.tsx
-// Aktualisiert: 28.10.2026 — Laufweg der Spielfigur für die Verhaltensaufzeichnung der Testphase
-// Version:      1.1.0
+// Aktualisiert: 06.11.2026 — Bedienung am Tisch im Seitenfeld ansprechbar („Mit … sprechen“), zurück zur Begleitung; 28.10.2026 — Laufweg der Spielfigur für die Verhaltensaufzeichnung der Testphase
+// Version:      1.1.1
 // Ein Bedienmodell für alle Gebäude (NOXIA-INTERIOR-0001): Bewegung, Hinsetzen,
 // Wege um die Möbel, Personen wählen, Porträt und Gespräch, Bedienplatz mit
 // Begrüßung, Besucher, die kommen und gehen, rechte Tafel mit dem Nötigen.
@@ -665,7 +665,11 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
     if(!selected||!historyState.length)select(guest)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[joined])
-  const waiterName=waiterId?(()=>{const w=everyone.find(r=>r.id===waiterId);return w?personSceneLabel(w):null})():null
+  const waiter=waiterId?everyone.find(r=>r.id===waiterId)??null:null
+  const waiterName=waiter?personSceneLabel(waiter):null
+  // Bedienung ansprechen (06.11.2026): Kommt jemand an den Tisch, während man mit der
+  // Begleitung spricht, fand man sie im Seitenfeld nicht – nur über ihre Figur im Raum.
+  const tableMate=(()=>{const id=joined??companion?.id??null;return id&&id!==waiterId?everyone.find(r=>r.id===id)??null:null})()
   useEffect(()=>{if(atTable&&waiterName)setStatus(waiterName+' kommt an deinen Tisch und nimmt die Bestellung auf.')},[atTable,waiterName])
 
   const openSeats=closed?[]:freeSeats(layout,figures,seat?[seat.id]:[]).filter(spot=>entryAllows(layout,spot,gateOpen))
@@ -760,6 +764,8 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
           {fitting.sideDoor&&!nearSide&&entryAllows(layout,fitting.sideDoor,gateOpen)&&<button onClick={()=>walkTo({x:fitting.sideDoor!.x,y:fitting.sideDoor!.y},()=>fitting.sideDoor!.use(ctxRef.current??ctx))}>{fitting.sideDoor.goLabel}</button>}
           {onFloor&&!seat&&<button onClick={()=>{const next=!dancing;setDancing(next);setStatus(next?'Du tanzt.':'Du hörst auf zu tanzen.')}}>{dancing?'Aufhören':'Tanzen'}</button>}
           {seat?<button onClick={()=>setSeat(null)}>Aufstehen</button>:nextSeat&&<button onClick={()=>sitAt(nextSeat)}>Hinsetzen</button>}
+          {waiter&&waiterName&&(tablePhase==='coming'||tablePhase==='at-table')&&selected?.id!==waiter.id&&<button onClick={()=>ctx.talkTo(waiter)}>Mit {waiterName} sprechen</button>}
+          {tableMate&&selected?.id!==tableMate.id&&selected&&selected.id===waiter?.id&&<button onClick={()=>select(tableMate)}>Mit {personSceneLabel(tableMate)} weitersprechen</button>}
         </div>}
         <button className="give-open block" onClick={()=>setEditingFigure(true)}>Deine Figur gestalten …</button>
         {!closed&&<div className="moves gestures"><small>GESTEN · auch im Chat: /winken, /prost, /hand …</small>{myPose&&FOLLOW_JOINTS.has(myPose.name)&&<button className="on" onClick={()=>{setMyPose(null);following.current=false;setNpcJoint(null);setStatus('Ihr lasst los.')}}>Loslassen</button>}{(Object.keys(GESTURES) as GestureName[]).map(g=><button key={g} className={poseNow(myPose,nowMs)===g?'on':''} onClick={()=>poseNow(myPose,nowMs)===g?setMyPose(null):doGesture(g)}>{GESTURES[g].label}</button>)}</div>}
