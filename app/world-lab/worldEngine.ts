@@ -1,6 +1,6 @@
 // app/world-lab/worldEngine.ts
-// Aktualisiert: 06.11.2026 — Autos anderer Spieler (fahrend und geparkt) aus der Präsenz; Busse nach Fahrplan auf OSM-Buslinien (setBusLines, busAt); Echter Verkehr: Personen mit Auto fahren ihren Arbeitsweg sichtbar über die Straßen; eigene Fahrt als Fahrt (driveTo) statt Sprung; geparktes eigenes Auto (setOwnVehicle)
-// Version:      1.3.0
+// Aktualisiert: 06.11.2026 — Mitgehen im Gespräch (followPerson): bleibt bei der Person, bis sie angekommen ist; 06.11.2026 — Autos anderer Spieler (fahrend und geparkt) aus der Präsenz; Busse nach Fahrplan auf OSM-Buslinien (setBusLines, busAt); Echter Verkehr: Personen mit Auto fahren ihren Arbeitsweg sichtbar über die Straßen; eigene Fahrt als Fahrt (driveTo) statt Sprung; geparktes eigenes Auto (setOwnVehicle)
+// Version:      1.3.1
 // Prototyp „eine Welt“ mit PixiJS – die Zeichenmaschine ohne React.
 //
 // WorldLab.tsx stellt nur Bühne und Anzeige; Kacheln, NOXIA-Gebäude und Bilder
@@ -8,7 +8,8 @@
 // Anmeldung und Datenbank mit Testkacheln messen.
 
 import type { Application, Container, Graphics as PixiGraphics, Sprite, Texture } from 'pixi.js'
-import { geoToMerc, mercPerGroundMetre, mercToGeo, tileAt, tileKey, tileOrigin, TILE_SIZE_MERC, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
+import { mercPerGroundMetre, tileKey, type GeoPoint, type TileId } from '@/lib/worldlab/mercator'
+import { EARTH_PROJECTION, type Projection } from '@/lib/worldlab/bodyProjection'
 import { heightTint, terrainShade, type TileTerrainPart } from '@/lib/worldlab/terrain'
 import { shouldReanchor } from '@/lib/worldlab/reanchor'
 import { KIESEL_POSES, kieselDirFrom, kieselSVG, type KieselDir, type KieselLook, type KieselPose } from '@/lib/figures/kiesel'
@@ -78,6 +79,13 @@ export interface WorldEngineOptions {
    * Die Ansicht startet die Welt dann an `at` neu. Wird einmal je Engine gemeldet.
    */
   onFarFromAnchor?: (at: GeoPoint, zoom: number) => void
+  /**
+   * Andere Himmelskörper (06.11.2026, `lib/worldlab/bodies.ts`): Projektion mit dem Umfang
+   * des Körpers, Bodenfarbe und Sonnenstand. Fehlt es, gilt die Erde wie bisher.
+   */
+  projection?: Projection
+  ground?: number
+  sunElevation?: (lat: number, lonEast: number, nowMs: number) => number
 }
 
 /** Was unter dem Zeiger lag, als geklickt wurde. */
@@ -141,6 +149,8 @@ export interface WorldEngine {
   releasePerson: (id: string) => void
   /** Spielfigur geht selbst zu einem Ziel, bis sie `withinM` Meter nah ist; Tasten brechen ab. */
   walkTo: (target: () => GeoPoint | null, withinM: number, onArrive?: () => void) => void
+  /** Spielfigur geht mit einer Person mit, solange diese unterwegs ist (sendPerson/leadPerson), und bleibt `withinM` Meter hinter ihr; Tasten brechen ab. */
+  followPerson: (id: string, withinM: number, onArrive?: () => void) => void
   stopWalking: () => void
   /** Spielfigur fährt mit dem eigenen Auto über die Straßen zum Ziel; am Ende bleibt das Auto dort stehen. */
   driveTo: (target: () => GeoPoint | null, withinM: number, onArrive?: () => void) => void
@@ -263,7 +273,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   const cleanup: Array<() => void> = []
 
   const app: Application = new PIXI.Application()
-  await app.init({ resizeTo: host, background: GROUND_COLOR, antialias: settings.antialias, autoDensity: true, resolution: Math.min(settings.maxResolution, window.devicePixelRatio || 1) })
+  await app.init({ resizeTo: host, background: options.ground ?? GROUND_COLOR, antialias: settings.antialias, autoDensity: true, resolution: Math.min(settings.maxResolution, window.devicePixelRatio || 1) })
   host.appendChild(app.canvas)
 
   // ── Gezeichnete Bilder ──────────────────────────────────────────────
@@ -334,6 +344,8 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // Die Welt wird relativ zu einem festen Punkt gezeichnet, damit die
   // Grafikkarte mit kleinen Zahlen rechnet. Die wahre Position bleibt Mercator.
   const startGeo = options.start
+  const { geoToMerc, mercToGeo, tileAt, tileOrigin, tileSizeMerc: TILE_SIZE_MERC } = options.projection ?? EARTH_PROJECTION
+  const sunElevation = options.sunElevation ?? sunElevationDeg
   const anchorTile = tileAt(geoToMerc(startGeo))
   const anchor = tileOrigin(anchorTile)
   const k = mercPerGroundMetre(startGeo.lat)
@@ -1890,7 +1902,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
   // ── Selbst gehen ────────────────────────────────────────────────────
   // Nahe Ziele (unter 30 m) gerade, weite entlang der Straßen der geladenen
   // Kacheln. Bewegt sich das Ziel weit weg (Person), wird neu geplant.
-  let autoWalk: { target: () => GeoPoint | null; withinM: number; onArrive?: () => void; path: Array<{ x: number; y: number }>; planFor: { x: number; y: number } | null; planAt: number; stuck: number; /** Mit dem eigenen Auto: Tempo eines Autos, Auto statt Figur, am Ziel bleibt es stehen. */ drive?: boolean } | null = null
+  let autoWalk: { target: () => GeoPoint | null; withinM: number; onArrive?: () => void; path: Array<{ x: number; y: number }>; planFor: { x: number; y: number } | null; planAt: number; stuck: number; /** Mitgehen (Gespräch): solange das wahr ist, endet der Gang am Ziel nicht, die Figur wartet dicht dabei. */ holdWhile?: () => boolean; /** Mit dem eigenen Auto: Tempo eines Autos, Auto statt Figur, am Ziel bleibt es stehen. */ drive?: boolean } | null = null
   function planRoute(to: { x: number; y: number }, from: { x: number; y: number } = player) {
     if (Math.hypot(to.x - from.x, to.y - from.y) < 30) return [to]
     const graph = new RoadGraph()
@@ -1910,7 +1922,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const target = autoWalk.target()
     if (!target) { autoWalk = null; return }
     const to = toWorld(target)
-    if (Math.hypot(to.x - player.x, to.y - player.y) <= autoWalk.withinM) { const done = autoWalk.onArrive; if (autoWalk.drive) parkOwnCar(); autoWalk = null; done?.(); return }
+    if (Math.hypot(to.x - player.x, to.y - player.y) <= autoWalk.withinM) { if (autoWalk.holdWhile?.()) { autoWalk.stuck = 0; return } const done = autoWalk.onArrive; if (autoWalk.drive) parkOwnCar(); autoWalk = null; done?.(); return }
     // Neu planen, wenn das Ziel sich bewegt hat oder (bei weiten Zielen) neue Kacheln geladen sind.
     const now = performance.now()
     if (!autoWalk.planFor || Math.hypot(to.x - autoWalk.planFor.x, to.y - autoWalk.planFor.y) > 12 || (autoWalk.path.length <= 1 && now - autoWalk.planAt > 4000)) {
@@ -1928,6 +1940,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     autoWalk.stuck = moved < step * 0.2 ? autoWalk.stuck + dt : 0
     if (autoWalk.stuck > 0.8 && autoWalk.path.length > 1) { autoWalk.path.shift(); autoWalk.stuck = 0 }
     // Ziel liegt hinter einer Wand (Schild mitten im Haus): so nah wie möglich gilt als angekommen.
+    else if (autoWalk.stuck > 1.2 && autoWalk.holdWhile?.()) { autoWalk.path = []; autoWalk.planFor = null; autoWalk.stuck = 0 }
     else if (autoWalk.stuck > 1.2) { const done = autoWalk.onArrive; if (autoWalk.drive) parkOwnCar(); autoWalk = null; done?.() }
   }
 
@@ -2471,7 +2484,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     const geo = toGeo(player)
     if (now - ambientAt > 20000) {
       ambientAt = now
-      sunNow = sunElevationDeg(geo.lat, geo.lon, Date.now())
+      sunNow = sunElevation(geo.lat, geo.lon, Date.now())
       const tint = dayTint(sunNow)
       if (tint !== worldTint) {
         worldTint = tint
@@ -2661,6 +2674,13 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       if (back) startCommute(walker, back)
     },
     walkTo(target, withinM, onArrive) { autoWalk = { target, withinM, onArrive, path: [], planFor: null, planAt: 0, stuck: 0 } },
+    followPerson(id, withinM, onArrive) {
+      // Bis 06.11.2026 lief Mitgehen über walkTo zur Person: Wer beim Gespräch schon
+      // nah stand, war sofort „angekommen“ und blieb stehen, während die Person losging.
+      const target = () => { const walker = walkers.get(id); return walker ? toGeo(walker) : null }
+      const holdWhile = () => { const sent = walkers.get(id)?.sent; return Boolean(sent && !sent.commute && performance.now() - sent.start < sent.seconds * 1000 + 1500) }
+      autoWalk = { target, withinM, onArrive, path: [], planFor: null, planAt: 0, stuck: 0, holdWhile }
+    },
     driveTo(target, withinM, onArrive) {
       // Erst zum Auto, wenn es nicht hier steht; dann fahren. Ohne geparktes Auto startet die Fahrt hier.
       ownCarAt = null

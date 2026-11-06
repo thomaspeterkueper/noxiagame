@@ -32,7 +32,7 @@ describe('Jahreszeiten', () => {
 })
 
 const square = (n: number) => [0, 0, n, 0, n, n, 0, n]
-const tile = (areas: Array<{ k: string; p: number[] }>, extra: Record<string, unknown> = {}) => ({ size: 190, areas, roads: [], rivers: [], blocks: [], trees: [], ...extra }) as never
+const tile = (areas: Array<{ k: string; p: number[]; l?: string }>, extra: Record<string, unknown> = {}) => ({ size: 190, areas, roads: [], rivers: [], blocks: [], trees: [], ...extra }) as never
 
 describe('Verteilung', () => {
   it('Wald: dicht, Bestände mit vorherrschender Art, nur heimische Arten', () => {

@@ -161,3 +161,78 @@ Pro Eingriff ein Merker (boolesch oder Anzahl), gespeichert mit der Reise. Beim 
 3. Einstieg in der dritten Nacht als Pilger – oder doch am frühen Morgen des Bruchtags?
 4. Eingreifen und Grenzen sind entschieden (06.11.2026); Spuren in Kap. 5. Offen: Wer schreibt die Liedstrophen und Reime – Thomas selbst oder Entwurf durch Claude zur Korrektur?
 5. Kap. 1.4 ff. (die Wege der Träger nach Iberien, Ḫattuša, Himalaya, Ajanta) gehören nicht in diese Chronomap; das wären eigene Chronomaps.
+
+## Zugänge zur Chronomap (Thomas, 06.11.2026, korrigiert)
+
+Entschieden: Eine Chronomap (auch „Chronotrip") ist auf **zwei Wegen** betretbar.
+
+1. **Timetravel-Agency**: eigene Ortsart, getrennt vom normalen Reisebüro. In Reisebüros bucht man **nur normale Reisen**; es gibt dort **keinen** Reiter „Zeit". Chronotrips gibt es ausschließlich in Timetravel-Agencys (Grabungsstätte Dvārakā, Istanbul, weitere).
+2. **Button am Ort**: wer schon vor Ort ist, findet im Erklärtext zu einem historischen Gebäude oder Ort (Gebäudechronik, Wahrzeichen-Panel) den Button „Zeitreise: so sah es aus …", sofern für diesen Ort eine Chronomap hinterlegt ist.
+
+Folgerung für die Umsetzung: ein **Register der Chronomaps** (Kennung, Titel, Epoche, Startpunkt in Weltkoordinaten, Orte/Gebäude mit Button, Timetravel-Agencys), das beide Zugänge speist. Der Button erscheint nur bei Treffern im Register.
+
+## Inhaltsgrundsatz (Thomas, 06.11.2026)
+
+1. **Reales Wissen zuerst**, aus dem Wissensgraphen (`kueper-knowledge-graph`). Das ist die Grundschicht jeder Chronomap.
+2. **Ergänzt aus den Büchern.** Buchwelt füllt, was das reale Wissen offenlässt.
+3. **Konsequente Aufarbeitung der Buchtexte**: Die Texte werden systematisch in prüfbare Aussagen (Ort, Zeit, Personen, Dinge) zerlegt. Daraus lassen sich Unstimmigkeiten in den Geschichten erkennen (zum Beispiel Kap. 1.3 „Dach der Stadt" gegen „Fischerviertel"). Die Etiketten [R]/[S]/[F] markieren die Herkunft jeder Aussage.
+
+Folge: Requests an Wissensgraph (Schnittstelle für reale Fakten je Ort und Epoche) und Bücher (strukturierte Aussagen je Kapitel, Konsistenzprüfung). Die Karte liest nur, sie hält keine eigene Wahrheit.
+
+Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?), Format der Schnittstelle zum Wissensgraphen.
+
+## Entscheidungen 06.11.2026 (Thomas: „bei den anderen Fragen kannst du entscheiden")
+
+- **Konstantinopel startet am Hafen** (Thomas). Register: `lib/worldlab/chronomaps.ts`, Startpunkt vorläufig bei 41,0136 N / 28,9784 O, später auf den Theodosianischen Hafen (Yenikapı) feinjustieren.
+- **Register** gebaut: `CHRONOMAPS`, `chronomapsForPlace(name)` (Button am Ort), `chronomapsNear(at)` (Timetravel-Agencys). Status `planned`, bis begehbarer Inhalt existiert. Noch keine Oberfläche.
+- **Inhaltsquelle:** Wissensgraph für reales Wissen, Bücher als Ergänzung (Thomas). Die Karte liest nur.
+- **Austauschformat (Vorschlag):** je Chronomap eine JSON-Datei `chronomaps/<id>.json` mit `facts[]`: `{ id, claim, place?, from?, to?, source: 'graph'|'book', ref, label: 'R'|'S'|'F' }`. Die Konsistenzprüfung läuft in den Büchern gegen genau diese Aussagen.
+- **Reihenfolge:** zuerst Register und Oberfläche (Agency-Ortsart, Button), dann Inhalte.
+
+## Request-Entwürfe (zum Einfügen in die jeweiligen Repos)
+
+**An kueper-knowledge-graph:** Je Chronomap (Konstantinopel zuerst: Hafen, Spätantike bis Mittelalter) die gesicherten Fakten als Aussagen mit Ort, Zeitraum und Quelle liefern, im obigen Format mit `source: 'graph'`. Unsicheres als [S] markieren. Zweck: Grundschicht der Zeitreise.
+
+**An buecherwelten:** Die Buchtexte (zuerst „Das Lied von Dvārakā", Neue Fassung Mai 2026) kapitelweise in prüfbare Aussagen (Ort, Zeit, Personen, Dinge) zerlegen, `source: 'book'`, und gegen den Graphen sowie untereinander auf Widersprüche prüfen. Funde als Liste je Kapitel zurückmelden.
+
+## Stand Oberfläche (06.11.2026)
+
+- Wahrzeichen-Panel zeigt bei Treffern im Register eine Zeile „Zeitreise: <Titel> (<Epoche>)" mit Knopf „In Vorbereitung" (deaktiviert, bis eine Chronomap `playable` ist). Ortsart `timetravel_agency` und deren Panel folgen.
+
+## Erlebnis-Studio statt „Timetravel-Agency" (Thomas, 06.11.2026)
+
+- Der Name „Timetravel-Agency" war zu eng: Es ist ein **VR-Anbieter**. Man legt sich in einen Pod und erlebt die Vergangenheit, **Spielwelten wie Endia** oder **ganz Abstraktes**. Gebäudeart: `immersion_studio`, Anzeigename „Erlebnis-Studio". Reisebüros bleiben bei normalen Reisen.
+- Register erweitert: `category` = `chronotrip` | `game` | `abstract`; `experiencesAt(at)` = Zeitreisen der Gegend plus alle Spiele und abstrakten Welten. Einträge: Dvārakā, Konstantinopel, Endia, Abstrakte Räume (alle `planned`).
+- Konstantinopel-Startpunkt korrigiert auf den Theodosianischen Hafen (Yenikapı, 40,999 N / 28,9515 O); Studio-Gegend 5 km um Fatih.
+- Live (Migration `20261106090000_immersion_studios.sql`, Trockenlauf ok): Studios in Dvārakā (osm:way:1343177734) und Istanbul/Fatih (osm:way:530509109). Gebäude-Panel zeigt die Erlebnisse mit „In Vorbereitung".
+- Requests eingefügt: `kueper-knowledge-graph` → `requests/open/REQ-L3-000003-noxiagame-chronomap-fakten.md`; `buecherwelten` → `external-tasks/open/EXT-NXU-BW-20261106-001.md`.
+
+## Studios Sundern und Frankfurt (06.11.2026)
+
+- Live (Migration `20261106100000_immersion_studios_sundern_frankfurt.sql`, Trockenlauf ok): Erlebnis-Studio Sundern (osm:way:246885862, 27,4 × 24,6 m, Region earth-sauerland) und Frankfurt (osm:way:174512109, 20,9 × 16 m). Beide in unbenannten, nicht als Wohnhaus eingetragenen Häusern nahe der Ortsmitte; die Häuser sind Vorschläge und lassen sich per Migration umsetzen.
+- Dort gibt es noch keine Zeitreise der Gegend (Chronomaps liegen in Dvārakā und Konstantinopel); das Studio zeigt Endia und Abstraktes, alle „In Vorbereitung".
+
+## Innenraum Erlebnis-Studio (06.11.2026)
+
+- Eintritt: Gebäudeart `immersion_studio` hat jetzt einen Eintrag (`kind: 'immersion'`, „Studio betreten"); die Anfrage trägt die Lage (`at`), damit das Studio die Zeitreisen der Gegend kennt.
+- `app/earth/ImmersionStudioInterior.tsx`: Empfangshalle mit den Erlebnissen aus dem Register (Zeitreise / Spielwelt / Abstrakte Erfahrung) und „Pod beziehen". Im Pod dunkler Raum mit Einführungstext je Kategorie und „Aufwachen". Erlebnisse mit Status `planned` zeigen „In Vorbereitung"; sobald eines `playable` ist, startet der Pod dort die Welt (Übergabepunkt in dieser Datei).
+- Noch nicht: Personal am Empfang, Preis/Zeitverbrauch, Begleiter im Pod.
+
+## Studio: Empfang, Preise, gemeinsames Erleben (06.11.2026)
+
+- **Empfang:** Im Studio sitzt eine stabile Mitarbeiterfigur (Name aus `landmarkStaffName`), die mit einem Satz begrüßt (`receptionGreeting`). Noch ohne Dialog und ohne Laufweg.
+- **Preise** (`lib/game/immersion.ts`, Server rechnet): Zeitreise 90 Cr / 30 Min, Spielwelt 60 Cr / 45 Min, Abstraktes 30 Cr / 15 Min je Person. Zu zweit 15 % und ab drei Personen 25 % Rabatt je Kopf, höchstens 6 Pods je Gruppe.
+- **Gemeinsames Erleben:** Wer ein Erlebnis bucht, öffnet eine Gruppe (`party_id`). Andere im selben Studio sehen sie unter dem Erlebnis („Gemeinsam erleben mit …") und legen sich dazu; der Preis richtet sich nach der Gruppengröße zum Zeitpunkt der Buchung. Eine offene Sitzung je Spieler. Im Pod: „Aufwachen" beendet.
+- **Technik:** Tabelle `immersion_sessions`, Funktionen `noxia_start_immersion` / `noxia_end_immersion` (Migration `20261106110000_immersion_sessions.sql`, live, Trockenlauf ok), Route `/api/game/immersion`. Erlös geht als Studioerlös in die Koloniekasse der Erde (colony_ledger `payout`); die Weitergabe an öffentliche Dienste wie bei Tickets ist noch nicht verdrahtet.
+- **Bewusst gesperrt:** Gebucht werden kann nur, was `playable` ist; bis dahin gibt es kostenlos nur „Pod ansehen". Damit wird nichts verkauft, was es noch nicht gibt.
+- Nicht geprüft: die Buchung im echten Spiel (kein spielbares Erlebnis, daher keine Livebuchung); getestet sind Preislogik (Vitest), Typen und das SQL im Trockenlauf.
+- Noch offen: Begleiter-NPCs im Pod, Treffpunkt im Erlebnis selbst (gemeinsame Anwesenheit in der Welt), Weitergabe des Erlöses.
+
+## Erste spielbare Welt: Grabung Dvārakā (06.11.2026)
+
+- **Erlebnis `dvaraka-grabung`** (neue Kategorie `site`, „Begehbarer Ort", 45 Cr / 20 Min, Status `playable`). Im Dvārakā-Studio buchbar; liegt man im Pod, startet die Szene `app/earth/DvarakaGrabungScene.tsx`.
+- **Inhalt:** Lageplan aus Kap. 3 (Ursprung Mitte des inneren Hafenbeckens, Meer im Westen): äußeres und inneres Becken (tief, gesperrt), Molen (begehbar), Flachwasser (watend, halbe Geschwindigkeit), Land. Camp und Labor am Start. Die Fundpunkte **G1–G14** mit Fundzetteln (Etikett R belegt / S erschlossen, Buchstelle als Verweis). Daten und Regeln in `lib/worldlab/dvarakaGrabung.ts` (5 Tests).
+- **Steuerung:** Pfeiltasten/WASD oder Klick; in der Nähe eines Fundes (14 m) erscheint „Fundzettel lesen"; Zähler „gefundene Stellen x von 14".
+- **Geprüft:** Szene in einem Headless-Browser: zeichnet, Laufen per Taste und Klick, Wasser sperrt/bremst, Fundzettel öffnet. Nicht geprüft: Buchung und Pod im echten Spiel.
+- **Datenbank:** Migration `20261106120000_immersion_category_site.sql` (Constraint um `site` erweitert, Trockenlauf ok, live).
+- **Noch nicht:** Gemeinsame Anwesenheit mehrerer Spieler in der Szene (Gruppen buchen schon zusammen, sehen sich aber noch nicht), Begleiter-NPCs, Grabungsbuch, Labor als eigener Raum, Gebäude/Gelände jenseits des Rasters (Himmel/Boote), Etikett F erst in der Chronomap.

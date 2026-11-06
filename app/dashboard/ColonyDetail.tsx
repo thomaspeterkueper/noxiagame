@@ -7,6 +7,7 @@
 // Vorher:       09.10.2026 — Flugkosten und Reichweite über transferQuote wie der Server
 // Version:      1.1.1
 
+import FleetDispatch from './FleetDispatch'
 import { ENERGY_GOOD_ICON, ENERGY_GOOD_LABEL } from '@/lib/constants'
 import React from 'react'
 
@@ -14,7 +15,6 @@ import { ResourceType, LocationSlug, useGameStore } from '@/lib/store/gameStore'
 import { passengerTicketPrice, transferQuote } from '@/lib/game/transfer'
 import { pilotFee } from '@/lib/game/pilotQualification'
 import BuildingResidentsCard from './BuildingResidentsCard'
-import { getToken } from '@/lib/supabase/auth'
 
 const RESOURCE_LABEL: Record<string, string> = { water: 'Wasser', energy: ENERGY_GOOD_LABEL, metal: 'Metall' }
 const RESOURCE_ICON:  Record<string, string> = { water: '💧', energy: ENERGY_GOOD_ICON, metal: '⛏️' }
@@ -157,25 +157,7 @@ export default function ColonyDetail({
                 </span>
               </> : <span style={{ color: hasEnergy ? '#5dcaa5' : '#e0846a' }}>🎫 Linienflug: {ticketPrice.toLocaleString('de')} Cr{!hasEnergy && ' · zu wenig Guthaben'}{parkedAt && parkedAt !== location && ` · dein Schiff liegt in ${parkedAt}`}{parkedAt && parkedAt === location && ' · dein Schiff liegt hier'}</span>}
             </div>
-            {!hasShip && parkedAt && parkedAt === location && <button
-              style={{ marginTop: '6px', width: '100%', padding: '7px 0', fontSize: '0.78rem', borderRadius: '8px', border: '1px solid #3d7a64', background: '#12261f', color: '#9ee2c6', cursor: 'pointer' }}
-              onClick={async () => {
-                const token = await getToken()
-                const response = await fetch('/api/game/transit', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'board' }) })
-                const json = await response.json().catch(() => ({}))
-                if (!response.ok || !json.ok) { alert(String(json.error ?? 'Das Einsteigen ist nicht möglich.')); return }
-                await useGameStore.getState().loadFromServer()
-              }}>An Bord deines Schiffs gehen</button>}
-            {!hasShip && parkedAt && parkedAt === location && <button
-              style={{ marginTop: '6px', width: '100%', padding: '7px 0', fontSize: '0.78rem', borderRadius: '8px', border: '1px solid #4a6a99', background: '#122033', color: '#a9c4ee', cursor: 'pointer' }}
-              onClick={async () => {
-                const token = await getToken()
-                const response = await fetch('/api/game/transit', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'dispatch', destination: colony.slug }) })
-                const json = await response.json().catch(() => ({}))
-                if (!response.ok || !json.ok) { alert(String(json.error ?? 'Das Schiff kann nicht losgeschickt werden.')); return }
-                await useGameStore.getState().loadFromServer()
-                onClose()
-              }}>Schiff mit Pilot nach {colony.name} schicken{quote ? ` · Honorar ${pilotFee(quote, false, currentTick).toLocaleString('de')} Cr` : ''}</button>}
+            <FleetDispatch destination={colony.slug} destinationName={colony.name} energy={quote ? quote.energy : null} onDone={onClose} />
           </div>
         ) : (
           <div title="Ziel außerhalb der Reichweite deines Schiffs" style={{ width: '100%', padding: '12px 0', fontSize: '0.9rem', borderRadius: '9px', border: '1px solid #3a4759', background: '#0f1722', color: '#7d93b0', textAlign: 'center', fontWeight: 600 }}>

@@ -1,11 +1,11 @@
 // app/api/game/population/route.ts
-// Aktualisiert: 28.10.2026 — knownAgeYears: Alter, wenn der Spieler das Geburtsjahr kennt (R-11)
-// Version:      1.1.0
+// Aktualisiert: 06.11.2026 — Bekannte Personen mit ihrem aktuellen Namen (currentKnownName); 28.10.2026 — knownAgeYears: Alter, wenn der Spieler das Geburtsjahr kennt (R-11)
+// Version:      1.1.1
 // NOXIA-LIVING — readable person view for location/building without exposing private knowledge.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
+import { currentKnownName, perceivedIdentityState, perceivedPersonLabel } from '@/lib/game/population/playerIdentityKnowledge'
 import { appearanceFromRow, observableDescriptionFromAppearance } from '@/lib/game/population/personAppearance'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { assessPersonDepth } from '@/lib/game/population/personDepth'
@@ -169,7 +169,7 @@ export async function GET(req: NextRequest) {
       state: identityState,
       observableDescription,
       inferredName: identity?.inferred_name ?? null,
-      knownName: identity?.known_name ?? null,
+      knownName: currentKnownName(identity?.known_name, person.display_name),
     })
     // Alter nur, wenn der Spieler es erfahren hat (R-11); Spieljahr aus dem letzten Tick der Person.
     const knownAgeYears = identity?.known_birth_year ? ageAtTick(identity.known_birth_year, person.last_tick) : null
