@@ -33,6 +33,14 @@ test('GET building endpoint does not write directly to game tables', () => {
   );
 });
 
+test('GET handler extraction stops before subsequent exported handlers', () => {
+  const sample = [
+    'export async function GET() { return 1 }',
+    'export async function POST() { return 2 }',
+  ].join('\n');
+  assert.doesNotMatch(getHandlerBody(sample), /POST/);
+});
+
 test('GET keeps read-only build snapshot and sale quotation', () => {
   const get = getHandlerBody(route);
   assert.match(get, /if \(!action\)/, 'existing build snapshot must remain available');
