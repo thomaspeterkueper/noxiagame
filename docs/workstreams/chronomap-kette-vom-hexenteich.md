@@ -37,7 +37,7 @@ Vorgaben Thomas für diesen Entwurf (06.11.2026): Roman gehört zum NOXIA-Univer
 | Figuren 2086 | **keine Begegnung**; im Museum nur Biografie-Tafeln, offen für spätere Bände |
 | Brunnen unter der Schule 2086 | **Denkmal, bei Führungen begehbar**: Treppe und Brunnenraum zugänglich, der Brunnen bleibt zugemauert; Grundlage LWL-Gutachten 1978 „potentiell denkmalwürdig“ (Kap. 20) |
 | Verbleib der Kette | Depot (passt zu OTA-TEC-0035 I „→ Depot“), im Museum eine Nachbildung |
-| Hör-Stein, Splitterlupe 2086 | OTA führt den Hör-Stein „bei Tim (durchgehend)“ und die Lupe „in Besitz“ Antons – beides nur bis Romanende. Vorschlag bis zur Entscheidung: Hör-Stein im Museum als **Leihgabe ohne Namensnennung**, Splitterlupe leere Vitrine „Verbleib unbekannt“ |
+| Hör-Stein, Splitterlupe 2086 | OTA führt den Hör-Stein „bei Tim (durchgehend)“ und die Lupe „in Besitz“ Antons – beides nur bis Romanende. **Entschieden:** Hör-Stein im Museum als „Leihgabe aus Privatbesitz“ ohne Namen, Splitterlupe leere Vitrine „Verbleib unbekannt“ |
 
 ## 1. Zwei Schichten, ein Ort
 
@@ -394,7 +394,7 @@ Nur **neue**, die erst Karte und Uhr zeigen. Bereits entschiedene (A1–A11, B, 
 | N10 | **Kap. 20 nach A2 zu eng**: „Der nächste Tag“ ist jetzt der Mittwoch, an dessen Morgen Leon schon berichtet und an dessen letzter Stunde präsentiert wird | Kap. 20 „Der nächste Tag verging wie in einem Fieber. … Am Abend hatte er einen Stapel Kopien“ | Kap. 20 „am Mittwochmorgen, vor der ersten Stunde“; „Mittwoch, letzte Stunde, Lehrerzimmer“ | a) „Der Rest des Tages verging wie in einem Fieber. Leon verbrachte den Abend in der Stadtbibliothek …“; Yara übt „Abends … Morgens“ bleibt. b) Präsentation auf Donnerstag früh (bricht die Frist „Bauarbeiten Donnerstag“) | **erledigt 06.11.:** „Der Rest des Dienstags verging wie in einem Fieber.“ |
 | N11 | **Zwei Zeitangaben** (klein): „in den letzten zehn Tagen“ am 3.11. (Fund war vor sieben Tagen); „letzte Woche“ am 16.11. für das Felsenmeer am 13.11., „Tim und ich“ ohne Yara | Kap. 6 „in den letzten zehn Tagen“ | Kap. 14 „Tim und ich waren letzte Woche dort.“; Kap. 10 „Yara blieb einen Schritt zurück.“ | a) „in der letzten Woche“; „Wir waren am Mittwoch dort.“ b) lassen | **a)** (Lektor-Linie) |
 
-Nebenfund ohne Karte und Uhr: Der Polizist heißt „Hauptkommissar Brenner“ (Kap. 21), der Mathelehrer „Herr Brenner“ (Kap. 20). Zwei Figuren, ein Name, drei Kapitel auseinander.
+Nebenfund ohne Karte und Uhr: Der Polizist heißt „Hauptkommissar Becker“ (Kap. 21), der Mathelehrer „Herr Brenner“ (Kap. 20). Zwei Figuren, ein Name, drei Kapitel auseinander.
 
 ## 7. Offene Punkte für Thomas
 
