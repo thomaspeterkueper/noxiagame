@@ -21,7 +21,10 @@ import React from 'react'
 import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
 
 import { useState } from 'react'
-import { getToken } from '@/lib/supabase/auth'
+import { getSessionInfo, getToken } from '@/lib/supabase/auth'
+import FigureEditor from '@/lib/figures/FigureEditor'
+import { useMyLook } from '@/lib/figures/KieselFigure'
+import { defaultPlayerLook } from '@/lib/figures/playerLook'
 
 const C = {
   bg:    '#020408',
@@ -46,7 +49,9 @@ const CARDS = [
 type QuizQuestion = { domain: string; question: string; options: string[] }
 
 export default function WelcomeSetup({ initialUsername, onDone }: { initialUsername?: string; onDone: (opts?: { openJourney?: boolean }) => void }) {
-  const [step, setStep]       = useState<'setup' | 'quiz' | 'cards'>('setup')
+  const [step, setStep]       = useState<'setup' | 'figure' | 'quiz' | 'cards'>('setup')
+  const [profileId, setProfileId] = useState<string>('')
+  const mine = useMyLook()
   const [name, setName]       = useState(initialUsername ?? '')
   const [avatar, setAvatar]   = useState<string | null>(null)
   const [cardIdx, setCardIdx] = useState(0)
@@ -85,6 +90,14 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
     // Die Figur beginnt in der Weltkarte am Startcafé (nicht in „Sundern Mitte“).
     const lat = Number(data?.starter?.lat), lon = Number(data?.starter?.lon)
     if (Number.isFinite(lat) && Number.isFinite(lon) && data?.starter?.lat != null) setStartPosition(null, { xM: 0, yM: 0 }, { lat, lon })
+    setProfileId((await getSessionInfo().catch(() => ({ userId: null }))).userId ?? '')
+    // Gleich die eigene Figur einstellen – vorbelegt nach dem Dienstfoto (06.11.2026).
+    setStep('figure')
+  }
+
+  async function figureDone(text?: string) {
+    // Ohne Speichern geschlossen: die Figur zum Foto trotzdem festhalten, damit niemand eine zufällige bekommt.
+    if (!text && avatar) await mine.save(defaultPlayerLook(profileId || 'me', avatar)).catch(() => {})
     setStep('quiz')
     loadQuiz()
   }
@@ -224,6 +237,10 @@ export default function WelcomeSetup({ initialUsername, onDone }: { initialUsern
               {saving ? '…' : 'Registrierung abschließen'}
             </button>
           </div>
+        )}
+
+        {step === 'figure' && avatar && (
+          <FigureEditor initialLook={defaultPlayerLook(profileId || 'me', avatar)} title="Deine Figur – passend zu deinem Dienstfoto. Stell sie ein, wie du magst." cancelLabel="So übernehmen" onClose={text => void figureDone(text)} />
         )}
 
         {step === 'quiz' && (

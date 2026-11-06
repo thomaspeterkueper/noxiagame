@@ -10,11 +10,19 @@ import { KieselFigure, useMyLook } from './KieselFigure'
 import { PLAYER_LOOK_OPTIONS as O } from './playerLook'
 import type { KieselLook, KieselPose } from './kiesel'
 
-type Props = { onClose: (text?: string) => void }
+type Props = {
+  onClose: (text?: string) => void
+  /** Startwerte (Onboarding: die Figur zum Dienstfoto). */
+  initialLook?: KieselLook
+  /** Überschrift (Onboarding: „Deine Figur – passend zu deinem Foto“). */
+  title?: string
+  /** Text des zweiten Knopfs (Onboarding: „So übernehmen“). */
+  cancelLabel?: string
+}
 
-export default function FigureEditor({ onClose }: Props) {
+export default function FigureEditor({ onClose, initialLook, title, cancelLabel }: Props) {
   const mine = useMyLook()
-  const [look, setLook] = useState<KieselLook>(mine.look)
+  const [look, setLook] = useState<KieselLook>(initialLook ?? mine.look)
   const [pose, setPose] = useState<KieselPose>('stehen')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -39,7 +47,7 @@ export default function FigureEditor({ onClose }: Props) {
 
   return <div className="fig-editor" role="dialog" aria-label="Deine Figur">
     <div className="fe-sheet">
-      <div className="fe-head"><div><small>DEINE FIGUR</small><b>So sehen dich alle im Spiel</b></div><button type="button" onClick={() => onClose()}>×</button></div>
+      <div className="fe-head"><div><small>DEINE FIGUR</small><b>{title ?? 'So sehen dich alle im Spiel'}</b></div><button type="button" onClick={() => onClose()}>×</button></div>
       <div className="fe-body">
         <div className="fe-stage">
           <div className="fe-dirs">{(['se', 'sw', 'ne', 'nw'] as const).map(d => <KieselFigure key={d} look={look} dir={d} pose={pose} width={70} title={'Deine Figur ' + d} />)}</div>
@@ -59,7 +67,7 @@ export default function FigureEditor({ onClose }: Props) {
         </div>
       </div>
       {error && <p className="fe-error">{error}</p>}
-      <div className="fe-foot"><button type="button" disabled={busy} onClick={() => void save()}>{busy ? 'Speichert …' : 'Speichern'}</button><button type="button" disabled={busy} onClick={() => onClose()}>Abbrechen</button></div>
+      <div className="fe-foot"><button type="button" disabled={busy} onClick={() => void save()}>{busy ? 'Speichert …' : 'Speichern'}</button><button type="button" disabled={busy} onClick={() => onClose()}>{cancelLabel ?? 'Abbrechen'}</button></div>
     </div>
     <style>{`
       .fig-editor{position:absolute;inset:54px 0 0;z-index:45;display:grid;place-items:center;padding:16px;background:#050c0dcc}
