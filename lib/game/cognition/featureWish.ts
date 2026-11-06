@@ -1,7 +1,8 @@
 // lib/game/cognition/featureWish.ts
 // Erstellt:     29.10.2026
 // Aktualisiert: 29.10.2026 — Hinweise auf fehlende Funktionen aus Spielersätzen
-// Version:      1.0.0
+// Aktualisiert: 06.11.2026 — Erwartungen („ich dachte, hier kommen mehr Leute zum Tanzen“) als Wunsch
+// Version:      1.1.0
 //
 // Rein, ohne DB. Wunsch Thomas (29.10.2026): „wenn jemand sagt, ich kann dies oder
 // das nicht machen, dann ist es ein Hinweis, dass vielleicht eine Funktion fehlt.“
@@ -59,6 +60,7 @@ const PATTERNS: Array<{ kind: FeatureWishKind; re: RegExp }> = [
   { kind: 'how_to', re: /\bgibt\s+es\s+(?:hier\s+)?(?:eine?n?|irgendwo)\s+(.+)\?/i },
   { kind: 'wish', re: /\bich\s+(?:m(?:ö|o|oe)chte|will|w(?:ü|u|ue)rde\s+gerne?|h(?:ä|a|ae)tte\s+gerne?|wollte)\s+(.+)/i },
   { kind: 'wish', re: /\bwir\s+m(?:ü|u|ue)ssen\s+(.+)/i },
+  { kind: 'wish', re: /\bich\s+dachte,?\s+(?:hier|es|man)\s+(?:gibt\s+es|g[äa]be\s+es|kommen|kann\s+man|könnte\s+man|wäre|sei)\s+(.+)/i },
 ]
 
 const NPC_DENIAL = /\b(gibt es (hier |bei uns )?(nicht|kein\w*)|haben wir (hier )?(nicht|kein\w*)|geht (hier |leider )?nicht|kann (ich )?(dir|hier) (leider )?(nicht|kein\w*)|wird (hier )?nicht|leider nicht|tut mir leid|nicht möglich|weiß ich (nicht|kein\w*)|keine ahnung)\b/i

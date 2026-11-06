@@ -1,5 +1,6 @@
 // lib/game/hospitality/venues.ts
 // Café, Bar und Restaurant als ein Raummodell – reine Regeln, kein Zustand.
+// Aktualisiert: 06.11.2026 — Personal in Ankunftslokalen ist zuerst Gastgeber; Einstiegshilfe nur auf Nachfrage (Metropol, Thomas)
 //
 // Drei Dinge liegen hier:
 //   1. Innenaufbau: Möbel, Plätze und begehbare Fläche je Lokaltyp.
@@ -987,7 +988,7 @@ export const MAX_CONVERSATION_FACT_CHARS = 140
  * in die Welt. Allgemeinwissen über die Gegend, nichts über den Gast.
  */
 export const ARRIVAL_ORIENTATION_FACTS: readonly string[] = [
-  'Du kennst die Gegend und hilfst neuen Gästen gern beim Einstieg',
+  'Du kennst die Gegend und hilfst Neuen beim Einstieg, wenn sie danach fragen; zuerst bist du Gastgeber, kein Ratgeber – biete keine Geldtipps ungefragt an',
   'In der Akademie kann man Wissen sammeln und Prüfungen ablegen; mehr Wissen öffnet mehr Möglichkeiten',
   'Handeln ist auch ohne eigenes Schiff möglich: Ein Spediteur übernimmt den Transport und behält dafür einen Anteil vom Gewinn',
   'Ohne eigenes Schiff kann man per Linienflug zu anderen Orten reisen; das Ticket kostet Credits',

@@ -1,7 +1,9 @@
 // lib/game/cognition/gameGuide.ts
 // Erstellt:     29.10.2026
+// Aktualisiert: 06.11.2026 — Weltwissen statt Spielanleitung: Wie man selbst etwas eröffnet, nur auf Nachfrage;
+//                              neu: wann in Bars und Clubs etwas los ist (Bar im Metropol, Thomas 06.11.2026)
 // Aktualisiert: 29.10.2026 — Wege zu dem, was es schon gibt (Spielerwünsche „vorhanden“)
-// Version:      1.0.0
+// Version:      1.1.0
 //
 // Rein, ohne DB. Entschieden (Thomas, 29.10.2026): Wünsche, die es im Spiel schon gibt
 // (Lokal eröffnen, Bücher, Akademie, Tanz, Toilette), sollen Spieler finden. Fragt jemand
@@ -10,7 +12,11 @@
 
 export type GuidePlace = { kind: string; name: string | null }
 
-type Entry = { re: RegExp; lines: (p: GuidePlace[], earth: boolean) => string[] }
+type Entry = { re: RegExp; lines: (p: GuidePlace[], earth: boolean, howTo: boolean) => string[] }
+
+// Fragt der Spieler, wie er selbst etwas aufmacht? Nur dann nennt die Figur den Weg im Spiel
+// (kaufen, umbauen). Sonst bleibt sie bei dem, was man am Ort sieht.
+const HOW_TO = /(eröffn|aufmach|gründ|selbst|selber|kaufen|bauen|umbauen|wie (kann|könnte) (ich|man))/i
 
 const named = (p: GuidePlace[], kinds: string[]) =>
   p.filter(x => kinds.includes(x.kind)).map(x => x.name).filter((n): n is string => Boolean(n))
@@ -53,11 +59,24 @@ const ENTRIES: Entry[] = [
   },
   { // Tanz, Feiern
     re: /\b(tanz|tanzen|disco|club|feiern|party)/i,
-    lines: p => {
+    lines: (p, _earth, howTo) => {
       const clubs = named(p, ['nightclub'])
-      return [clubs.length
-        ? `Tanzen kann man nachts im Nachtclub, z. B. ${list(clubs)}; Eintritt an der Tür`
-        : 'Einen Nachtclub gibt es hier noch nicht; wer ein Haus kauft, kann daraus einen machen']
+      if (clubs.length) return [`Tanzen kann man nachts im Nachtclub, z. B. ${list(clubs)}; Eintritt an der Tür`]
+      return [
+        'Einen Nachtclub oder eine Tanzfläche gibt es hier im Ort zurzeit nicht; abends trifft man sich in der Bar',
+        ...(howTo ? ['Wer selbst einen Club aufmachen will, kann ein leeres Haus kaufen und zum Nachtclub umbauen'] : []),
+      ]
+    },
+  },
+  { // Wann ist etwas los?
+    re: /(was los|wann .{0,20}los|betrieb|voll hier|viele leute|mehr leute|abends|heute abend|nachts|ausgehen)/i,
+    lines: p => {
+      const bars = named(p, ['bar'])
+      const clubs = named(p, ['nightclub'])
+      return [
+        `Abends ab etwa 18 Uhr gehen Leute, denen Gesellschaft fehlt, in die Bar${bars.length ? ` (${list(bars)})` : ''}${clubs.length ? `, ab 22 Uhr in den Nachtclub (${list(clubs)})` : ''} – wie voll es wird, hängt davon ab, wie viele gerade Zeit und Lust haben`,
+        'Wie viele Gäste zuletzt da waren, weißt du aus eigener Beobachtung; sag das ehrlich',
+      ]
     },
   },
   { // Raumhafen, ins All
@@ -85,7 +104,7 @@ export function gameGuideLines(playerText: string, places: GuidePlace[], locatio
   const out: string[] = []
   for (const entry of ENTRIES) {
     if (!entry.re.test(text)) continue
-    out.push(...entry.lines(places, earth))
+    out.push(...entry.lines(places, earth, HOW_TO.test(text)))
     if (out.length >= 4) break
   }
   return out.slice(0, 4)

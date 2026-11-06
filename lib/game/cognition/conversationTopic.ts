@@ -1,7 +1,8 @@
 // lib/game/cognition/conversationTopic.ts
 // Erstellt:     28.10.2026
+// Aktualisiert: 06.11.2026 — „tanzen“ allein ist kein Beziehungsanliegen (Frage nach Tanzen in der Bar)
 // Aktualisiert: 28.10.2026 — Grobe Einordnung von Spielerfragen nach Anliegen für die Auswertung der Testphase
-// Version:      1.0.0
+// Version:      1.0.1
 //
 // Rein, ohne DB-Zugriff. Ordnet eine Spielereingabe einem Anliegen zu, damit
 // die Auswertung zählen kann, was Spieler von Figuren wollen. Absichtlich
@@ -38,7 +39,7 @@ const RULES: ReadonlyArray<[ConversationTopic, RegExp]> = [
   ['work_money', /\b(arbeit\w*|job\w*|stelle|geld|credit\w*|lohn|verdien\w*|bau\w*|eroeffn\w*|oeffn\w*|kauf\w*|verkauf\w*|handel\w*|firma|geschaeft\w*|auftrag\w*|investier\w*)\b/],
   ['orientation', /\b(wo ist|wo gibt|wo finde|wo kann|weg zu\w*|wie komme|was kann ich|was mache ich|was soll ich|akademie|verwaltung|bibliothek|toilett\w*|ich suche|hier in der naehe|gegend|umgebung|zeig mir)\b/],
   ['identity', /\b(wer bist du|wie heisst du|dein name|mein name|ich heisse|ich bin \w+|nenn mich|vorstell\w*)\b/],
-  ['relationship', /\b(freund\w*|zusammen|gemeinsam|begleit\w*|treffen|date|mag dich|magst du mich|liebe\w*|tanz\w*|spazier\w*|lass uns|wollen wir)\b/],
+  ['relationship', /\b(freund\w*|zusammen|gemeinsam|begleit\w*|treffen|date|mag dich|magst du mich|liebe\w*|spazier\w*|lass uns|wollen wir)\b/],
   ['greeting', /\b(hallo|hi|hey|moin|servus|hello|hola|guten (morgen|tag|abend)|danke\w*|tschuess|bis bald|ciao)\b/],
 ]
 
