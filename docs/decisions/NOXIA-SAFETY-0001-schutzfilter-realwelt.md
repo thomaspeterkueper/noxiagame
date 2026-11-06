@@ -37,6 +37,12 @@ Thomas: „Wir dürfen nicht vergessen, dass auch andere Sprachen benutzt werden
 - **Stufe 2 – KI-Prüfung** (`lib/game/safety/aiReview.ts`): Codewörter kann keine Liste kennen. Auffällige Fenster (`needsAiReview`: Handelsmuster, getarnte Kontakte, nicht abgedeckte Sprache beim Flüstern, mehrere Merkmale, Hinweise auf Minderjährige oder Geheimhaltung) prüft Claude Haiku im Zusammenhang, im Hintergrund (`after()`), ohne Spielernamen. Höchstens eine Prüfung je Person und Raum in 10 Minuten. Gespeichert wird nur das Ergebnis (`safety_reviews`). Bei „real_world“ ab 60 % Sicherheit wird der Ausschnitt gesichert. Die KI entscheidet nichts über Spieler.
 - **Lernen** nur aus Sätzen, die der Filter lesen kann (Deutsch, Englisch) – sonst könnten Figuren als Briefkasten in einer ungeprüften Sprache dienen.
 
+## Freundes-Chat (06.11.2026)
+
+Der Freundes-Chat (`/api/game/chat`, Tabelle `chat_messages`) hatte bis zum 06.11.2026 keinen Kontaktfilter und keinen Schutzfilter. Jetzt wie im Raum-Chat: Kontaktdaten werden ausgeblendet, gespeichert und zugestellt wird nur die gefilterte Fassung; das Gesprächsfenster der letzten 30 Minuten wird bewertet, bei Verdacht gesichert (Quelle `direct`), auffällige Fenster gehen in die KI-Prüfung.
+
+Noch ohne Filter: frei wählbare Namen (Spielername, Koloniename, Ortsbezeichnungen) – dort passt weiterhin eine Telefonnummer hinein.
+
 ## Verfahren bei Verdacht – Entwurf, zu entscheiden
 
 | Schritt | Vorschlag | Entscheidung |

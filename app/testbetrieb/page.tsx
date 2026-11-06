@@ -20,13 +20,13 @@ export default function TestbetriebInformation() {
       <p className="mt-2">In NOXIA darfst du frei sprechen: schmuggeln, intrigieren, streiten, Grenzen testen – das gehört zur Welt, und die Figuren reagieren darauf, ohne zu moralisieren. NOXIA darf aber nicht genutzt werden, um Straftaten in der realen Welt zu verabreden. Ein automatischer Schutzfilter achtet darauf, wenn mehrere Hinweise zusammenkommen, etwa reale Drogen oder Waffen mit Geldweg, Gewalt mit Bezug zur echten Welt oder Annäherung an Minderjährige mit Geheimhaltung. Der Filter versteht mehrere Sprachen und achtet auch auf Muster wie Preise in echter Währung – im Spiel zahlt man nur in Credits. Auffällige Ausschnitte aus Gesprächen zwischen Spielern prüft zusätzlich eine KI im Zusammenhang, ohne eure Spielernamen; gespeichert wird dabei nur ihr Ergebnis. Nur wenn sich ein Verdacht ergibt, wird der betreffende Ausschnitt gesichert und von uns geprüft. Kontaktdaten wie Telefonnummern, E-Mail-Adressen und Links werden in Nachrichten an andere Spieler ausgeblendet.</p>
 
       <h2 className="mt-6 text-lg font-semibold">Was Figuren lernen</h2>
-      <p className="mt-2">Was du Figuren über die Welt erzählst, können sie sich merken und anderen weitererzählen – als Gerücht, ohne zu sagen, von wem es stammt. Persönliches über dich oder dein Gegenüber, Fragen und Kontaktdaten übernehmen sie nicht. Was nur eine Person erzählt, bleibt unbestätigt und ist nach etwa einem Monat vergessen; was mehrere unabhängig erzählen, behalten die Figuren bis zu einem halben Jahr.</p>
+      <p className="mt-2">Was du Figuren über die Welt erzählst, können sie sich merken und anderen weitererzählen – als Gerücht, ohne zu sagen, von wem es stammt. Persönliches über dich oder dein Gegenüber, Fragen und Kontaktdaten übernehmen sie nicht. Vergessen wird ab der letzten Erwähnung: Was nur eine Person erzählt, bleibt unbestätigt und ist einen Monat nach dem letzten Mal vergessen; was mehrere unabhängig erzählen, ein halbes Jahr nach dem letzten Mal. Wird etwas immer wieder erzählt, bleibt es. Was mindestens drei Menschen über Wochen hinweg erzählen, wird festes Wissen der Figur und nicht mehr vergessen.</p>
 
       <h2 className="mt-6 text-lg font-semibold">Wie lange etwas bleibt</h2>
       <ul className="mt-2 list-disc space-y-1 pl-5">
         <li>Der Wortlaut von Gesprächen wird nach 14 Tagen automatisch gelöscht. Die daraus gewonnenen Kennzahlen bleiben.</li>
-        <li>NPCs behalten eine gekürzte Erinnerung an eure gemeinsamen Gespräche – das gehört zum Spiel. Diese Erinnerung ist für das Team nicht einsehbar und verschwindet mit deinem Konto.</li>
-        <li>Was Figuren über die Welt gelernt haben, bleibt höchstens 180 Tage und verschwindet mit deinem Konto.</li>
+        <li>NPCs behalten eine gekürzte Erinnerung an eure gemeinsamen Gespräche – das gehört zum Spiel und zu ihrer Lebensgeschichte. Diese Erinnerung ist für das Team nicht einsehbar. Löschst du dein Konto, bleibt sie Teil der Biografie der Figur, aber ohne Verbindung zu deinem Konto.</li>
+        <li>Was Figuren über die Welt gelernt haben, vergessen sie ab der letzten Erwähnung (siehe oben); auch das bleibt nach einer Kontolöschung ohne Verbindung zu dir erhalten.</li>
         <li>Gemeldete und vom Schutzfilter gesicherte Ausschnitte werden nach 90 Tagen gelöscht.</li>
       </ul>
 

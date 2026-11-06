@@ -10,7 +10,7 @@ import type { RiskAssessment } from './realWorldRisk'
 
 export async function secureSuspicion(db: SupabaseClient, input: {
   subjectProfileId: string
-  source: 'npc' | 'room'
+  source: 'npc' | 'room' | 'direct'
   risk: RiskAssessment
   excerpt: ExcerptLine[]
   roomKey?: string | null

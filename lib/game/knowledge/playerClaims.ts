@@ -12,7 +12,10 @@
 //    schneller. So kann ein einzelner Troll nicht allen Figuren etwas beibringen.
 //  * Wer etwas erzählt hat, nennt die Figur nie.
 //
-// Vergessen ist gestuft, nicht pauschal: unbestätigt 30 Tage, bestätigt 180 Tage.
+// Vergessen ist gestuft und zählt ab der letzten Erwähnung: unbestätigt 30 Tage,
+// bestätigt 180 Tage, festes Wissen (≥3 Quellen über ≥30 Tage) nie.
+// Nach einer Kontolöschung bleibt das Gelernte Teil der Biografie der Figur –
+// ohne Verbindung zum Konto (source_key statt Spieler-ID).
 
 import { stripContactData, type RiskAssessment } from '../safety/realWorldRisk'
 import type { ConversationTopic } from '../cognition/conversationTopic'
@@ -49,39 +52,91 @@ export function learnableClaim(text: string, topic: ConversationTopic, risk: Ris
   return { claim: stripped.slice(0, CLAIM_MAX_CHARS), words }
 }
 
-export type StoredClaim = { source_profile_id: string; claim: string; words: string[]; created_at: string }
-export type HeardClaim = { claim: string; sources: number; corroborated: boolean; at: string }
+export type StoredClaim = {
+  id?: number
+  /** Pseudonymer Schlüssel der Quelle (sha256 der Spieler-ID); bleibt nach Kontolöschung. */
+  source_key: string
+  claim: string
+  words: string[]
+  created_at: string
+  /** Letzte Erwähnung – auch Wiederholungen derselben Quelle frischen auf. */
+  last_heard_at?: string | null
+  established?: boolean | null
+}
+export type HeardClaim = { claim: string; sources: number; corroborated: boolean; established: boolean; at: string }
+
+/** Ab hier gehört eine Aussage zum festen Wissen der Figur und wird nicht mehr vergessen. */
+export const ESTABLISHED_SOURCES = 3
+export const ESTABLISHED_SPAN_DAYS = 30
 
 const overlap = (a: string[], b: string[]) => a.filter(w => b.includes(w)).length
+const heardAt = (r: StoredClaim) => Date.parse(r.last_heard_at ?? r.created_at)
 
-/**
- * Was die Figur einem Spieler weitererzählen kann: nur Aussagen anderer Spieler,
- * gebündelt nach Inhalt, gewichtet nach der Zahl unabhängiger Quellen.
- */
-export function selectHeardClaims(rows: StoredClaim[], input: { currentPlayer: string; now: number; max?: number }): HeardClaim[] {
-  const others = rows.filter(r => r.source_profile_id !== input.currentPlayer)
-  const clusters: Array<{ rep: StoredClaim; members: StoredClaim[] }> = []
-  for (const row of [...others].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))) {
+type Cluster = { rep: StoredClaim; members: StoredClaim[] }
+
+/** Bündelt Aussagen gleichen Inhalts (mindestens zwei gemeinsame Schlüsselwörter). */
+export function clusterClaims(rows: StoredClaim[]): Cluster[] {
+  const clusters: Cluster[] = []
+  for (const row of [...rows].sort((a, b) => heardAt(b) - heardAt(a))) {
     const home = clusters.find(c => overlap(c.rep.words, row.words) >= 2)
     if (home) home.members.push(row)
     else clusters.push({ rep: row, members: [row] })
   }
-  const out: HeardClaim[] = []
-  for (const c of clusters) {
-    const sources = new Set(c.members.map(m => m.source_profile_id)).size
-    const corroborated = sources >= CORROBORATION_SOURCES
-    const newest = Math.max(...c.members.map(m => Date.parse(m.created_at)))
-    const ageDays = (input.now - newest) / DAY_MS
-    if (ageDays > (corroborated ? CORROBORATED_DAYS : SINGLE_SOURCE_DAYS)) continue
-    out.push({ claim: c.rep.claim, sources, corroborated, at: new Date(newest).toISOString() })
+  return clusters
+}
+
+function clusterFacts(c: Cluster) {
+  const sources = new Set(c.members.map(m => m.source_key)).size
+  const newest = Math.max(...c.members.map(heardAt))
+  const oldest = Math.min(...c.members.map(m => Date.parse(m.created_at)))
+  const established = c.members.some(m => m.established)
+    || (sources >= ESTABLISHED_SOURCES && (newest - oldest) / DAY_MS >= ESTABLISHED_SPAN_DAYS)
+  return { sources, newest, established, corroborated: sources >= CORROBORATION_SOURCES }
+}
+
+/**
+ * IDs der Aussagen, die jetzt zum festen Wissen werden: von mindestens drei
+ * unabhängigen Quellen, über mindestens 30 Tage immer wieder erzählt.
+ */
+export function newlyEstablishedIds(rows: StoredClaim[]): number[] {
+  const ids: number[] = []
+  for (const c of clusterClaims(rows)) {
+    if (!clusterFacts(c).established) continue
+    for (const m of c.members) if (!m.established && typeof m.id === 'number') ids.push(m.id)
   }
-  out.sort((a, b) => Number(b.corroborated) - Number(a.corroborated) || b.sources - a.sources || Date.parse(b.at) - Date.parse(a.at))
+  return ids
+}
+
+/**
+ * Was die Figur einem Spieler weitererzählen kann: nur Aussagen anderer Spieler,
+ * gebündelt nach Inhalt, gewichtet nach der Zahl unabhängiger Quellen.
+ *
+ * Vergessen zählt ab der letzten Erwähnung (06.11.2026, Thomas: „warum
+ * verschwindet etwas, obwohl es wiederholt wird?“):
+ *  * unbestätigt: 30 Tage nach der letzten Erwähnung
+ *  * bestätigt (≥2 Quellen): 180 Tage nach der letzten Erwähnung
+ *  * festes Wissen (≥3 Quellen über ≥30 Tage): nie
+ */
+export function selectHeardClaims(rows: StoredClaim[], input: { currentSourceKey: string; now: number; max?: number }): HeardClaim[] {
+  const out: HeardClaim[] = []
+  for (const c of clusterClaims(rows)) {
+    const facts = clusterFacts(c)
+    // Was nur der aktuelle Spieler selbst erzählt hat, bekommt er nicht zurück.
+    const others = c.members.filter(m => m.source_key !== input.currentSourceKey)
+    if (!others.length) continue
+    const ageDays = (input.now - facts.newest) / DAY_MS
+    if (!facts.established && ageDays > (facts.corroborated ? CORROBORATED_DAYS : SINGLE_SOURCE_DAYS)) continue
+    out.push({ claim: others[0].claim, sources: facts.sources, corroborated: facts.corroborated, established: facts.established, at: new Date(facts.newest).toISOString() })
+  }
+  out.sort((a, b) => Number(b.established) - Number(a.established) || Number(b.corroborated) - Number(a.corroborated) || b.sources - a.sources || Date.parse(b.at) - Date.parse(a.at))
   return out.slice(0, input.max ?? 3)
 }
 
 /** Zeilen für die Figur. Nie mit Namen der Quelle. */
 export function heardClaimLines(claims: HeardClaim[]): string[] {
-  return claims.map(c => c.corroborated
-    ? `Mehrere Leute haben dir erzählt: „${c.claim}“`
-    : `Jemand hat dir erzählt (unbestätigt, du bist dir nicht sicher): „${c.claim}“`)
+  return claims.map(c => c.established
+    ? `Das erzählt man sich hier schon lange, du hältst es für wahr: „${c.claim}“`
+    : c.corroborated
+      ? `Mehrere Leute haben dir erzählt: „${c.claim}“`
+      : `Jemand hat dir erzählt (unbestätigt, du bist dir nicht sicher): „${c.claim}“`)
 }

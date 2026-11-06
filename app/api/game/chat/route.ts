@@ -8,7 +8,7 @@
 // POST action=send                  — Nachricht senden
 // POST action=read&userId={id}      — Nachrichten als gelesen markieren
 
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 async function getUserFromRequest(req: NextRequest) {
@@ -20,6 +20,9 @@ async function getUserFromRequest(req: NextRequest) {
   return user
 }
 import { publishDirectMessage } from '@/lib/ably/server'
+import { assessRealWorldRisk, needsAiReview, stripContactData } from '@/lib/game/safety/realWorldRisk'
+import { secureSuspicion } from '@/lib/game/safety/secureSuspicion'
+import { aiVerdictIsSuspect, reviewWindow } from '@/lib/game/safety/aiReview'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -96,21 +99,56 @@ export async function POST(req: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    // Nachricht speichern
+    // Schutzfilter wie im Raum-Chat (NOXIA-SAFETY-0001, 06.11.2026): Kontaktdaten
+    // werden ausgeblendet, gespeichert und zugestellt wird nur die gefilterte Fassung.
+    const shown = stripContactData(content)
     const { data: message, error } = await supabase
       .from('chat_messages')
-      .insert({ sender_id: user.id, receiver_id: receiverId, content })
+      .insert({ sender_id: user.id, receiver_id: receiverId, content: shown })
       .select()
       .single()
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    try {
+      const since = new Date(Date.now() - 30 * 60_000).toISOString()
+      const { data: recent } = await supabase.from('chat_messages').select('sender_id,content,created_at')
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${receiverId}),and(sender_id.eq.${receiverId},receiver_id.eq.${user.id})`)
+        .gte('created_at', since).lt('created_at', message.created_at).order('created_at', { ascending: false }).limit(9)
+      const nameOf = (id: string) => id === user.id ? (sender?.username ?? 'Absender') : (receiver.username ?? 'Empfänger')
+      const lines = [
+        ...(recent ?? []).reverse().map(m => ({ speaker: nameOf(String(m.sender_id)), text: String(m.content), at: String(m.created_at) })),
+        // Die aktuelle Nachricht im Original: getarnte oder entfernte Kontakte zählen mit.
+        { speaker: nameOf(user.id), text: content, at: String(message.created_at) },
+      ]
+      const risk = assessRealWorldRisk(lines.map(l => l.text))
+      const roomKey = 'direct:' + [user.id, receiverId].sort().join(':')
+      if (risk.level === 'suspect') {
+        await secureSuspicion(supabase, { subjectProfileId: user.id, source: 'direct', risk, roomKey, locationName: 'Freundes-Chat', excerpt: lines })
+      } else if (needsAiReview(risk, { whisper: true })) {
+        after(async () => {
+          try {
+            const anon = lines.map(l => ({ ...l, speaker: l.speaker === nameOf(user.id) ? 'Person A' : 'Person B' }))
+            const verdict = await reviewWindow(supabase, { subjectProfileId: user.id, roomKey, whisper: true, risk, lines: anon })
+            if (aiVerdictIsSuspect(verdict)) await secureSuspicion(supabase, {
+              subjectProfileId: user.id, source: 'direct', roomKey, locationName: 'Freundes-Chat', excerpt: lines,
+              risk: { ...risk, level: 'suspect', reasons: [`KI-Prüfung (${verdict!.category}, ${Math.round(verdict!.confidence * 100)} %): ${verdict!.reason}`] },
+            })
+          } catch (reviewError) {
+            console.error('[safety] direct ai review failed', reviewError instanceof Error ? reviewError.message : reviewError)
+          }
+        })
+      }
+    } catch (safetyError) {
+      console.error('[safety] direct assessment failed', safetyError instanceof Error ? safetyError.message : safetyError)
+    }
 
     // Ably: Empfänger sofort benachrichtigen
     await publishDirectMessage(receiverId, {
       id:             message.id,
       senderId:       user.id,
       senderUsername: sender?.username ?? 'Unbekannt',
-      content,
+      content: shown,
       createdAt:      message.created_at,
     })
 

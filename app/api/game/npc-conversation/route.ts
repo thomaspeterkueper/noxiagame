@@ -35,7 +35,8 @@ import { assessRealWorldRisk, riskFlags, stripContactData } from '@/lib/game/saf
 import { secureSuspicion } from '@/lib/game/safety/secureSuspicion'
 import { dreamConversationLines, insightConversationLines } from '@/lib/game/cognition/nightDreams'
 import { WORLD_AWARENESS_SOURCES } from '@/lib/game/worldAwareness'
-import { heardClaimLines, learnableClaim, selectHeardClaims, CORROBORATED_DAYS, type StoredClaim } from '@/lib/game/knowledge/playerClaims'
+import { heardClaimLines, learnableClaim, newlyEstablishedIds, selectHeardClaims, CORROBORATED_DAYS, type StoredClaim } from '@/lib/game/knowledge/playerClaims'
+import { claimSourceKey } from '@/lib/game/knowledge/sourceKey'
 
 const MAX_PLAYER_CHARS = 500
 const MAX_HISTORY_MESSAGES = 10
@@ -497,12 +498,13 @@ export async function POST(request: NextRequest) {
   let heardFromPlayers: string[] = []
   if (npcId && canonicalNpc?.id && !opening && !sermon) {
     const { data: claimRows, error: claimError } = await serviceClient.from('npc_learned_claims')
-      .select('source_profile_id, claim, words, created_at')
+      .select('id, source_key, claim, words, created_at, last_heard_at, established')
       .eq('npc_person_id', npcId)
-      .gte('created_at', new Date(Date.now() - CORROBORATED_DAYS * 86_400_000).toISOString())
-      .order('created_at', { ascending: false }).limit(200)
+      // Festes Wissen immer, sonst was in den letzten 180 Tagen noch erwähnt wurde.
+      .or(`established.eq.true,last_heard_at.gte.${new Date(Date.now() - CORROBORATED_DAYS * 86_400_000).toISOString()}`)
+      .order('last_heard_at', { ascending: false }).limit(300)
     if (claimError) console.error('npc learned claims read failed', { code: claimError.code })
-    heardFromPlayers = heardClaimLines(selectHeardClaims((claimRows ?? []) as StoredClaim[], { currentPlayer: user.id, now: Date.now() }))
+    heardFromPlayers = heardClaimLines(selectHeardClaims((claimRows ?? []) as StoredClaim[], { currentSourceKey: claimSourceKey(user.id), now: Date.now() }))
   }
   const system = [
     repeat.level === 'hint' && !sermon ? REPEAT_HINT_INSTRUCTION : '',
@@ -711,15 +713,25 @@ export async function POST(request: NextRequest) {
       // gewichtet nach unabhängigen Quellen (lib/game/knowledge/playerClaims.ts).
       const learned = canonicalNpc?.id && !memoryError ? learnableClaim(player, topic, risk) : null
       if (learned) {
-        const { error: claimError } = await serviceClient.from('npc_learned_claims').upsert({
-          npc_person_id: npcId,
-          source_profile_id: user.id,
-          topic,
-          claim: learned.claim,
-          words: learned.words,
-        }, { onConflict: 'npc_person_id,source_profile_id,claim', ignoreDuplicates: true })
+        // Wiederholung frischt auf (last_heard_at, times_heard) statt ignoriert zu werden.
+        const { error: claimError } = await serviceClient.rpc('remember_player_claim', {
+          p_npc_person_id: npcId,
+          p_source_profile_id: user.id,
+          p_source_key: claimSourceKey(user.id),
+          p_topic: topic,
+          p_claim: learned.claim,
+          p_words: learned.words,
+        })
         recordStage('testimony_write', claimError ? 'failed' : 'succeeded', { store: 'npc_learned_claims', source: 'player_statement', code: claimError?.code ?? null })
         if (claimError) console.error('npc learned claim write failed', { npcId, code: claimError.code })
+        else {
+          // Oft und lange von mehreren erzählt → festes Wissen der Figur, wird nicht mehr vergessen.
+          const { data: known } = await serviceClient.from('npc_learned_claims')
+            .select('id, source_key, claim, words, created_at, last_heard_at, established')
+            .eq('npc_person_id', npcId).order('last_heard_at', { ascending: false }).limit(300)
+          const ids = newlyEstablishedIds((known ?? []) as StoredClaim[])
+          if (ids.length) await serviceClient.from('npc_learned_claims').update({ established: true }).in('id', ids)
+        }
       }
 
       // R-12: Nennt der Spieler seinen Namen, merkt sich die Figur ihn.
