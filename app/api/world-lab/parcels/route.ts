@@ -7,6 +7,7 @@
 // GET  ?lat=…&lon=…&dry=1: nur abrufen und lesen, nichts speichern – zur Prüfung des Dienstes.
 
 import { NextRequest, NextResponse } from 'next/server'
+import { PARCEL_INITIAL_IMPORT_UPSERT } from '@/lib/worldlab/parcelImportPolicy'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { cadastreServicesAt, cadastreSource, parcelCell, parcelKey, parcelLabel, parcelRequestUrl, parcelUsage, parseParcels, parseUsePieces, usesByParcel, type CadastreService, type Parcel, type ParcelUsePiece } from '@/lib/worldlab/alkis'
@@ -94,7 +95,9 @@ function rowsFor(parcels: Found[]) {
 }
 
 export async function GET(req: NextRequest) {
-  const lat = Number(req.nextUrl.searchParams.get('lat')), lon = Number(req.nextUrl.searchParams.get('lon'))
+  const latParam = req.nextUrl.searchParams.get('lat'), lonParam = req.nextUrl.searchParams.get('lon')
+  if (latParam === null || lonParam === null || !latParam.trim() || !lonParam.trim()) return NextResponse.json({ error: 'lat/lon fehlt' }, { status: 400 })
+  const lat = Number(latParam), lon = Number(lonParam)
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return NextResponse.json({ error: 'lat/lon fehlt' }, { status: 400 })
   if (req.nextUrl.searchParams.get('dry') !== '1') return NextResponse.json({ error: 'nur dry=1' }, { status: 400 })
   const cell = parcelCell({ lat, lon })
@@ -117,37 +120,58 @@ export async function GET(req: NextRequest) {
     const { parcels, sample, errors } = await fetchCell(cell)
     return NextResponse.json({ cell, services: services.map(service => service.key), errors, url: parcelRequestUrl(cell, 0, 1000, services[0]), count: parcels.length, first: parcels[0] ? { id: parcels[0].id, label: parcelLabel(parcels[0].props), usage: parcelUsage(parcels[0].props), points: parcels[0].ring.length, keys: Object.keys(parcels[0].props) } : null, sample: parcels.length ? undefined : sample })
   } catch (error) {
-    return NextResponse.json({ cell, error: error instanceof Error ? error.message : String(error) })
+    return NextResponse.json({ cell, error: 'Katasterabfrage fehlgeschlagen.' }, { status: 503 })
   }
 }
 
 export async function POST(req: NextRequest) {
   if (!await verifiedBearerUserId(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json().catch(() => ({})) as { lat?: number; lon?: number }
-  const point = { lat: Number(body.lat), lon: Number(body.lon) }
+  // Reject absent or nonnumeric coordinates rather than silently coercing null to zero.
+  if (typeof body.lat !== 'number' || typeof body.lon !== 'number') return NextResponse.json({ error: 'lat/lon fehlt' }, { status: 400 })
+  const point = { lat: body.lat, lon: body.lon }
   if (!Number.isFinite(point.lat) || !Number.isFinite(point.lon)) return NextResponse.json({ error: 'lat/lon fehlt' }, { status: 400 })
   if (!cadastreServicesAt(point).length) return NextResponse.json({ ok: true, outside: true, parcels: 0 })
   const cell = parcelCell(point)
   const supabase = createServiceClient()
-  const { data: known } = await supabase.from('earth_parcel_cells').select('cell,parcels,error,fetched_at,source').eq('cell', cell.key).maybeSingle()
+  const { data: known, error: cacheReadError } = await supabase.from('earth_parcel_cells').select('cell,parcels,error,fetched_at,source').eq('cell', cell.key).maybeSingle()
+  if (cacheReadError) {
+    console.error('[world-lab parcels] cache read', cell.key, cacheReadError.message)
+    return NextResponse.json({ ok: false, error: 'Kataster-Zellencache nicht lesbar.' }, { status: 503 })
+  }
   // Erfolgreich geholte Zellen bleiben; gescheiterte frühestens nach einer Stunde erneut; ältere Fassung einmal neu.
-  if (known && known.source === CELL_VERSION && (!known.error || Date.now() - Date.parse(known.fetched_at) < 3600_000)) return NextResponse.json({ ok: !known.error, cached: true, parcels: known.parcels, error: known.error ?? undefined })
+  if (known && known.source === CELL_VERSION && (!known.error || Date.now() - Date.parse(known.fetched_at) < 3600_000)) {
+    // A cached failed import is still a failure, not an HTTP 200 success.
+    return NextResponse.json(
+      { ok: !known.error, cached: true, parcels: known.parcels, error: known.error ?? undefined },
+      { status: known.error ? 503 : 200 },
+    )
+  }
   try {
     const { parcels, errors } = await fetchCell(cell)
     // Alle Länder ausgefallen: nichts speichern, später neu versuchen
     if (errors.length && !parcels.length) throw new Error(errors.join(' | '))
     const rows = rowsFor(parcels)
+    // Preserve every existing cadastral snapshot and any later NOXIA edits.
+    // Only previously unknown IDs may be inserted by another provider fetch.
     for (let i = 0; i < rows.length; i += 300) {
-      const { error } = await supabase.from('earth_parcels').upsert(rows.slice(i, i + 300), { onConflict: 'id' })
+      const { error } = await supabase.from('earth_parcels').upsert(rows.slice(i, i + 300), PARCEL_INITIAL_IMPORT_UPSERT)
       if (error) throw error
     }
     // Ein Land ausgefallen: Gefundenes bleibt, die Zelle gilt als fehlerhaft und wird nach einer Stunde neu geholt.
-    await supabase.from('earth_parcel_cells').upsert({ cell: cell.key, source: CELL_VERSION, parcels: rows.length, error: errors.length ? errors.join(' | ').slice(0, 500) : null, fetched_at: new Date().toISOString() })
+    const { error: cacheWriteError } = await supabase.from('earth_parcel_cells').upsert({ cell: cell.key, source: CELL_VERSION, parcels: rows.length, error: errors.length ? errors.join(' | ').slice(0, 500) : null, fetched_at: new Date().toISOString() })
+    if (cacheWriteError) throw cacheWriteError
     return NextResponse.json({ ok: true, cached: false, parcels: rows.length, partial: errors.length > 0 || undefined })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     console.error('[world-lab parcels]', cell.key, message)
-    await supabase.from('earth_parcel_cells').upsert({ cell: cell.key, source: CELL_VERSION, parcels: 0, error: message.slice(0, 500), fetched_at: new Date().toISOString() })
-    return NextResponse.json({ ok: false, error: 'Kataster gerade nicht erreichbar.' })
+    // Best-effort diagnostic only: do not hide the original import failure.
+    try {
+      const { error: cacheFailureWriteError } = await supabase.from('earth_parcel_cells').upsert({ cell: cell.key, source: CELL_VERSION, parcels: 0, error: message.slice(0, 500), fetched_at: new Date().toISOString() })
+      if (cacheFailureWriteError) console.error('[world-lab parcels] cache failure write', cell.key, cacheFailureWriteError.message)
+    } catch (cacheFailureWriteError) {
+      console.error('[world-lab parcels] cache failure write', cell.key, cacheFailureWriteError)
+    }
+    return NextResponse.json({ ok: false, error: 'Katasterimport fehlgeschlagen.' }, { status: 503 })
   }
 }
