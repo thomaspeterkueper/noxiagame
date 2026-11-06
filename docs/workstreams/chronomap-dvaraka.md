@@ -118,10 +118,46 @@ Dabei gestrichen: der „Hügel mit Sternenritual“ (das Ritual findet in der W
 - **Fundzettel:** An Orten mit [R] zeigt eine Tafel den Fundzettel der Grabung mit Datum; bei [S] „aus Funden erschlossen“, bei [F] „Rekonstruktion nach dem Buch“.
 - **Ende:** Der Spieler steht am Kai oder auf dem Fels über dem Hafen. Das letzte Dach des Fischerviertels verschwindet unter Wasser. Dann blendet die Szene in die Grabung über: Wo das Dach war, liegt heute das Grabungsfeld G12. Die Felsstadt steht in der Chronomap noch; in der Gegenwart liegt auch sie unter Wasser (Phase 2).
 
-## 5. Offene Punkte für Thomas
+## 5. Wie die Gegenwart die Eingriffe zeigt (Thomas, 06.11.2026: Grenzen bestätigt)
+
+Grundsatz: **Die Funde bleiben fest, die Deutung ist beweglich.** Die Steine (G1–G14) ändern sich nie. Was sich ändert, ist, was Menschen heute über den Ort wissen, singen und tun – wie im Epilog „Hundert Jahre später“, wo Dvārakā in Bräuchen überlebt, deren Herkunft niemand kennt („So hält die Wärme länger.“).
+
+### Vier Arten von Spuren
+
+1. **Lieder** – die Fischer an der arabischen Küste singen schon im Buch von Matsya. Gerettete Familien ergeben eine Strophe mehr; ein Grabungshelfer aus einem Fischerdorf singt sie abends im Camp.
+2. **Bräuche ohne Erklärung** – in einem heutigen Küstendorf, z. B. „zwei volle Krüge im Keller, weil man das so macht“.
+3. **Kinderreime** – ein Abzählreim, Sprichwörter.
+4. **Lesart auf dem Fundzettel** – derselbe Fund, eine andere Deutung der Grabungsleiterin, immer mit „möglicherweise“.
+
+### Eingriff → Spur
+
+| Eingriff (Chronomap) | Merker | Spur in der Gegenwart | Wo der Spieler sie findet |
+| --- | --- | --- | --- |
+| Priyas Liste vor Mittag zum Wartungsrat bringen | `priya_liste_rat` | Abzählreim der Kinder: „Neunzehn Lampen, vier Brunnen, sieben …“; Fundzettel G10 nennt „eine Überlieferung von einem Mädchen, das in der Nacht zählte“ | Dorfplatz; Labor (Fundzettel G10) |
+| Babus Warnung im Fischerviertel weitertragen | `babu_warnung` | Sprichwort der Fischer: Bei glattem Wasser fährt man nicht hinaus (Anklang an *śītala-bodha*) | Anlegestelle, Gespräch mit Fischern |
+| Familien aus dem Fischerviertel zu den Booten bringen | `fischer_gerettet` (Anzahl) | neue Strophe im Matsya-Lied; bei vielen Geretteten eine zweite Strophe über „die Boote, die mitfuhren“ | Grabungscamp am Abend |
+| Jaya hilft, die Krüge zu füllen | `jaya_kruege` | Brauch: zwei volle Krüge im Keller, „weil man das so macht“ | Haus im Küstendorf |
+| Ketans Warnung an weitere Brunnen bringen | `ketan_brunnen` | Brauch: aus einem „stillen“ Brunnen trinkt man nicht; Fundzettel G7 vermerkt Ritzzeichen an mehreren Brunnen (Deutung, kein neuer Fund) | Dorfbrunnen; Labor (G7) |
+| Velus Jüngsten aus dem Westbezirk holen | `velu_sohn` | eine Steinmetz-Familie im Hinterland führt ihre Linie auf „einen Jungen vom Meer“ zurück | Steinbruch im Hinterland |
+| Meena beim Umräumen helfen | `meena_vorrat` | Gewürzhändler an der Küste lagern das Wertvolle innen, das Billige außen, ohne Begründung | Markt im Küstendorf |
+| Kasyapa in der dritten Nacht ansprechen | `kasyapa_gespraech` | Der Bruch bleibt. Fundzettel G9 erhält eine zweite Lesart: „Hinweise, dass das Mahlwerk bewusst überlastet wurde – oder dass jemand versuchte, es aufzuhalten.“ | Labor (G9) |
+
+### Regeln
+
+- **Kein Punktestand.** Das Spiel sagt nie „14 Menschen gerettet“. Der Spieler muss die Spuren selbst finden: zuhören, ins Dorf gehen, Fundzettel neu lesen.
+- **Immer unsicher.** Keine Spur beweist etwas (vgl. Kap. 1.4.2: „Beides konnte gleichzeitig wahr sein“).
+- **Ohne Eingriff bleibt es still.** Wer nichts tut, findet nichts Neues („Stille ist auch eine Form des Bleibens“).
+- **Grabungsbuch** im Camp, im Stil von Dhruvas Notizen: hält nach jeder Reise fest, was sich verändert hat. Die Gegenwart zeigt die Spuren der **letzten** Reise; das Grabungsbuch bewahrt alle früheren.
+- Der 13. Same bleibt unberührt: Keine Reise erzeugt eine Spur von ihm.
+
+### Technik
+
+Pro Eingriff ein Merker (boolesch oder Anzahl), gespeichert mit der Reise. Beim Übergang in die Gegenwart wählt eine Tabelle (wie oben) die Spuren aus: Liedzeile, Dorfszene, Zusatztext auf dem Fundzettel. Keine Simulation nötig. Die Spurtexte gehören zum Werk und sollten in `buecherwelten` (`works/das-lied-von-dvaraka/`) gepflegt werden; das Spiel liest sie nur.
+
+## 6. Offene Punkte für Thomas
 
 1. Passen die 14 Fundpunkte (Kap. 2)? (G13 liegt jetzt vor der Werkstatt, entschieden 06.11.2026.)
 2. Passt die Verteilung: Wasserturm, Heilgarten und Manus Haus im Westbezirk (innerhalb der 300 m), Stadtrat und Markt in der Felsstadt?
 3. Einstieg in der dritten Nacht als Pilger – oder doch am frühen Morgen des Bruchtags?
-4. Eingreifen ist entschieden (06.11.2026). Offen: Passen die Grenzen in Kap. 4 (Bruch fest, Rettung veränderbar)? Wie zeigt die Gegenwart die Folgen?
+4. Eingreifen und Grenzen sind entschieden (06.11.2026); Spuren in Kap. 5. Offen: Wer schreibt die Liedstrophen und Reime – Thomas selbst oder Entwurf durch Claude zur Korrektur?
 5. Kap. 1.4 ff. (die Wege der Träger nach Iberien, Ḫattuša, Himalaya, Ajanta) gehören nicht in diese Chronomap; das wären eigene Chronomaps.
