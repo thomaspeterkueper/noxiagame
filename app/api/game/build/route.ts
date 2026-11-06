@@ -29,6 +29,14 @@ const MODULE_COSTS: Record<string, { cost: number; buildTicks: number }> = {
   reactor: { cost: 8000, buildTicks: 6 },
 }
 
+function parseTileInteger(raw: string | null): number {
+  // Missing coordinates retain the legacy default of zero. Explicitly malformed
+  // values must not be coerced, truncated or interpreted as hexadecimal.
+  if (raw === null) return 0
+  if (!/^-?\\d+$/.test(raw)) return Number.NaN
+  return Number(raw)
+}
+
 async function getUserFromRequest(req: NextRequest) {
   const id = await verifiedBearerUserId(req)
   return id ? { id } : null
@@ -221,9 +229,9 @@ export async function GET(req: NextRequest) {
     const buildableId = searchParams.get('buildableId')
     const locationSlug = searchParams.get('location')
     // Reject partial numeric strings (e.g. "1oops", "0.5") instead of truncating them.
-    const tileRow = Number(searchParams.get('tileRow') ?? '0')
-    const tileCol = Number(searchParams.get('tileCol') ?? '0')
-    const tileLevel = Number(searchParams.get('tileLevel') ?? '0')
+    const tileRow = parseTileInteger(searchParams.get('tileRow'))
+    const tileCol = parseTileInteger(searchParams.get('tileCol'))
+    const tileLevel = parseTileInteger(searchParams.get('tileLevel'))
 
     if (!buildableId || !locationSlug) return NextResponse.json({ error: 'Fehlende Parameter' }, { status: 400 })
     if (BUILDINGS[buildableId]?.stateOnlyLocations?.some((slug) => slug === locationSlug)) {
