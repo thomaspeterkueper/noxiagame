@@ -16,6 +16,6 @@ describe("ontogenetic language experiment",()=>{
  it("preserves earlier snapshots when later experiences occur",()=>{
   const snapshots=runDevelopment(syntheticInfancy(20),targets,[0,19]);
   expect(snapshots[0].vocabulary).toBe(1);
-  expect(snapshots[0].associations.ball).toBeUndefined();
+  expect(snapshots[0].associations.cup).toBeUndefined();
  });
 });
