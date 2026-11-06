@@ -141,6 +141,27 @@ export async function applyEventAffect(
   }
 }
 
+/**
+ * Träume (NOXIA-LIVING-0016): ein Traum färbt die Gefühle leicht. Einmal je Figur und Nacht –
+ * der Aufrufer schreibt nur für neu angelegte Träume. Die Quelle des letzten Ereignisses bleibt.
+ */
+export async function applyDreamAffect(
+  supabase: SupabaseLike,
+  input: { personId: string; tick: number; traits?: Record<string, unknown> | null; delta: { joy: number; fear: number; anger: number; sadness: number } },
+): Promise<AffectWriteResult> {
+  if (input.delta.joy + input.delta.fear + input.delta.anger + input.delta.sadness <= 0) return 'no_affect'
+  try {
+    const current = await readAffect(supabase, input.personId)
+    if (!current) return 'unavailable'
+    const profile = affectProfileFromTraits(input.traits ?? null)
+    const next = applyAffect(current.state, input.delta, input.tick, profile)
+    const { error } = await supabase.from('person_affect').upsert(affectRow(next, current.sourceEventId), { onConflict: 'person_id' })
+    return error ? 'unavailable' : 'applied'
+  } catch {
+    return 'unavailable'
+  }
+}
+
 /** Folds a health event into pain, its emotional echo and a learned place aversion. */
 export async function applyHealthEventAffect(
   supabase: SupabaseLike,

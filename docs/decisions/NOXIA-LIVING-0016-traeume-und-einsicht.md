@@ -1,6 +1,6 @@
 # NOXIA-LIVING-0016 – Träume und Einsicht aus übergeordnetem Wissen
 
-Stand: 06.11.2026 · Status: **Schritte 1 und 2 umgesetzt** (regionale Meldungen, Träume); Schritte 3–5 offen
+Stand: 06.11.2026 · Status: **Schritte 1–3 umgesetzt** (regionale Meldungen, Träume, Stimmung und seltene Einsicht); Schritte 4–5 offen
 
 ## Vorgabe (Thomas, 06.11.2026)
 
@@ -86,7 +86,11 @@ Jeder Schritt ist für sich nutzbar; die tägliche Auswertung bekommt je Schritt
 - **Träume:** `npc_dreams` (ein Traum je Figur und Nacht, `canonical = false`, Löschen nach 30 Tagen). `runDreamTick` (`lib/game/cognition/dreamRuntime.ts`) läuft in jedem Tick nach der Bevölkerung für alle Figuren, die gerade schlafen. Stoff: Begegnungen der letzten 24 Ticks (fiktive Namen), Arbeit, manchmal eine Meldung der Region – Namen aus Meldungen fallen weg (`newsMotifs`).
 - **Erinnern:** Fest je Figur (`dreamRecallAbility`, Trait `dream_recall` geht vor), schief verteilt. Zusammen mit der Intensität der Nacht: `none` (unterbewusst, die meisten), `fragment` (Bruchstück), `clear` (deutlich, wenige). Im Test mit 400 Figuren: über 55 % unterbewusst, unter 20 % deutlich.
 - **Gespräch:** Nur ein erinnerter Traum der letzten 30 Stunden kommt ins Gespräch (`dreamConversationLines`), mit der Regel „nur wenn es passt, kein Ausschmücken, keine Vorhersage“. Hing er an einer Meldung, wird die Meldung als belegt, der Traum als Traum genannt.
-- **Noch nicht:** Unterbewusste Träume wirken bisher nicht weiter. Vorschlag für Schritt 3: Sie färben Stimmung und Einsichts-Chance leicht; Erleuchtung nur für die wenigen mit deutlicher Erinnerung.
+- **Stimmung (Schritt 3, Thomas: „machen wir so“):** Jeder Traum hat einen Grundton (`tone`, −1..1: Streit dunkel, Hilfe hell, dazu Zufall je Nacht). Auch unterbewusste Träume färben die Gefühle leicht (`dreamAffectDelta`, höchstens 0,12 je Gefühl; über `applyDreamAffect` bewegt sich die Grundstimmung um wenige Hundertstel).
+- **Erleuchtung (Schritt 3):** Nur bei deutlich erinnertem Traum und offenem Problem (drängendstes Bedürfnis unter 0,45, `openProblemFromNeeds`), höchstens eine je Figur und Woche. Das Einsichtstor im Traum wiegt Intensität, Druck des Problems, Assoziationsweite, Fachwissen und Zufall. Ergebnis in `npc_insights` als Vermutung (`status = vermutet`, `canonical = false`); Herkunft `knowledge_gateway`, wenn der Traum an einer Meldung hing, sonst `dream_recombination`. Im Gespräch: „Dir ist neulich nach einem Traum eine Idee gekommen, sicher bist du nicht …“.
+- **Verteilung (Simulation, 2000 Träume):** 76 % unterbewusst, 16 % Bruchstück, 8 % deutlich; bei offenem Problem führt etwa jeder 27. Traum zu einer Einsicht, die Wochensperre bremst weiter.
+- **Erster Abruf 06.11.2026 15:50:** Deutschlandfunk (2 Feeds) und tagesschau je 20 Meldungen. WDR und NASA lieferten, scheiterten aber an doppelten IDs (abgeschnittener Link als ID) – behoben mit vollem Hash. ESA (404) und JPL (403) liefern nicht; das betrifft auch das Dashboard und ist noch offen.
+- **Noch nicht:** Einsichten verändern noch keine Entscheidung und werden noch nicht bestätigt oder verworfen (Schritt 5). Knowledge Graph und SSF als zweiter Fremdimpuls (Schritt 4).
 
 ## Ursprünglich offene Fragen
 

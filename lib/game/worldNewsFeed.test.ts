@@ -13,6 +13,11 @@ describe('worldNewsFeed', () => {
     expect(items[0].title).toBe('Neue Radwege im Sauerland')
     expect(items[0].publishedAt).toBe('2026-11-06T06:00:00.000Z')
   })
+  it('items with the same link prefix get different ids', () => {
+    const feed = `<rss><channel>${[1, 2, 3].map(n => `<item><title>Meldung ${n} aus Südwestfalen</title><link>https://www1.wdr.de/nachrichten/westfalen-lippe/sehr-lange-gemeinsame-adresse-${n}-100.html</link></item>`).join('')}</channel></rss>`
+    const ids = parseFeed('wdr', feed).map(i => i.id)
+    expect(new Set(ids).size).toBe(3)
+  })
   it('keeps death and accidents out of dreams, the German word „war“ is harmless', () => {
     expect(isDreamMaterial('Zwei Tote bei Unfall auf der A46')).toBe(false)
     expect(isDreamMaterial('Neue Radwege im Sauerland')).toBe(true)
