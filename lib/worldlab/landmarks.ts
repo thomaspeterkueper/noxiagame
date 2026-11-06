@@ -3,7 +3,7 @@
 // Gleiche Bezeichnungen wie in der begehbaren Erdszene (dort nicht exportiert).
 
 const LANDMARK_LABEL: Record<string, string> = {
-  library: 'Bibliothek', place_of_worship: 'Gotteshaus', rowhouse: 'Reihenhaus', rowhouse_wg: 'Wohngemeinschaft', museum: 'Museum', gallery: 'Galerie', attraction: 'Sehenswürdigkeit',
+  library: 'Bibliothek', place_of_worship: 'Gotteshaus', rowhouse: 'Reihenhaus', rowhouse_wg: 'Wohngemeinschaft', rowhouse_duplex: 'Doppelstock-Reihenhaus', rowhouse_duplex_corner: 'Eckhaus mit Durchgang', museum: 'Museum', gallery: 'Galerie', attraction: 'Sehenswürdigkeit',
   viewpoint: 'Aussichtspunkt', castle: 'Burg / Schloss', fort: 'Festung', city_gate: 'Stadttor', ruins: 'Ruine',
   archaeological_site: 'Ausgrabungsstätte', monument: 'Denkmal', memorial: 'Gedenkstätte', university: 'Universität',
   townhall: 'Rathaus', theatre: 'Theater', arts_centre: 'Kulturzentrum', hospital: 'Krankenhaus', station: 'Bahnhof',

@@ -20,7 +20,7 @@ export type LandmarkRoomKind =
   // Öffentliche Dienste (Gastronomie, 06.11.2026): öffnen den Innenraum-Motor (PublicServiceInterior).
   | 'police' | 'fire_station' | 'doctors' | 'hospital'
   // Reihenhausserie Krokusweg 2–14, Friedrichsdorf; Nr. 10 ist die WG aus „Der Duft der bleibt“ (06.11.2026).
-  | 'rowhouse' | 'rowhouse_wg'
+  | 'rowhouse' | 'rowhouse_wg' | 'rowhouse_duplex' | 'rowhouse_duplex_corner'
 export type LandmarkPoint = { x: number; y: number }
 export type LandmarkFurnitureKind = 'shelf' | 'shelf-low' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern' | 'armchair' | 'sofa' | 'plant' | 'globe' | 'pinboard' | 'counter' | 'goods' | 'lift' | 'bench' | 'vehicle' | 'gate' | 'crate' | 'piano' | 'chair' | 'wall' | 'artwork' | 'stairs'
   | 'grave' | 'tap' | 'tree' | 'memorial'
@@ -532,7 +532,7 @@ function cemeteryLayout(): LandmarkRoomLayout {
 }
 
 /** Mehrgeschossige Häuser: Anzahl Geschosse je Raumart (alle anderen haben eines). */
-export const LANDMARK_LEVELS: Partial<Record<LandmarkRoomKind, number>> = { artlounge: 3, rowhouse: ROWHOUSE_LEVELS, rowhouse_wg: ROWHOUSE_LEVELS }
+export const LANDMARK_LEVELS: Partial<Record<LandmarkRoomKind, number>> = { artlounge: 3, rowhouse: ROWHOUSE_LEVELS, rowhouse_wg: ROWHOUSE_LEVELS, rowhouse_duplex: ROWHOUSE_LEVELS, rowhouse_duplex_corner: ROWHOUSE_LEVELS }
 
 const STAIRS = { x: 690, y: 236, w: 44, h: 100 }
 const STAIRS_LANDING = { x: 640, y: 290 }
@@ -660,7 +660,7 @@ export function landmarkRoomKind(landmarkClass: string, tags?: Record<string, st
   if (landmarkClass === 'library') return 'library'
   if (landmarkClass === 'place_of_worship') return worshipRoomKind(tags?.religion, tags?.building)
   if (landmarkClass === 'artlounge') return 'artlounge'
-  if (landmarkClass === 'rowhouse' || landmarkClass === 'rowhouse_wg') return landmarkClass
+  if (landmarkClass === 'rowhouse' || landmarkClass === 'rowhouse_wg' || landmarkClass === 'rowhouse_duplex' || landmarkClass === 'rowhouse_duplex_corner') return landmarkClass
   if (landmarkClass === 'community_centre') return 'community_hall'
   if (landmarkClass === 'resonance_place') return 'resonance_place'
   if (landmarkClass === 'cemetery' || landmarkClass === 'grave_yard') return 'cemetery'
@@ -697,7 +697,7 @@ export function landmarkRoomLayout(kind: LandmarkRoomKind, level = 0, byStairs =
     case 'worship': return worshipLayout()
     case 'shop': return shopLayout()
     case 'artlounge': return artLoungeLayout(level, byStairs)
-    case 'rowhouse': case 'rowhouse_wg': return rowhouseLayout(kind, level, byStairs)
+    case 'rowhouse': case 'rowhouse_wg': case 'rowhouse_duplex': case 'rowhouse_duplex_corner': return rowhouseLayout(kind, level, byStairs)
     case 'mosque': return mosqueLayout()
     case 'synagogue': return synagogueLayout()
     case 'hindu_temple': return hinduTempleLayout()

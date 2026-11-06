@@ -1,6 +1,6 @@
 // lib/game/landmarks/rowhouse.ts
 // Erstellt: 06.11.2026 – Reihenhausserie Krokusweg 2–14, Friedrichsdorf (Bauvorhaben Schäferborn, 1979).
-// Version:  1.0.0
+// Version:  1.1.0 – 06.11.2026: Doppelstock-Reihenhäuser gegenüber (ungerade Nummern), Eckhaus Nr. 3 mit Durchgang
 //
 // Vier Geschosse nach den Bauplänen (gerundet): Keller mit Tür zur Tiefgarage, EG mit Küche
 // vorn und Wohnraum hinten, 1. OG (kragt vorn 1,20 m vor, auf zwei Betonpfeilern; darunter eine
@@ -13,11 +13,19 @@
 
 import type { LandmarkFurniture, LandmarkFurnitureKind, LandmarkLamp, LandmarkPoint, LandmarkRoomLayout, LandmarkSpot, LandmarkZone, LandmarkZoneKind } from './interiors'
 
-export type RowhouseVariant = 'rowhouse' | 'rowhouse_wg'
+export type RowhouseVariant = 'rowhouse' | 'rowhouse_wg' | 'rowhouse_duplex' | 'rowhouse_duplex_corner'
 
-/** Geschosse: 0 EG, 1 erstes OG, 2 Dachgeschoss, 3 Keller. */
+/**
+ * Geschosse. Reihe Krokusweg 2–14: 0 EG, 1 erstes OG, 2 Dachgeschoss, 3 Keller.
+ * Doppelstockhäuser gegenüber (ungerade Nummern): 0 untere Wohnung, 1 obere Wohnung am Laubengang
+ * (wie das EG der Reihe), 2 deren Obergeschoss, 3 deren Dachgeschoss.
+ */
 export const ROWHOUSE_LEVELS = 4
+type Levels = { eg: number; og1: number; dg: number; cellar: number | null; lower: number | null }
+const SINGLE: Levels = { eg: 0, og1: 1, dg: 2, cellar: 3, lower: null }
+const DUPLEX: Levels = { eg: 1, og1: 2, dg: 3, cellar: null, lower: 0 }
 const FLOOR_NAMES = ['Erdgeschoss', '1. Obergeschoss', 'Dachgeschoss', 'Keller'] as const
+const DUPLEX_FLOOR_NAMES = ['Wohnung unten · Erdgeschoss', 'Wohnung oben · Eingang am Laubengang', 'Wohnung oben · Obergeschoss', 'Wohnung oben · Dachgeschoss'] as const
 
 const PX = 46
 const X = (m: number) => Math.round(24 + (m + 1.3) * PX)
@@ -29,6 +37,13 @@ const WALL = 6
 const SERIES_CENTER = { lat: 50.25583, lon: 8.64940 }
 const SERIES_RADIUS_M = 350
 const SERIES_NUMBERS = new Set(['2', '4', '6', '8', '10', '12', '14'])
+/**
+ * Gegenüber (Thomas, 06.11.2026, ohne Pläne): Nr. 1 Kita am Wendekreis, Nr. 3 Eckhaus mit
+ * Durchgang nach hinten, danach Doppelstock-Reihenhäuser mit zwei Parteien. Annahme: ungerade
+ * Nummern 5–25; die genaue Länge der Reihe ist noch nicht bestätigt.
+ */
+const DUPLEX_CORNER = '3'
+const DUPLEX_MAX = 25
 
 /**
  * Gehört ein Haus der Weltkarte zur Reihenhausserie Krokusweg in Friedrichsdorf?
@@ -36,11 +51,16 @@ const SERIES_NUMBERS = new Set(['2', '4', '6', '8', '10', '12', '14'])
  */
 export function rowhouseVariantFor(address?: string | null, at?: { lat: number; lon: number } | null): RowhouseVariant | null {
   const match = String(address ?? '').trim().match(/^Krokusweg\s+(\d+)\s*$/i)
-  if (!match || !SERIES_NUMBERS.has(match[1]) || !at) return null
+  if (!match || !at) return null
   const dLat = (at.lat - SERIES_CENTER.lat) * 111_320
   const dLon = (at.lon - SERIES_CENTER.lon) * 111_320 * Math.cos(SERIES_CENTER.lat * Math.PI / 180)
   if (Math.hypot(dLat, dLon) > SERIES_RADIUS_M) return null
-  return match[1] === '10' ? 'rowhouse_wg' : 'rowhouse'
+  const number = match[1]
+  if (SERIES_NUMBERS.has(number)) return number === '10' ? 'rowhouse_wg' : 'rowhouse'
+  const n = Number(number)
+  if (number === DUPLEX_CORNER) return 'rowhouse_duplex_corner'
+  if (n % 2 === 1 && n >= 5 && n <= DUPLEX_MAX) return 'rowhouse_duplex'
+  return null
 }
 
 type Builder = {
@@ -94,15 +114,24 @@ function partyWalls(b: Builder) {
 
 const pt = (x: number, y: number): LandmarkPoint => ({ x: X(x), y: Y(y) })
 
-function groundFloor(b: Builder, wg: boolean, byStairs: boolean): Omit<LandmarkRoomLayout, 'kind' | 'noun'> {
+function groundFloor(b: Builder, wg: boolean, byStairs: boolean, lv: Levels = SINGLE): Omit<LandmarkRoomLayout, 'kind' | 'noun'> {
   partyWalls(b)
-  // Außen vorn unter dem vorkragenden Obergeschoss: Eingang und Terrasse vor der Küche, zwei Betonpfeiler.
-  b.zone('front-entry', 'concrete', -1.3, 0, 0, 2.6)
-  b.zone('front-terrace', 'tiles', -1.3, 2.6, 0, W)
-  b.item('pillar-a', 'pillar', -1.2, 0.1, -0.9, 0.4)
-  b.item('pillar-b', 'pillar', -1.2, 4.9, -0.9, 5.2)
-  b.item('front-bench', 'bench', -0.75, 4.2, -0.15, 5.1)
-  b.item('front-plant', 'plant', -0.7, 2.8, -0.2, 3.3)
+  const walkway = lv.lower !== null
+  if (walkway) {
+    // Doppelstockhaus: vor der oberen Wohnung läuft der Laubengang, eine Außentreppe führt hinunter.
+    b.zone('walkway', 'concrete', -1.3, 0, 0, W)
+    b.item('walkway-rail', 'railing', -1.3, 0.05, -1.2, 3.9)
+    b.item('walkway-stairs', 'stairs', -1.3, 4.0, -0.35, 5.25)
+    b.item('walkway-plant', 'plant', -0.7, 2.9, -0.2, 3.4)
+  } else {
+    // Außen vorn unter dem vorkragenden Obergeschoss: Eingang und Terrasse vor der Küche, zwei Betonpfeiler.
+    b.zone('front-entry', 'concrete', -1.3, 0, 0, 2.6)
+    b.zone('front-terrace', 'tiles', -1.3, 2.6, 0, W)
+    b.item('pillar-a', 'pillar', -1.2, 0.1, -0.9, 0.4)
+    b.item('pillar-b', 'pillar', -1.2, 4.9, -0.9, 5.2)
+    b.item('front-bench', 'bench', -0.75, 4.2, -0.15, 5.1)
+    b.item('front-plant', 'plant', -0.7, 2.8, -0.2, 3.3)
+  }
   // Außenwände: vorn mit Haustür, hinten mit Terrassentür.
   b.wallY('front', 0, 0, W, [[1.55, 2.45]])
   b.wallY('back', 11.7, 0, W, [[2.2, 3.2]])
@@ -151,26 +180,31 @@ function groundFloor(b: Builder, wg: boolean, byStairs: boolean): Omit<LandmarkR
   b.spot('living', 'WOHNRAUM', 8.6, 2.6, wg
     ? 'Der Wohnraum zum Garten: abends das hellste Zimmer im Haus. Wer hier sitzt, hört oben die Schritte auf der Dachterrasse nicht – aber man sieht, wer auf den Balkon tritt.'
     : 'Der Wohnraum zum Garten, abends voller Sonne.', { action: 'sit' })
-  b.spot('terrace', 'GARTENTERRASSE', 12.8, 2.0, wg
+  b.spot('terrace', 'GARTENTERRASSE', 12.8, 2.0, walkway ? 'Die Terrasse der oberen Wohnung. Weil das Gelände ansteigt, liegt der Garten hier auf Höhe des ersten Stocks.' : wg
     ? 'Die Gartenterrasse. Über dir der Balkon im ersten Stock, darüber die Dachterrasse – das Haus treppt sich zum Garten ab.'
     : 'Die Terrasse zum Garten. Das Nachbarhaus rechts steht hier einen Meter weiter vor.', { action: 'sit' })
+  if (walkway) {
+    b.spot('walkway', 'LAUBENGANG', -0.6, 1.0, 'Der Laubengang vor den oberen Wohnungen. Von hier sieht man über den Wohnweg auf die Reihe gegenüber.')
+    b.spot('walkway-down', 'AUSSENTREPPE HINUNTER', -0.75, 3.7, 'Die Außentreppe führt hinunter auf den Weg und zur unteren Wohnung.', { action: 'stairs', toLevel: lv.lower as number, toName: 'Hinunter zur unteren Wohnung' })
+  } else {
   b.spot('front-terrace', 'TERRASSE VORN', -0.55, 3.6, wg
     ? 'Unter dem vorkragenden ersten Stock, zwischen zwei Betonpfeilern: eine kleine Terrasse vor dem Küchenfenster. Vom Spielplatz gegenüber hört man die Kinder.'
     : 'Eine kleine Terrasse vor dem Küchenfenster, überdacht vom ersten Stock, getragen von zwei Betonpfeilern.', { action: 'sit' })
+  }
   b.spot('wc', 'WC', 1.3, 1.0, 'Das Gäste-WC neben der Haustür.')
-  b.spot('up-1', 'TREPPE HINAUF', 3.4, 0.75, 'Die Treppe führt in den ersten Stock.', { action: 'stairs', toLevel: 1, toName: 'Ins 1. Obergeschoss' })
-  b.spot('down-3', 'TREPPE IN DEN KELLER', 6.7, 0.8, 'Unter der Treppe geht es hinunter in den Keller.', { action: 'stairs', toLevel: 3, toName: 'In den Keller' })
+  b.spot('up-1', 'TREPPE HINAUF', 3.4, 0.75, 'Die Treppe führt ins Obergeschoss.', { action: 'stairs', toLevel: lv.og1, toName: 'Ins Obergeschoss' })
+  if (lv.cellar !== null) b.spot('down-3', 'TREPPE IN DEN KELLER', 6.7, 0.8, 'Unter der Treppe geht es hinunter in den Keller.', { action: 'stairs', toLevel: lv.cellar, toName: 'In den Keller' })
   return {
-    level: 0, floorName: FLOOR_NAMES[0],
+    level: lv.eg, floorName: walkway ? DUPLEX_FLOOR_NAMES[1] : FLOOR_NAMES[0],
     furniture: b.furniture, zones: b.zones, spots: b.spots, lamps: b.lamps,
-    start: byStairs ? pt(3.4, 1.0) : pt(0.6, 2.0),
-    exit: pt(-0.6, 2.3),
+    start: walkway ? pt(-0.6, 2.0) : byStairs ? pt(3.4, 1.0) : pt(0.6, 2.0),
+    exit: walkway ? { x: -100, y: -100 } : pt(-0.6, 2.3),
     staff: null,
     gatherAt: [pt(4.85, 2.25), pt(8.6, 2.6), pt(12.8, 2.0)],
   }
 }
 
-function firstFloor(b: Builder, wg: boolean): Omit<LandmarkRoomLayout, 'kind' | 'noun'> {
+function firstFloor(b: Builder, wg: boolean, lv: Levels = SINGLE): Omit<LandmarkRoomLayout, 'kind' | 'noun'> {
   partyWalls(b)
   // Vorn kragt das Geschoss 1,20 m über die Küche vor; hinten endet es vor dem Wohnraum.
   b.wallY('front', -1.2, 0, W)
@@ -229,16 +263,16 @@ function firstFloor(b: Builder, wg: boolean): Omit<LandmarkRoomLayout, 'kind' | 
   b.spot('balcony', 'BALKON', 10.2, 3.6, wg
     ? 'Der Balkon auf dem Dach des Wohnraums. Von oben, von der Dachterrasse, kann man hier hereinsehen. Links ist das Fenster von Priyas Zimmer.'
     : 'Der Balkon auf dem Dach des Wohnraums, zum Garten.', { action: 'sit' })
-  b.spot('down-0', 'TREPPE INS ERDGESCHOSS', 2.7, 1.8, 'Die Treppe führt hinunter ins Erdgeschoss.', { action: 'stairs', toLevel: 0, toName: 'Ins Erdgeschoss' })
-  b.spot('up-2', 'TREPPE INS DACHGESCHOSS', 4.7, 1.8, 'Die Treppe führt hinauf unters Dach.', { action: 'stairs', toLevel: 2, toName: 'Ins Dachgeschoss' })
+  b.spot('down-0', 'TREPPE HINUNTER', 2.7, 1.8, 'Die Treppe führt hinunter.', { action: 'stairs', toLevel: lv.eg, toName: lv.lower !== null ? 'Hinunter zum Eingang' : 'Ins Erdgeschoss' })
+  b.spot('up-2', 'TREPPE INS DACHGESCHOSS', 4.7, 1.8, 'Die Treppe führt hinauf unters Dach.', { action: 'stairs', toLevel: lv.dg, toName: 'Ins Dachgeschoss' })
   return {
-    level: 1, floorName: FLOOR_NAMES[1],
+    level: lv.og1, floorName: lv.lower !== null ? DUPLEX_FLOOR_NAMES[2] : FLOOR_NAMES[1],
     furniture: b.furniture, zones: b.zones, spots: b.spots, lamps: b.lamps,
     start: pt(4.1, 1.9), exit: { x: -100, y: -100 }, staff: null,
   }
 }
 
-function atticFloor(b: Builder, wg: boolean): Omit<LandmarkRoomLayout, 'kind' | 'noun'> {
+function atticFloor(b: Builder, wg: boolean, lv: Levels = SINGLE): Omit<LandmarkRoomLayout, 'kind' | 'noun'> {
   partyWalls(b)
   b.wallY('front', -1.2, 0, W)
   b.wallY('back-store', 8.9, 0, 2.35)
@@ -289,9 +323,9 @@ function atticFloor(b: Builder, wg: boolean): Omit<LandmarkRoomLayout, 'kind' | 
   b.spot('bath', 'BAD', 3.8, 4.4, wg
     ? 'Das zweite Bad, klein und ohne Fenster. Drei Menschen teilen es.'
     : 'Ein kleines Bad ohne Fenster.')
-  b.spot('down-1', 'TREPPE HINUNTER', 4.4, 1.75, 'Die Treppe führt hinunter in den ersten Stock.', { action: 'stairs', toLevel: 1, toName: 'Ins 1. Obergeschoss' })
+  b.spot('down-1', 'TREPPE HINUNTER', 4.4, 1.75, 'Die Treppe führt hinunter ins Obergeschoss.', { action: 'stairs', toLevel: lv.og1, toName: 'Ins Obergeschoss' })
   return {
-    level: 2, floorName: FLOOR_NAMES[2],
+    level: lv.dg, floorName: lv.lower !== null ? DUPLEX_FLOOR_NAMES[3] : FLOOR_NAMES[2],
     furniture: b.furniture, zones: b.zones, spots: b.spots, lamps: b.lamps,
     start: pt(3.6, 1.9), exit: { x: -100, y: -100 }, staff: null,
   }
@@ -341,9 +375,70 @@ function basement(b: Builder, wg: boolean): Omit<LandmarkRoomLayout, 'kind' | 'n
   }
 }
 
+/**
+ * Untere Wohnung eines Doppelstockhauses (ohne Plan, Annahme): vorn ebenerdig am Weg, hinten im
+ * Hang. Wohnküche vorn mit Fenstern, Bad innen, Schlafzimmer hinten mit Lichtschacht.
+ * Beim Eckhaus (Nr. 3) führt stattdessen ein Durchgang nach hinten, daneben Abstellräume.
+ */
+function lowerFlat(b: Builder, corner: boolean): Omit<LandmarkRoomLayout, 'kind' | 'noun'> {
+  partyWalls(b)
+  b.zone('path', 'concrete', -1.3, 0, 0, W)
+  b.item('outside-stairs', 'stairs', -1.3, 4.0, -0.35, 5.25)
+  b.spot('outside-up', 'AUSSENTREPPE ZUM LAUBENGANG', -0.75, 3.6, 'Die Außentreppe führt hinauf zum Laubengang und zur oberen Wohnung.', { action: 'stairs', toLevel: DUPLEX.eg, toName: 'Hinauf zur oberen Wohnung' })
+  if (corner) {
+    b.zone('passage', 'concrete', 0, 0, 13.9, 2.4)
+    b.wallX('passage-side', 2.4, 0, 11.7, [[3.0, 3.8]])
+    b.wallY('store-front', 0, 2.4, W)
+    b.wallY('store-back', 11.7, 2.4, W)
+    b.wallY('store-split', 6.0, 2.4, W, [[3.4, 4.2]])
+    b.item('bikes', 'vehicle', 0.4, 3.0, 2.4, 3.6)
+    b.item('store-crate-a', 'crate', 9.6, 4.2, 11.4, 5.1)
+    b.item('store-shelf', 'shelf-low', 6.3, 4.6, 9.0, 5.1)
+    b.zone('store', 'concrete', 0, 2.4, 11.7, W)
+    b.lamp(4.0, 1.2, 90, false); b.lamp(8.5, 3.8, 70, false)
+    b.spot('passage', 'DURCHGANG', 5.0, 1.2, 'Der Durchgang unter dem Eckhaus führt vom Wendekreis nach hinten zu den Gärten. Hier zieht es immer ein wenig.')
+    b.spot('store', 'ABSTELLRÄUME', 3.4, 4.2, 'Fahrräder, Kinderwagen, Kisten – die Abstellräume des Eckhauses.')
+    b.spot('garden-end', 'ZU DEN GÄRTEN', 13.0, 1.2, 'Hinter dem Durchgang beginnen die Gärten der oberen Wohnungen, eine Etage höher als der Weg vorn.')
+    return { level: 0, floorName: 'Eckhaus · Durchgang', furniture: b.furniture, zones: b.zones, spots: b.spots, lamps: b.lamps, start: pt(-0.6, 1.2), exit: pt(-0.9, 1.6), staff: null }
+  }
+  b.wallY('front', 0, 0, W, [[0.3, 1.2]])
+  b.wallY('back', 11.7, 0, W)
+  b.wallX('hall', 1.5, 0, 7.0, [[2.8, 3.6], [5.2, 5.9]])
+  b.wallY('kitchen-back', 4.6, 1.5, W, [[4.0, 4.7]])
+  b.wallX('bath', 3.6, 4.6, 7.0)
+  b.wallY('bedroom', 7.0, 0, W, [[0.3, 1.1]])
+  b.item('kitchen-counter', 'counter', 0.2, 4.7, 2.4, 5.2)
+  b.item('kitchen-stove', 'stove', 2.5, 4.7, 3.2, 5.2)
+  b.item('kitchen-fridge', 'fridge', 3.4, 4.6, 4.0, 5.2)
+  b.item('table', 'table', 1.0, 3.0, 2.4, 3.9)
+  b.item('sofa', 'sofa', 0.2, 1.65, 1.8, 2.2)
+  b.item('bath-tub', 'bathtub', 5.2, 2.9, 6.85, 3.5)
+  b.item('bath-sink', 'sink', 4.8, 1.7, 5.2, 2.1)
+  b.item('bath-toilet', 'toilet', 6.3, 1.7, 6.8, 2.15)
+  b.item('store-shelf', 'shelf-low', 4.75, 4.7, 6.85, 5.15)
+  b.item('bed', 'bed', 9.2, 2.6, 11.4, 4.4)
+  b.item('wardrobe', 'wardrobe', 7.2, 4.6, 9.0, 5.15)
+  b.item('lightwell', 'railing', 11.6, 1.0, 11.7, 2.2)
+  b.zone('hall', 'tiles', 0, 0, 7.0, 1.5)
+  b.zone('living', 'parquet', 0, 1.5, 4.6, W)
+  b.zone('bath', 'tiles', 4.6, 1.5, 7.0, 3.6)
+  b.zone('store', 'concrete', 4.6, 3.6, 7.0, W)
+  b.zone('bedroom', 'carpet', 7.0, 0, 11.7, W)
+  b.lamp(2.2, 3.2); b.lamp(9.3, 2.6, 90); b.lamp(3.5, 0.75, 60, false)
+  b.spot('living', 'WOHNKÜCHE', 3.6, 3.3, 'Die Wohnküche der unteren Wohnung, mit Fenstern zum Weg. Über dem Fenster läuft der Laubengang, man hört die Schritte der Nachbarn von oben.', { action: 'sit' })
+  b.spot('bath', 'BAD', 5.8, 2.4, 'Ein Bad ohne Fenster.')
+  b.spot('store', 'ABSTELLRAUM', 5.8, 4.3, 'Ein Abstellraum, der in den Hang hineinreicht.')
+  b.spot('bedroom', 'SCHLAFZIMMER', 8.6, 1.7, 'Das Schlafzimmer liegt hinten im Hang. Licht kommt nur durch einen Lichtschacht; darüber liegt der Garten der oberen Wohnung.')
+  return { level: 0, floorName: DUPLEX_FLOOR_NAMES[0], furniture: b.furniture, zones: b.zones, spots: b.spots, lamps: b.lamps, start: pt(0.6, 0.75), exit: pt(-0.6, 0.75), staff: null }
+}
+
 export function rowhouseLayout(variant: RowhouseVariant, level = 0, byStairs = false): LandmarkRoomLayout {
   const wg = variant === 'rowhouse_wg'
   const b = builder()
+  if (variant === 'rowhouse_duplex' || variant === 'rowhouse_duplex_corner') {
+    const body = level === 1 ? groundFloor(b, false, byStairs, DUPLEX) : level === 2 ? firstFloor(b, false, DUPLEX) : level === 3 ? atticFloor(b, false, DUPLEX) : lowerFlat(b, variant === 'rowhouse_duplex_corner')
+    return { kind: variant, noun: 'Doppelstockhaus', ...body }
+  }
   const body = level === 1 ? firstFloor(b, wg) : level === 2 ? atticFloor(b, wg) : level === 3 ? basement(b, wg) : groundFloor(b, wg, byStairs)
   return { kind: variant, noun: wg ? 'WG' : 'Reihenhaus', ...body }
 }

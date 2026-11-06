@@ -42,6 +42,15 @@ Die ganze Reihe Krokusweg 2–14 hat diesen Grundriss. Im Spiel: Nr. 10 als WG e
 - Vor dem Haus liegt auf der Seite des Wohnwegs ein Spielplatz mit Sandkasten.
 - Ausrichtung (unter Vorbehalt, Schrägansicht): Die Reihe läuft etwa Süd-Südwest – Nord-Nordost. Die Vorderseite mit Spielplatz liegt nach Ost-Südost (Morgensonne), die Gartenseite mit den Terrassen nach West-Nordwest (Abendsonne).
 
+## Gegenüber: Doppelstock-Reihenhäuser (Thomas, 06.11.2026, ohne Pläne)
+
+- Die Häuser auf der gegenüberliegenden Seite sind ähnlich, haben von vorn aber ein Geschoss mehr: zwei Parteien je Haus.
+- **Unten:** eine eigene Wohnung, vorn ebenerdig am Weg. Annahme: hinten im Hang, Wohnküche vorn, Bad innen, Schlafzimmer mit Lichtschacht.
+- **Oben:** ab dem 1. OG derselbe Aufbau wie Krokusweg 10 ab dem EG – Eingangsgeschoss mit Küche und Wohnraum, darüber Zimmer, Dachgeschoss mit Dachterrasse. Garten hinten auf Höhe des 1. OG.
+- **Laubengang:** vor dem 1. OG läuft ein Weg, Außentreppe hinunter.
+- **Am Ende der Sackgasse mit dem Wendekreis:** Nr. 1 ist ein Kindergarten (Kita Krokusweg), davor ein Eckhaus mit Durchgang nach hinten.
+- **Annahmen, zu bestätigen:** Eckhaus = Nr. 3, Doppelstockhäuser = ungerade Nummern 5–25, beide Wohnungen unter derselben Hausnummer.
+
 ## Belegung
 
 | Ebene | Zimmer / Raum | Bewohner (Romanfigur) |
@@ -82,7 +91,7 @@ Die Dachterrasse gehört zum Mehrzweckraum; wer von den dreien dort wohnt, ist n
 
 Auf Wunsch von Thomas („jetzt müssen wir das Gebäude bzw. die ganze Gebäudeserie ins Spiel integrieren“) im Schauplatz-Chat gebaut, ausnahmsweise über die Teilprojektgrenzen:
 
-- **Raumart** `rowhouse` (Familienhaus) und `rowhouse_wg` (Nr. 10) mit vier Geschossen: 0 EG, 1 erstes OG, 2 DG, 3 Keller (`lib/game/landmarks/rowhouse.ts`, Tests in `rowhouse.test.ts`). Wände mit Türen, Möbel, Bereiche mit Texten, Treppen zwischen allen Geschossen. Neue Möbelarten: Bett, Schrank, Wanne, Dusche, Waschbecken, WC, Herd, Kühlschrank, Pfeiler, Geländer, Heizkessel, Waschmaschine.
+- **Raumart** `rowhouse` (Familienhaus), `rowhouse_wg` (Nr. 10), `rowhouse_duplex` (gegenüber) und `rowhouse_duplex_corner` (Eckhaus Nr. 3) mit je vier Geschossen; beim Doppelstockhaus 0 untere Wohnung, 1–3 obere Wohnung, verbunden über die Außentreppe am Laubengang: 0 EG, 1 erstes OG, 2 DG, 3 Keller (`lib/game/landmarks/rowhouse.ts`, Tests in `rowhouse.test.ts`). Wände mit Türen, Möbel, Bereiche mit Texten, Treppen zwischen allen Geschossen. Neue Möbelarten: Bett, Schrank, Wanne, Dusche, Waschbecken, WC, Herd, Kühlschrank, Pfeiler, Geländer, Heizkessel, Waschmaschine.
 - **Erkennung auf der Weltkarte:** Anschrift „Krokusweg 2…14“ und Lage im Umkreis von 350 m um Nr. 10 (`rowhouseVariantFor`, eingehängt in `WorldPanels.tsx`). Sobald Friedrichsdorf auf der Karte geladen ist (lädt beim Hingehen nach), zeigen die Häuser „Betreten“.
 - **Register:** `earth-de-friedrichsdorf-krokusweg-10` in `earthLandmarks.ts`, Relation `setting`.
 - **Noch nicht:** Bewohner (R-37), Einladen und Klingeln – vorerst ist jedes Haus der Reihe offen begehbar.
