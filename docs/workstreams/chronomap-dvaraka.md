@@ -161,3 +161,14 @@ Pro Eingriff ein Merker (boolesch oder Anzahl), gespeichert mit der Reise. Beim 
 3. Einstieg in der dritten Nacht als Pilger – oder doch am frühen Morgen des Bruchtags?
 4. Eingreifen und Grenzen sind entschieden (06.11.2026); Spuren in Kap. 5. Offen: Wer schreibt die Liedstrophen und Reime – Thomas selbst oder Entwurf durch Claude zur Korrektur?
 5. Kap. 1.4 ff. (die Wege der Träger nach Iberien, Ḫattuša, Himalaya, Ajanta) gehören nicht in diese Chronomap; das wären eigene Chronomaps.
+
+## Zugänge zur Chronomap (Thomas, 06.11.2026)
+
+Entschieden: Eine Chronomap ist auf **zwei Wegen** betretbar.
+
+1. **Zeit-Reisebüro**: im Reisebüro-Panel ein vierter Reiter „Zeit" mit allen Chronomaps (Dvārakā um 1600 v. Chr., Konstantinopel, weitere). Reisebüros gibt es dort, wo die Chronomap beginnt (Grabungsstätte Dvārakā, Istanbul).
+2. **Button am Ort**: wer schon vor Ort ist, findet im Erklärtext zu einem historischen Gebäude oder Ort (Gebäudechronik, Wahrzeichen-Panel) den Button „Zeitreise: so sah es aus …", sofern für diesen Ort eine Chronomap hinterlegt ist.
+
+Folgerung für die Umsetzung: ein **Register der Chronomaps** (Kennung, Titel, Epoche, Startpunkt in Weltkoordinaten, Orte/Gebäude, die einen Button erhalten), das beide Zugänge speist. Der Button erscheint nur bei Treffern im Register, nie pauschal.
+
+Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?), Inhaltsquelle (Buch-Repo oder Wissensgraph).
