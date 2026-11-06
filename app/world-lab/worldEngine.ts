@@ -89,6 +89,9 @@ export interface WorldEngineOptions {
 }
 
 /** Was unter dem Zeiger lag, als geklickt wurde. */
+/** Flurstück mit Eigentümer und Bewirtschaftung (NOXIA-MAT-0001, lib/worldlab/landWork.ts parcelLooks) */
+export interface WorldParcelOwner { id: string; own: boolean; look?: 'clearing' | 'young' | 'sown' | 'ripe' | 'stubble' | 'pasture'; crop?: string; animals?: number }
+
 export type WorldPick =
   | { type: 'person'; id: string }
   /** Mitspieler (W-16): andere Spieler in der Nähe */
@@ -182,7 +185,7 @@ export interface WorldEngine {
   /** Zeitregler: zeigt den Stand der Abrisse zu diesem Zeitpunkt (null = jetzt). */
   setAsOf: (iso: string | null) => void
   /** Flurstücke mit Eigentümer: eigene golden umrandet, fremde blau. */
-  setParcelOwners: (owners: Array<{ id: string; own: boolean }>) => void
+  setParcelOwners: (owners: WorldParcelOwner[]) => void
   /** Baustellen zeigen (ersetzt die vorigen). */
   setSites: (sites: WorldSite[]) => void
   /** Plaketten der Omnizedenz-Begegnungsstätten (ersetzt die vorigen). */
@@ -1083,6 +1086,7 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       entry.trees.push(sprite)
       entry.plants.push({ x, y, spot, region, sprite, k })
     }
+    if (parcelOwners.size) applyClearings()
     drawGraves(entry)
   }
 
@@ -2172,19 +2176,100 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
       apronLayer.addChild(g)
     }
   }
-  let parcelOwners = new Map<string, boolean>()
+  let parcelOwners = new Map<string, WorldParcelOwner>()
+  /** Bewirtschaftung sichtbar (NOXIA-MAT-0001): Lichtung, Jungwald, Feld, Weide mit Rindern */
+  function drawLook(g: PixiGraphics, owner: WorldParcelOwner, ring: Array<{ x: number; y: number }>, pts: number[], seed: number) {
+    if (!owner.look) return
+    const minY = Math.min(...ring.map(p => p.y)), maxY = Math.max(...ring.map(p => p.y))
+    const minX = Math.min(...ring.map(p => p.x)), maxX = Math.max(...ring.map(p => p.x))
+    /** Reihen quer über das Flurstück (Weltmeter), an den Rändern abgeschnitten */
+    const rows = (step: number, draw: (a: { x: number; y: number }, b: { x: number; y: number }) => void) => {
+      for (let y = minY + step / 2; y < maxY; y += step) {
+        const xs: number[] = []
+        for (let i = 0; i < ring.length; i++) {
+          const a = ring[i], b = ring[(i + 1) % ring.length]
+          if ((a.y <= y) !== (b.y <= y)) xs.push(a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x))
+        }
+        xs.sort((u, v) => u - v)
+        for (let i = 0; i + 1 < xs.length; i += 2) draw({ x: xs[i], y }, { x: xs[i + 1], y })
+      }
+    }
+    let r = seed >>> 0
+    const rand = () => { r = (r * 1664525 + 1013904223) >>> 0; return r / 4294967296 }
+    const spots = (count: number, each: (p: { x: number; y: number }) => void) => {
+      for (let tries = 0, placed = 0; placed < count && tries < count * 30; tries++) {
+        const p = { x: minX + rand() * (maxX - minX), y: minY + rand() * (maxY - minY) }
+        if (insidePolygon(p, ring)) { each(iso(p.x, p.y)); placed++ }
+      }
+    }
+    const area = Math.abs(ring.reduce((sum, a, i) => { const b = ring[(i + 1) % ring.length]; return sum + a.x * b.y - b.x * a.y }, 0)) / 2
+    switch (owner.look) {
+      case 'clearing': {
+        // Kahlschlag: Waldboden, Reisig, Stubben
+        g.poly(pts).fill({ color: 0x8f7d55, alpha: 0.92 })
+        spots(Math.min(400, Math.round(area / 40)), q => { g.circle(q.x, q.y, 0.45).fill({ color: 0x5e4a2c, alpha: 0.9 }); g.circle(q.x, q.y - 0.1, 0.25).fill({ color: 0xc8b07a, alpha: 0.9 }) })
+        break
+      }
+      case 'young': {
+        // Jungwald nach der Aufforstung: Pflanzreihen
+        g.poly(pts).fill({ color: 0x7f9a52, alpha: 0.9 })
+        rows(3, (a, b) => { for (let x = a.x + 1.5; x < b.x; x += 3) { const q = iso(x, a.y); g.circle(q.x, q.y - 0.4, 0.7).fill({ color: 0x3f6b2e, alpha: 0.95 }) } })
+        break
+      }
+      case 'sown': case 'ripe': case 'stubble': {
+        const ground = owner.look === 'ripe' ? (owner.crop === 'potatoes' ? 0x7e8f45 : 0xd8b552) : owner.look === 'stubble' ? 0xc4ac72 : 0x8a6f4a
+        const row = owner.look === 'ripe' ? (owner.crop === 'potatoes' ? 0x55702f : 0xb8902e) : owner.look === 'stubble' ? 0xa88f58 : 0x7fa64a
+        g.poly(pts).fill({ color: ground, alpha: 0.93 })
+        rows(owner.crop === 'potatoes' ? 1.6 : 1.1, (a, b) => { const p = iso(a.x, a.y), q = iso(b.x, b.y); g.moveTo(p.x, p.y).lineTo(q.x, q.y) })
+        g.stroke({ width: owner.crop === 'potatoes' ? 0.55 : 0.35, color: row, alpha: 0.9 })
+        break
+      }
+      case 'pasture': {
+        // Weide mit Rindern (höchstens 60 gezeichnet)
+        g.poly(pts).fill({ color: 0x8dbb5e, alpha: 0.35 })
+        spots(Math.min(60, owner.animals ?? 0), q => {
+          const dark = rand() < 0.5
+          g.ellipse(q.x, q.y - 0.7, 1.1, 0.6).fill(dark ? 0x4a3526 : 0xf2eee4).stroke({ width: 0.15, color: 0x2a1d14 })
+          g.circle(q.x + (rand() < 0.5 ? -1 : 1) * 1.05, q.y - 0.9, 0.38).fill(dark ? 0x3a281c : 0xe2dccd)
+          if (!dark) g.circle(q.x + 0.2, q.y - 0.75, 0.25).fill(0x3a281c)
+        })
+        break
+      }
+    }
+  }
+  /** Bäume in gerodeten Flurstücken und im Jungwald ausblenden (alle geladenen Kacheln) */
+  function applyClearings() {
+    const rings: Array<{ ring: Array<{ x: number; y: number }>; minX: number; maxX: number; minY: number; maxY: number }> = []
+    const seen = new Set<string>()
+    for (const entry of loaded.values()) for (const parcel of entry.data.parcels ?? []) {
+      const look = parcelOwners.get(parcel.i)?.look
+      if ((look !== 'clearing' && look !== 'young' && look !== 'sown' && look !== 'ripe' && look !== 'stubble') || seen.has(parcel.i)) continue
+      seen.add(parcel.i)
+      const ring: Array<{ x: number; y: number }> = []
+      for (let i = 0; i + 1 < parcel.p.length; i += 2) ring.push({ x: entry.ox + parcel.p[i], y: entry.oy + parcel.p[i + 1] })
+      rings.push({ ring, minX: Math.min(...ring.map(p => p.x)), maxX: Math.max(...ring.map(p => p.x)), minY: Math.min(...ring.map(p => p.y)), maxY: Math.max(...ring.map(p => p.y)) })
+    }
+    for (const entry of loaded.values()) for (const plant of entry.plants) {
+      if (plant.sprite.destroyed) continue
+      const gone = rings.some(item => plant.x >= item.minX && plant.x <= item.maxX && plant.y >= item.minY && plant.y <= item.maxY && insidePolygon(plant, item.ring))
+      plant.sprite.visible = !gone
+    }
+  }
   function drawOwned(entry: Loaded) {
     entry.owned?.destroy(); entry.owned = null
     if (!parcelOwners.size || !entry.data.parcels?.length) return
     const g = new PIXI.Graphics()
     let any = false
     for (const parcel of entry.data.parcels) {
-      const own = parcelOwners.get(parcel.i)
-      if (own === undefined) continue
+      const owner = parcelOwners.get(parcel.i)
+      if (owner === undefined) continue
       any = true
-      const pts: number[] = []
-      for (let i = 0; i + 1 < parcel.p.length; i += 2) { const q = iso(entry.ox + parcel.p[i], entry.oy + parcel.p[i + 1]); pts.push(q.x, q.y) }
-      g.poly(pts).fill({ color: own ? 0xf2c94c : 0x6c9bd2, alpha: 0.13 }).stroke({ width: 0.55, color: own ? 0xd9a62a : 0x4a78b0, alpha: 0.9 })
+      const pts: number[] = [], ring: Array<{ x: number; y: number }> = []
+      for (let i = 0; i + 1 < parcel.p.length; i += 2) { const x = entry.ox + parcel.p[i], y = entry.oy + parcel.p[i + 1]; ring.push({ x, y }); const q = iso(x, y); pts.push(q.x, q.y) }
+      // Jede Kachel zeichnet das ganze Flurstück (wie die Eigentumsfläche); Muster und Tiere
+      // hängen nur am Flurstück, liegen also in Nachbarkacheln deckungsgleich übereinander.
+      drawLook(g, owner, ring, pts, [...parcel.i].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7))
+      g.poly(pts).fill({ color: owner.own ? 0xf2c94c : 0x6c9bd2, alpha: owner.look ? 0.05 : 0.13 }).stroke({ width: 0.55, color: owner.own ? 0xd9a62a : 0x4a78b0, alpha: 0.9 })
     }
     if (!any) { g.destroy(); return }
     ownedLayer.addChild(g)
@@ -2694,8 +2779,9 @@ export async function startWorldEngine(PIXI: Pixi, options: WorldEngineOptions):
     busAt(lineId) { const line = busLines.find(item => item.id === lineId); return line ? busState(line, Date.now()) : null },
     trainAt(stationName) { const line = railLines.find(item => item.station?.name === stationName); return line ? trainState(line.lengthM, Date.now()) : null },
     setParcelOwners(list) {
-      parcelOwners = new Map(list.map(item => [item.id, item.own]))
+      parcelOwners = new Map(list.map(item => [item.id, item]))
       for (const entry of loaded.values()) drawOwned(entry)
+      applyClearings()
     },
     setPlots(list) { allPlots = list; applyPlots() },
     setAsOf(iso) { asOf = iso; applyPlots() },

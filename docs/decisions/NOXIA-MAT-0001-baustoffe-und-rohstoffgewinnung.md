@@ -91,8 +91,15 @@ Dieselben Regeln: Auf dem Mars gibt es kein Holz; Baustoffe sind Regolith (Ziege
    - **Lohnschnitt:** 1 m³ Rundholz → 0,6 m³ Schnittholz, 2 Cr/m³ an die Gemeinde (`saw_earth_roundwood`).
    - **Bauen nimmt zuerst aus dem Lager** (`take_construction_materials` in `/api/game/build/spatial`, Erde): Was im Lager liegt, wird verbraucht und senkt den Preis um seinen Wert (höchstens den Materialanteil); der Rest gilt als zugekauft. Protokoll in `construction_material_uses`.
    - Geprüft als `service_role` (zurückgerollt): 45 Tage nach Kauf 30 m³ nachhaltig, Kahlschlag 700 m³, Lohnschnitt 100 → 60 m³, Verkauf 50 m³ = 250 Cr, Bau nimmt 8 m³ Schnittholz (spart 80 Cr), Aufforsten 80 Cr.
-4. Offen: Mineralische Baustoffe gewinnen (Steinbruch, Kiesgrube, Zementwerk), Zukauf mit Lieferzeit statt sofort, Recycling beim Abriss, Feldbau und Weide auf Flurstücken, Karte zeigt Lichtung nach Kahlschlag.
-5. Bisher offen: Inventare für die neuen Güter, Reservierung und Verbrauch auf der Baustelle, Zukauf beim Lieferanten mit Lieferzeit, Recycling beim Abriss; Holzeinschlag und Feldbau auf Flurstücken (Request 0041).
+4. **Umgesetzt (06.11.2026, Migrationen `20261106080000`, `20261106080100`; Regeln in `lib/worldlab/landWork.ts`, getestet):**
+   - Neue Güter: `grain` (Getreide), `potatoes` (Kartoffeln), `cattle` (Rinder, Stück).
+   - **Feldbau auf eigenem Ackerland** (`earth_parcel_field`, `sow_earth_field`, `harvest_earth_field`): Weizen 7,5 t/ha, reif nach 22 Tagen (neun Spielmonate), Saatgut und Bestellung 35 Cr/ha; Kartoffeln 40 t/ha, reif nach 12 Tagen, 130 Cr/ha. Fünf Tage volle Ernte, bis Tag 15 die Hälfte, danach verdorben. Ankauf durch die Gemeinde: Getreide 11 Cr/t, Kartoffeln 5 Cr/t.
+   - **Weide auf eigenem Grünland** (`earth_parcel_herd`, `buy_earth_cattle`, `sell_earth_cattle`): zwei Rinder je ha, Jungrind 25 Cr von der Gemeinde, nach einem Spieljahr schlachtreif, Gemeinde zahlt 70 Cr.
+   - **Steinbruch** (`earth_parcel_quarry`, `extract_earth_quarry`): 40 t Bruchstein je ha und Tag, angesammelt höchstens zehn Tage (vier Spielmonate); Sprengen, Laden, Maschinen 60 % des Werts an die Gemeinde; Vorrat 50.000 t/ha, danach erschöpft. **Lohnbrechen** Bruchstein → Schotter 1 : 1, 1 Cr je angefangene 2 t (`convert_earth_material`, allgemein für spätere Verarbeitung). Ankauf Bruchstein und Schotter 1 Cr/t.
+   - **Wald:** Vorrat wächst jetzt mit dem Zuwachs (bis zum Vorrat eines ausgewachsenen Waldes), auch nach Aufforstung von null an – vorher blieb ein aufgeforsteter Wald leer.
+   - **Karte:** Lichtung nach Kahlschlag (Waldboden mit Stubben, Bäume ausgeblendet), Jungwald in Pflanzreihen, Feld als Saat, reif (Weizen gelb, Kartoffeln grün) oder Stoppel, Weide mit den eigenen Rindern (`parcelLooks`, `/api/world-lab/buildings`).
+   - Gemeinsame Helfer in der Datenbank: `noxia_earth_actor`, `noxia_pay_earth_actor`, `noxia_earth_actor_buys`, `noxia_owns_earth_parcel`.
+5. Offen: Kiesgrube, Sandgrube, Zementwerk, Ziegelei; Zukauf mit Lieferzeit statt sofort, Reservierung und Verbrauch über die Bauzeit, Recycling beim Abriss; Getreide in die Lebensmittelkette (Mühle, Bäckerei – NOXIA-FOOD-0002); Zucht (Mutterkühe, Kälber), Futter im Winter; Jahreszeiten für Saat und Ernte.
 
 ## Requests
 

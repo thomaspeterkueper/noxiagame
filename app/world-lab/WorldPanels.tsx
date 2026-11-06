@@ -12,8 +12,9 @@
 // genutzt wird.
 
 import MaterialStore from './MaterialStore'
+import LandWork from './LandWork'
 import { billOfMaterials, billText, costSplit } from '@/lib/game/construction/materials'
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { getBuildingEntryDefinition, type BuildingEntryRequest } from '@/lib/game/buildings/entry'
 import { personSceneLabel } from '@/lib/game/population/personSceneLabel'
@@ -114,7 +115,7 @@ function MaterialLine({ item }: { item: { id: string; cost: number; footprint?: 
  */
 type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string; areaM2?: number; levels?: number; listed?: boolean; own?: boolean; entityId?: string; taxRate?: number; /** Reales Lokal (R-13): Lokalart und Ausbauwert im Preis */ venue?: string | null; fitOut?: number }
 /** Angebot für ein Flurstück (/api/game/parcel-offer) */
-type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; land?: { kind: string; label: string; potential: string[]; activity: string | null }; forest?: { stockM3: number; growthM3Year: number; harvestableM3: number; cleared: boolean; replanted: boolean; regrowsAt: string | null; replantFee: number }; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; partsOnly?: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
+type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; land?: { kind: string; label: string; potential: string[]; activity: string | null }; forest?: { stockM3: number; growthM3Year: number; harvestableM3: number; cleared: boolean; replanted: boolean; regrowsAt: string | null; replantFee: number }; field?: ComponentProps<typeof LandWork>['field']; herd?: ComponentProps<typeof LandWork>['herd']; quarry?: ComponentProps<typeof LandWork>['quarry']; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; partsOnly?: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
 /** Vermessungsgebühr fürs Teilen und Zusammenlegen (wie app/api/game/parcel-offer) */
 const SURVEY_FEE = 200
 
@@ -245,6 +246,8 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
         return
       }
       setParcelVersion(value => value + 1)
+      // Bewirtschaftung sieht man auf der Karte (Lichtung, Feld, Rinder)
+      if (['harvest', 'replant', 'sow', 'reap', 'cattle_buy', 'cattle_sell'].includes(String(body.action))) onWorldChanged()
     } catch { setBuyError(failText) } finally { setBuying(false) }
   }
   /** Eigenes Haus (ohne Kataster) anbieten/zurückziehen oder ein angebotenes kaufen. */
@@ -894,7 +897,9 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
                 </>}
             <MaterialStore version={parcelVersion}/>
           </div>
-          : parcel.land?.activity && <p className="hint">{parcel.own ? 'Bewirtschaften' : 'Nach dem Kauf'}: {parcel.land.activity}{parcel.land.kind === 'forest' ? ' – Holz schlagen, verkaufen oder schneiden lassen und selbst verbauen.' : ' – kommt mit Baustoffen und Rohstoffen ins Spiel (NOXIA-MAT-0001).'}</p>}
+          : parcel.own && (parcel.field || parcel.herd || parcel.quarry)
+            ? <LandWork field={parcel.field} herd={parcel.herd} quarry={parcel.quarry} busy={buying} version={parcelVersion} act={(body, failText) => void parcelAction(body, failText)}/>
+            : parcel.land?.activity && <p className="hint">{parcel.own ? 'Bewirtschaften' : 'Nach dem Kauf'}: {parcel.land.activity}{({ forest: ' – Holz schlagen, verkaufen oder schneiden lassen und selbst verbauen.', farmland: ' – Weizen oder Kartoffeln säen, ernten, an die Gemeinde verkaufen.', grassland: ' – Jungrinder halten, schlachtreif an die Gemeinde verkaufen.', quarry: ' – Bruchstein abbauen, zu Schotter brechen lassen, verbauen oder verkaufen.' } as Record<string, string>)[parcel.land.kind] ?? ''}</p>}
         <span className="source">Quelle: {parcel.source ?? 'Liegenschaftskataster'}</span>
       </>}
     </>}
@@ -957,6 +962,12 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       .row input{flex:1;min-width:0;border:1px solid #40595a;background:#08151a;color:#fff;border-radius:5px;padding:6px 8px;font-size:12px}
       .row button{border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
       .row button:disabled{opacity:.5;cursor:default}
+      /* Zeilen in Unterbausteinen (Lager, Feld, Weide, Steinbruch) wie hier */
+      .world-panel :global(.work .row), .world-panel :global(.store .row){display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
+      .world-panel :global(.work .row span), .world-panel :global(.store .row span){flex:1;font-size:11px;color:#9fb5b0}
+      .world-panel :global(.work .row input){flex:1;min-width:0;border:1px solid #40595a;background:#08151a;color:#fff;border-radius:5px;padding:6px 8px;font-size:12px}
+      .world-panel :global(.work .row button), .world-panel :global(.store .row button){border:1px solid #5d7b79;background:#17383a;color:#fff;border-radius:5px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
+      .world-panel :global(.work .row button:disabled), .world-panel :global(.store .row button:disabled){opacity:.5;cursor:default}
       
     `}</style>
   </aside>
