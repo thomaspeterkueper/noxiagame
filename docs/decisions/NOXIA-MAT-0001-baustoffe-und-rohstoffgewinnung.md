@@ -83,7 +83,16 @@ Dieselben Regeln: Auf dem Mars gibt es kein Holz; Baustoffe sind Regolith (Ziege
 
 1. **Erledigt:** Produktion nur mit Eingängen (`lib/game/production/inputGate.ts`, im Tick; Request 0930 in `coordination/done/`).
 2. **Begonnen:** Katalog der Baustoffe, Stückliste je Bautyp und Aufteilung des Baupreises in Material und Arbeit (`lib/game/construction/materials.ts`, getestet). Die Bautafel der Weltkarte zeigt je Bautyp die größten Posten („72 t Beton, 48 t Ziegel, 4 t Stahl · darin Material 540 Cr, Arbeit 360 Cr“). Der Gesamtpreis ist unverändert; noch wird kein Lager belastet.
-3. Offen: Inventare für die neuen Güter, Reservierung und Verbrauch auf der Baustelle, Zukauf beim Lieferanten mit Lieferzeit, Recycling beim Abriss; Holzeinschlag und Feldbau auf Flurstücken (Request 0041).
+3. **Erledigt (06.11.2026, Migrationen `20261106020000`, `20261106020100`, live):**
+   - Neue Güter im Inventar (`resource_type`): `roundwood`, `lumber`, `stone`, `gravel`, `sand`, `cement`, `concrete`, `bricks`, `steel`, `regolith`.
+   - Baustofflager je Spieler auf der Erde (`logistics_inventories`, `subject_type = 'profile_earth_depot'`), Anzeige in der Flurstückstafel (`app/world-lab/MaterialStore.tsx`, `/api/game/materials`).
+   - **Holz aus dem eigenen Wald** (`earth_parcel_forest`, `harvest_earth_forest`): Vorrat und Zuwachs aus Fläche und Waldart (Nadel 350, Laub 280, Misch 320 m³/ha; Zuwachs 10 m³/ha je Spieljahr = 30 Tage). Nachhaltig: höchstens der Zuwachs seit dem letzten Einschlag (bis zwei Spieljahre). Kahlschlag: der ganze Vorrat, danach Aufforsten (40 Cr/ha an die Gemeinde) und zehn Spieljahre kein Einschlag.
+   - **Verkauf an die Gemeinde:** Rundholz 5 Cr/m³, Schnittholz 8 Cr/m³ – Transfer aus der Kasse des öffentlichen Akteurs, nur solange sie reicht (`sell_earth_material`).
+   - **Lohnschnitt:** 1 m³ Rundholz → 0,6 m³ Schnittholz, 2 Cr/m³ an die Gemeinde (`saw_earth_roundwood`).
+   - **Bauen nimmt zuerst aus dem Lager** (`take_construction_materials` in `/api/game/build/spatial`, Erde): Was im Lager liegt, wird verbraucht und senkt den Preis um seinen Wert (höchstens den Materialanteil); der Rest gilt als zugekauft. Protokoll in `construction_material_uses`.
+   - Geprüft als `service_role` (zurückgerollt): 45 Tage nach Kauf 30 m³ nachhaltig, Kahlschlag 700 m³, Lohnschnitt 100 → 60 m³, Verkauf 50 m³ = 250 Cr, Bau nimmt 8 m³ Schnittholz (spart 80 Cr), Aufforsten 80 Cr.
+4. Offen: Mineralische Baustoffe gewinnen (Steinbruch, Kiesgrube, Zementwerk), Zukauf mit Lieferzeit statt sofort, Recycling beim Abriss, Feldbau und Weide auf Flurstücken, Karte zeigt Lichtung nach Kahlschlag.
+5. Bisher offen: Inventare für die neuen Güter, Reservierung und Verbrauch auf der Baustelle, Zukauf beim Lieferanten mit Lieferzeit, Recycling beim Abriss; Holzeinschlag und Feldbau auf Flurstücken (Request 0041).
 
 ## Requests
 

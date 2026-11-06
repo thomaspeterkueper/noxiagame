@@ -1,6 +1,7 @@
 // app/api/game/build/spatial/route.ts
 // Aktualisiert: 27.10.2026 — Geländedatensatz des Weltrahmens auch dann, wenn er einem anderen Ort gehört (gemeinsames MOLA für Mars-Orte)
 // Version:      1.1.0
+import { billForStock, billOfMaterials, costSplit } from '@/lib/game/construction/materials'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { BUILDINGS } from '@/lib/game/buildings'
@@ -624,7 +625,23 @@ export async function POST(req: NextRequest) {
 
   if (buildError || !build) return NextResponse.json({ error: buildError?.message ?? 'Bauauftrag konnte nicht angelegt werden.' }, { status: 500 })
 
-  const { error: creditError } = await serviceClient.from('profiles').update({ credits: Number(profile.credits) - def.cost }).eq('id', user.id)
+  // NOXIA-MAT-0001: Baustoffe zuerst aus dem eigenen Lager (Erde); nur der Rest wird zugekauft.
+  // Der Wert des Genommenen senkt den Preis, höchstens um den Materialanteil.
+  let charge = def.cost
+  let materialsTaken: unknown[] = []
+  if (locationSlug === 'earth') {
+    const bill = billOfMaterials(buildableId, footprint.widthM * footprint.depthM, 1, locationSlug)
+    const split = costSplit(def.cost, bill)
+    const { data: taken, error: takeError } = await serviceClient.rpc('take_construction_materials', { p_profile_id: user.id, p_build_ref: build.id, p_bill: billForStock(bill) })
+    if (takeError) console.error('[build/spatial] Baustoffe', takeError.message)
+    else {
+      const saved = Math.min(Number((taken as { saved?: number })?.saved ?? 0), split.material)
+      charge = def.cost - saved
+      materialsTaken = ((taken as { taken?: unknown[] })?.taken ?? [])
+    }
+  }
+
+  const { error: creditError } = await serviceClient.from('profiles').update({ credits: Number(profile.credits) - charge }).eq('id', user.id)
   if (creditError) {
     await serviceClient.from('player_builds').delete().eq('id', build.id)
     return NextResponse.json({ error: 'Credits konnten nicht belastet werden.' }, { status: 500 })
@@ -644,7 +661,9 @@ export async function POST(req: NextRequest) {
     terrainStatus: terrain.status,
     terrainDatasetId: terrainDataset?.id ?? null,
     footprint,
-    newCredits: Number(profile.credits) - def.cost,
+    newCredits: Number(profile.credits) - charge,
+    charged: charge,
+    materialsTaken,
     completesAt: completesAt.toISOString(),
   })
 }

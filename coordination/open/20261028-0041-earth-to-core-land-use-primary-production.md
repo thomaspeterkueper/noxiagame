@@ -39,3 +39,8 @@ Die Weltkarte (Workstream world-map) baut danach die Bedienung: Tafel des Flurst
 - [ ] Ein Verfahren läuft nur auf einem Flurstück mit passender Nutzung und nur für den Eigentümer.
 - [ ] Erträge landen im Lager des Eigentümers am Ort (eine Buchung), Holzvorrat/Bodenzustand wird fortgeschrieben.
 - [ ] Nutzungsänderung (Wald → Acker) ist ein Antrag mit Zeit und Gebühr, kein Knopfdruck.
+
+## Zwischenstand (06.11.2026, Erdkarte)
+
+- **Wald erledigt:** Holzeinschlag nachhaltig und Kahlschlag mit Aufforstungspflicht auf eigenem Wald-Flurstück, Rundholz ins Baustofflager, Verkauf an die Gemeinde, Lohnschnitt (NOXIA-MAT-0001, Migration `20261106020100`).
+- Offen: Feldbau (Ackerland), Weide (Grünland), Steinbruch; Karte zeigt den Zustand (Lichtung).

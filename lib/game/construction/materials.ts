@@ -12,6 +12,8 @@ export type MaterialId = 'beton' | 'ziegel' | 'schotter' | 'sand' | 'zement' | '
 
 export interface Material {
   id: MaterialId
+  /** Gut im Inventar (`resource_type`, Migration 20261106020000) */
+  resource: string
   name: string
   unit: 't' | 'm³'
   /** Spielpreis je Einheit in Cr (vorläufig, relativ zueinander) */
@@ -21,16 +23,16 @@ export interface Material {
 }
 
 export const MATERIALS: Readonly<Record<MaterialId, Material>> = {
-  beton: { id: 'beton', name: 'Beton', unit: 't', price: 3, from: 'Zement, Kies, Sand, Wasser' },
-  ziegel: { id: 'ziegel', name: 'Ziegel', unit: 't', price: 3, from: 'Lehm, Energie' },
-  schotter: { id: 'schotter', name: 'Schotter', unit: 't', price: 1, from: 'Bruchstein (Brecher)' },
-  sand: { id: 'sand', name: 'Sand', unit: 't', price: 1, from: 'Sandgrube' },
-  zement: { id: 'zement', name: 'Zement', unit: 't', price: 8, from: 'Kalkstein, viel Energie' },
-  schnittholz: { id: 'schnittholz', name: 'Schnittholz', unit: 'm³', price: 10, from: 'Rundholz (Sägewerk)' },
-  rundholz: { id: 'rundholz', name: 'Rundholz', unit: 'm³', price: 5, from: 'Wald (Holzeinschlag)' },
-  stahl: { id: 'stahl', name: 'Stahl', unit: 't', price: 25, from: 'Metall (Stahlwerk)' },
-  bruchstein: { id: 'bruchstein', name: 'Bruchstein', unit: 't', price: 1, from: 'Steinbruch' },
-  regolith: { id: 'regolith', name: 'Regolith, gesintert', unit: 't', price: 4, from: 'Regolith, viel Energie' },
+  beton: { id: 'beton', resource: 'concrete', name: 'Beton', unit: 't', price: 3, from: 'Zement, Kies, Sand, Wasser' },
+  ziegel: { id: 'ziegel', resource: 'bricks', name: 'Ziegel', unit: 't', price: 3, from: 'Lehm, Energie' },
+  schotter: { id: 'schotter', resource: 'gravel', name: 'Schotter', unit: 't', price: 1, from: 'Bruchstein (Brecher)' },
+  sand: { id: 'sand', resource: 'sand', name: 'Sand', unit: 't', price: 1, from: 'Sandgrube' },
+  zement: { id: 'zement', resource: 'cement', name: 'Zement', unit: 't', price: 8, from: 'Kalkstein, viel Energie' },
+  schnittholz: { id: 'schnittholz', resource: 'lumber', name: 'Schnittholz', unit: 'm³', price: 10, from: 'Rundholz (Sägewerk)' },
+  rundholz: { id: 'rundholz', resource: 'roundwood', name: 'Rundholz', unit: 'm³', price: 5, from: 'Wald (Holzeinschlag)' },
+  stahl: { id: 'stahl', resource: 'steel', name: 'Stahl', unit: 't', price: 25, from: 'Metall (Stahlwerk)' },
+  bruchstein: { id: 'bruchstein', resource: 'stone', name: 'Bruchstein', unit: 't', price: 1, from: 'Steinbruch' },
+  regolith: { id: 'regolith', resource: 'regolith', name: 'Regolith, gesintert', unit: 't', price: 4, from: 'Regolith, viel Energie' },
 }
 
 export type BuildForm = 'massiv' | 'halle' | 'holz' | 'habitat' | 'feld'
@@ -60,14 +62,14 @@ export function buildFormFor(typeId: string, location = 'earth'): BuildForm {
 
 export interface BillLine { material: MaterialId; amount: number }
 
-/** Stückliste: Mengen gerundet (t auf 1, m³ auf 0,1). */
+/** Stückliste: Mengen auf ganze Einheiten (wie im Inventar), angefangene aufgerundet. */
 export function billOfMaterials(typeId: string, footprintM2: number, levels = 1, location = 'earth'): BillLine[] {
   const form = buildFormFor(typeId, location)
   const area = Math.max(0, footprintM2) * Math.max(1, form === 'feld' ? 1 : levels)
   return (Object.entries(PER_M2[form]) as Array<[MaterialId, number]>)
     .map(([material, perM2]) => {
       const raw = perM2 * area
-      return { material, amount: MATERIALS[material].unit === 'm³' ? Math.round(raw * 10) / 10 : Math.round(raw) }
+      return { material, amount: raw > 0 && raw < 1 ? 1 : Math.ceil(raw - 0.05) }
     })
     .filter(line => line.amount > 0)
 }
@@ -95,3 +97,23 @@ export function billText(bill: readonly BillLine[], max = 3) {
     .map(line => `${fmt(line.amount)} ${MATERIALS[line.material].unit} ${MATERIALS[line.material].name}`)
     .join(', ')
 }
+
+/** Material zum Inventargut (z. B. „lumber“) – null, wenn unbekannt. */
+export function materialForResource(resource: string): Material | null {
+  return Object.values(MATERIALS).find(material => material.resource === resource) ?? null
+}
+
+/** Stückliste für die Datenbank (`take_construction_materials`). */
+export function billForStock(bill: readonly BillLine[]) {
+  return bill.map(line => ({ resource: MATERIALS[line.material].resource, amount: line.amount, price: MATERIALS[line.material].price }))
+}
+
+/** Forstwirtschaft und Holzhandel (vorläufig, NOXIA-MAT-0001) */
+export const FORESTRY = {
+  /** Ankaufspreis der Gemeinde je m³ Rundholz */
+  roundwoodBuyPrice: 5,
+  /** Lohnschnitt je m³ Rundholz (Ausbeute 60 % Schnittholz) */
+  sawFeePerM3: 2,
+  /** Aufforstung je ha (Pflanzgut, Arbeit) */
+  replantFeePerHa: 40,
+} as const

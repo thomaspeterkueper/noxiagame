@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { billOfMaterials, billText, buildFormFor, costSplit, materialValue } from './materials'
+import { billForStock, billOfMaterials, billText, buildFormFor, costSplit, materialForResource, materialValue } from './materials'
 
 describe('Baustoffe (NOXIA-MAT-0001)', () => {
   it('wählt die Bauform nach Typ und Ort', () => {
@@ -13,7 +13,7 @@ describe('Baustoffe (NOXIA-MAT-0001)', () => {
     const bill = billOfMaterials('cafe', 120)
     expect(bill).toEqual([
       { material: 'beton', amount: 72 }, { material: 'ziegel', amount: 48 },
-      { material: 'schnittholz', amount: 8.4 }, { material: 'stahl', amount: 4 },
+      { material: 'schnittholz', amount: 9 }, { material: 'stahl', amount: 4 },
     ])
     expect(billOfMaterials('cafe', 120, 2)[0].amount).toBe(144)
     expect(billOfMaterials('habitat', 100, 1, 'mars').map(line => line.material)).toEqual(['regolith', 'stahl'])
@@ -24,6 +24,10 @@ describe('Baustoffe (NOXIA-MAT-0001)', () => {
     expect(split.material + split.labor).toBe(900)
     expect(split.material).toBe(Math.round(materialValue(bill)))
     expect(costSplit(100, bill).material).toBe(80)
+  })
+  it('kennt die Inventargüter', () => {
+    expect(billForStock(billOfMaterials('cafe', 120))[0]).toEqual({ resource: 'concrete', amount: 72, price: 3 })
+    expect(materialForResource('lumber')?.name).toBe('Schnittholz')
   })
   it('beschreibt die größten Posten', () => {
     expect(billText(billOfMaterials('cafe', 120))).toBe('72 t Beton, 48 t Ziegel, 4 t Stahl')

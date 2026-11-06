@@ -74,3 +74,15 @@ export function landUse(usage: string | null | undefined, detail: string | null 
       return { kind, label, potential: [], activity: null }
   }
 }
+
+/** Holzvorrat und Zuwachs eines Waldes (m³, m³ je Spieljahr) – Startwerte für `earth_parcel_forest`. */
+export function forestFigures(detail: string | null | undefined, areaM2: number) {
+  const ha = Math.max(0, areaM2) / 10_000
+  const type = /nadel/i.test(detail ?? '') ? 'conifer' : /laub/i.test(detail ?? '') ? 'broadleaf' : 'mixed'
+  return { areaHa: Math.round(ha * 100) / 100, stockM3: Math.round(ha * FOREST_STOCK_M3_PER_HA[type]), growthM3Year: Math.round(ha * FOREST_GROWTH_M3_PER_HA_YEAR * 10) / 10 }
+}
+
+/** Ein Spieljahr in echten Tagen (Lebenslauf-Uhr 12×, NOXIA-TIME-0001) – wie in harvest_earth_forest. */
+export const GAME_YEAR_DAYS = 30
+/** Nach Kahlschlag und Aufforstung wieder Einschlag nach zehn Spieljahren */
+export const REGROW_DAYS = 300

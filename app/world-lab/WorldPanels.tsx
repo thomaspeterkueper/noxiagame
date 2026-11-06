@@ -11,6 +11,7 @@
 // die zu einem Ort geht) ist keine Tafel, sondern ein Vermerk, der im Innenraum
 // genutzt wird.
 
+import MaterialStore from './MaterialStore'
 import { billOfMaterials, billText, costSplit } from '@/lib/game/construction/materials'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
@@ -112,7 +113,7 @@ function MaterialLine({ item }: { item: { id: string; cost: number; footprint?: 
  */
 type Offer = { forSale: boolean; price?: number; seller?: string; residents?: number; newResidents?: number; rentPerInterval?: number; reason?: string; parcelId?: string; areaM2?: number; levels?: number; listed?: boolean; own?: boolean; entityId?: string; taxRate?: number; /** Reales Lokal (R-13): Lokalart und Ausbauwert im Preis */ venue?: string | null; fitOut?: number }
 /** Angebot für ein Flurstück (/api/game/parcel-offer) */
-type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; land?: { kind: string; label: string; potential: string[]; activity: string | null }; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; partsOnly?: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
+type ParcelInfo = { id: string; label: string; areaM2: number; usage: string | null; source?: string; land?: { kind: string; label: string; potential: string[]; activity: string | null }; forest?: { stockM3: number; growthM3Year: number; harvestableM3: number; cleared: boolean; replanted: boolean; regrowsAt: string | null; replantFee: number }; owned: boolean; own: boolean; listed?: boolean; taxRate?: number; district?: string | null; neighbours?: Array<{ id: string; label: string; areaM2: number }>; forSale: boolean; partsOnly?: boolean; reason?: string; price?: number; seller?: string; buildings: Array<{ name: string; residents: number }>; residents: number; rentPerInterval: number }
 /** Vermessungsgebühr fürs Teilen und Zusammenlegen (wie app/api/game/parcel-offer) */
 const SURVEY_FEE = 200
 
@@ -224,6 +225,7 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
 
   // Verkaufen an andere Spieler: Wunschpreis
   const [askPrice, setAskPrice] = useState('')
+  const [confirmClear, setConfirmClear] = useState(false)
   /** Flurstück: anbieten, zurückziehen, teilen, zusammenlegen. */
   async function parcelAction(body: Record<string, unknown>, failText: string) {
     if (!parcelId || buying) return
@@ -871,7 +873,23 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           <div className="row"><span>Teilen an der angeklickten Stelle</span><button disabled={buying} onClick={() => void parcelAction({ action: 'split', at: panel.at, direction: 'across' }, 'Teilen nicht möglich.')}>quer</button><button disabled={buying} onClick={() => void parcelAction({ action: 'split', at: panel.at, direction: 'along' }, 'Teilen nicht möglich.')}>längs</button></div>
           {(parcel.neighbours ?? []).map(item => <div key={item.id} className="row"><span>Zusammenlegen mit {item.label} ({item.areaM2.toLocaleString('de-DE')} m²)</span><button disabled={buying} onClick={() => void parcelAction({ action: 'merge', with: item.id }, 'Zusammenlegen nicht möglich.')}>Zusammenlegen</button></div>)}
         </>}
-        {parcel.land?.activity && <p className="hint">{parcel.own ? 'Bewirtschaften' : 'Nach dem Kauf'}: {parcel.land.activity} – kommt mit Baustoffen und Rohstoffen ins Spiel (NOXIA-MAT-0001).</p>}
+        {parcel.own && parcel.forest
+          ? <div className="forest">
+            <small>DEIN WALD</small>
+            <p>Vorrat {parcel.forest.stockM3.toLocaleString('de-DE')} m³ · Zuwachs {parcel.forest.growthM3Year.toLocaleString('de-DE')} m³ je Spieljahr (30 Tage)</p>
+            {parcel.forest.cleared && !parcel.forest.replanted
+              ? <div className="row"><span>Kahlschlag – die Fläche muss aufgeforstet werden.</span><button disabled={buying} onClick={() => void parcelAction({ action: 'replant' }, 'Aufforsten nicht möglich.')}>Aufforsten ({credits(parcel.forest.replantFee)})</button></div>
+              : parcel.forest.cleared && parcel.forest.regrowsAt && Date.parse(parcel.forest.regrowsAt) > Date.now()
+                ? <p>Jungwald – Einschlag wieder ab {new Date(parcel.forest.regrowsAt).toLocaleDateString('de-DE')}.</p>
+                : <>
+                  <div className="row"><span>{parcel.forest.harvestableM3 > 0 ? `Nachgewachsen: ${parcel.forest.harvestableM3} m³` : 'Noch nichts nachgewachsen.'}</span><button disabled={buying || parcel.forest.harvestableM3 < 1} onClick={() => void parcelAction({ action: 'harvest', mode: 'sustainable' }, 'Holzeinschlag nicht möglich.')}>Nachhaltig schlagen</button></div>
+                  {confirmClear
+                    ? <div className="row"><span>Den ganzen Wald schlagen ({parcel.forest.stockM3.toLocaleString('de-DE')} m³)? Danach ist Aufforsten Pflicht, zehn Spieljahre kein Einschlag.</span><button disabled={buying} onClick={() => { setConfirmClear(false); void parcelAction({ action: 'harvest', mode: 'clear' }, 'Kahlschlag nicht möglich.') }}>Ja, Kahlschlag</button><button onClick={() => setConfirmClear(false)}>Nein</button></div>
+                    : <div className="row"><span>Alles auf einmal, wie bei einer Rodung</span><button disabled={buying || parcel.forest.stockM3 < 1} onClick={() => setConfirmClear(true)}>Kahlschlag …</button></div>}
+                </>}
+            <MaterialStore version={parcelVersion}/>
+          </div>
+          : parcel.land?.activity && <p className="hint">{parcel.own ? 'Bewirtschaften' : 'Nach dem Kauf'}: {parcel.land.activity}{parcel.land.kind === 'forest' ? ' – Holz schlagen, verkaufen oder schneiden lassen und selbst verbauen.' : ' – kommt mit Baustoffen und Rohstoffen ins Spiel (NOXIA-MAT-0001).'}</p>}
         <span className="source">Quelle: {parcel.source ?? 'Liegenschaftskataster'}</span>
       </>}
     </>}
@@ -915,6 +933,9 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
       .head b{display:block;font-size:15px}
       .head span{display:block;font-size:11px;color:#9fb5b0;margin-top:2px}
       .head .grow{flex:1}
+      .forest{margin-top:8px;padding:6px 8px;border-radius:8px;background:rgba(60,110,60,.18)}
+      .forest small{font-size:10px;letter-spacing:.08em;color:#a9c9a0}
+      .forest p{font-size:11px;margin:4px 0}
       .material{display:block;font-size:10px;color:#9fb5b0;margin-top:1px}
       .hint{margin:6px 0 0;font-size:11px;color:#c9d6c2;line-height:1.4}
       .source{display:block;margin-top:8px;font-size:10px;color:#7f9792}
