@@ -66,6 +66,12 @@ export const LEARNING_CATALOG: readonly LearningCatalogEntry[] = [
   { unlock: 'UNL:NOX:mars-habitat', label: 'Mars-Habitat bauen', moduleTitle: 'Mars-Habitat I',
     moduleIds: ['LRN:SSF:NOX-MARS-HABITAT', 'ENG-L1-000009'] },
 
+  // Wissenschaftliche Forschungsplanung: explizit bestandene SSF-Pruefung erforderlich.
+  { unlock: 'UNL:NOX:research:gold-transmutation-design', label: 'Goldtransmutation experimentell planen',
+    moduleTitle: 'Gold durch Kerntransmutation', moduleIds: ['PHY-L1-000031', 'LRN:SSF:PHY-L1-000031', 'SSF-PHY-GOLD-2026', 'LRN:SSF:SSF-PHY-GOLD-2026'] },
+  { unlock: 'UNL:NOX:research:optomechanics-experiment-design', label: 'Quantenoptomechanik experimentell planen',
+    moduleTitle: 'Nanokugel und Licht: Verschränkung', moduleIds: ['SSF-PHY-LEVITATION-2026', 'LRN:SSF:SSF-PHY-LEVITATION-2026'] },
+
   // Navigation
   { unlock: 'UNL:NOX:NAV:ORBITAL', label: 'Orbitale Navigation', moduleTitle: 'Das Sonnensystem',
     moduleIds: ['LRN:SSF:AST-L1-000001', 'AST-L1-000001', 'PATH:SSF:AST-SONNENSYSTEM-0001'] },
