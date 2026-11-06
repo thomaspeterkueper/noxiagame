@@ -301,6 +301,14 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
     - Beim Schließen des Tabs meldet man sich ab; beim Verlassen erst abmelden, dann den Kanal schließen.
   - **Nur der vorderste Raum ist aktiv:** Öffnet sich ein Raum über einem anderen, meldet man sich im unteren ab und beim Schließen des oberen wieder an.
   - **Ortsräume:** Die Raumkennung enthält nur noch zulässige Zeichen, sonst hätte der Raum-Chat Orte mit Leerzeichen oder Umlauten im Namen abgelehnt.
+- **06.11.2026 – Chat, Tasten, Testhinweis** (Rückmeldung von Rawdium über Thomas):
+  - **Chat im Vordergrund:**
+    - Wer mit einer Figur oder einem Mitspieler spricht oder in den Raum-Chat klickt, sieht das Gespräch groß. Der Verlauf hat volle Höhe, die Schrift ist größer, das Eingabefeld mehrzeilig (Enter sendet, Umschalt+Enter macht eine neue Zeile).
+    - Gesten, Angebot, Hinsetzen und Lernen liegen dann unter „Weitere Möglichkeiten …“. „Chat verkleinern“ führt zurück.
+  - **Seitenleiste breiter ziehen:** Am linken Rand ziehen (280–760 px); Doppelklick wechselt zwischen groß und klein. Die Breite wird im Browser gemerkt.
+  - **Pfeiltasten** gehen in Gebäuden wie WASD; die Tasten werden abgefangen, damit die Figur draußen auf der Karte nicht mitläuft.
+  - **Gesten auf Tasten 1–6:** Winken, Jubeln, Klatschen, Verbeugen, Prost, Tanzen; die Ziffer steht auf dem Knopf.
+  - **Testbetrieb:** Statt dauerhaft unten rechts erscheint der Hinweis einmal je Anmeldung (Browsersitzung) mit „Verstanden“ und „Mehr dazu“; er verschwindet nach 20 s von selbst. Der Hinweis im Gespräch („Automatisch ausgewertet · Mehr dazu“) bleibt.
   - Gilt für alle Räume des Motors: Lokale, Bank, Agentur, Reisebüro, Wache, Feuerwache, Praxis, Krankenhaus.
   - Im Browser geprüft (Metropol, Café, Wache; Laufen per Klick, Tasten, Einrichten).
   - **Später** (Thomas): eine 80er-/90er-Fassung für die Zeitreise in VR.
