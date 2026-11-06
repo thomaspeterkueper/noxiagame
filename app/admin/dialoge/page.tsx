@@ -19,12 +19,10 @@ type Response = {
  testTurns:TestTurn[];reports:Report[]
  safety:{signal:string;npc:number;room:number}[]
  learning:{claims:number;npcs:number;sources:number|null}
- aiReviews:{total:number;byVerdict:{key:string;count:number}[];byCategory:{key:string;count:number}[];byLanguage:{key:string;count:number}[]}
 }
 
 const REASON:Record<string,string>={error:'Fehler',harassment:'Belästigung',feedback:'Rückmeldung',other:'Sonstiges',safety:'Schutzfilter'}
-const SIGNAL:Record<string,string>={suspect:'Verdacht (gesichert)',watch:'Beobachtung',contact:'Kontaktdaten',offline:'„in echt“',meetup:'Treffen/Zeit',real_goods:'reale Ware',money:'Geldweg',violence:'Gewalt',school:'Schule',minor_cue:'Hinweis auf Minderjährige',secrecy:'Geheimhaltung',sexual:'sexueller Bezug',abuse_material:'Missbrauchsdarstellung',obfuscated_contact:'getarnte Kontaktdaten',real_currency:'reale Währung',quantity:'Menge mit Einheit',trade_shape:'Handelsmuster',unscreened_language:'nicht abgedeckte Sprache'}
-const VERDICT:Record<string,string>={game:'Spiel',unclear:'unklar',real_world:'reale Welt (gesichert ab 60 %)',error:'Fehler'}
+const SIGNAL:Record<string,string>={suspect:'Verdacht (gesichert)',watch:'Beobachtung',contact:'Kontaktdaten',offline:'„in echt“',meetup:'Treffen/Zeit',real_goods:'reale Ware',money:'Geldweg',violence:'Gewalt',school:'Schule',minor_cue:'Hinweis auf Minderjährige',secrecy:'Geheimhaltung',sexual:'sexueller Bezug',abuse_material:'Missbrauchsdarstellung'}
 const pct=(n:number)=>Math.round(n*100)+' %'
 
 function Table({title,group,label}:{title:string;group:InsightGroup;label:string}){
@@ -121,15 +119,6 @@ export default function ConversationInsightsPage(){
        {data.safety.length===0?<p className="mt-2 text-sm text-[#5d6b70]">Keine.</p>:
        <table className="mt-2 w-full text-sm"><thead><tr className="text-left text-xs text-[#5d6b70]"><th>Merkmal</th><th className="text-right">NPC</th><th className="text-right">Raum</th></tr></thead>
         <tbody>{data.safety.map(x=><tr key={x.signal} className="border-t"><td className="py-1">{SIGNAL[x.signal]??x.signal}</td><td className="text-right">{x.npc}</td><td className="text-right">{x.room}</td></tr>)}</tbody></table>}
-      </section>
-      <section className="rounded-xl border bg-white p-4">
-       <h3 className="font-semibold">KI-Prüfung (Stufe 2)</h3>
-       <p className="mt-1 text-xs text-[#5d6b70]">Nur auffällige Fenster – Codewörter, Handelsmuster mit echter Währung, nicht abgedeckte Sprachen. Gespeichert wird nur das Ergebnis.</p>
-       {data.aiReviews.total===0?<p className="mt-2 text-sm text-[#5d6b70]">Keine Prüfungen im Zeitraum.</p>:<>
-        <p className="mt-2 text-sm">{data.aiReviews.total} Prüfungen: {data.aiReviews.byVerdict.map(v=>`${VERDICT[v.key]??v.key} ${v.count}`).join(' · ')}</p>
-        {data.aiReviews.byCategory.length>0&&<p className="mt-1 text-sm">Bereiche: {data.aiReviews.byCategory.map(v=>`${v.key} ${v.count}`).join(' · ')}</p>}
-        <p className="mt-1 text-sm">Sprachen: {data.aiReviews.byLanguage.map(v=>`${v.key} ${v.count}`).join(' · ')}</p>
-       </>}
       </section>
       <section className="rounded-xl border bg-white p-4">
        <h3 className="font-semibold">Was Figuren gelernt haben</h3>

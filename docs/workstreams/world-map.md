@@ -35,8 +35,6 @@ Wie es arbeitet:
 - **Jedes Gebäude einmal.** Es gehört zu der Kachel, in der seine Mitte liegt; doppelt importierte Objekte werden nur einmal gezählt.
 - **NOXIA-Gebäude** stehen mit ihren bestehenden Bildern an ihrer echten Position.
 
-**Andere Himmelskörper (06.11.2026):** Die Zeichenmaschine nimmt jetzt optional `projection`, `ground` und `sunElevation` (`WorldEngineOptions`); ohne sie gilt die Erde unverändert. Genutzt vom Teilprojekt „Weltkarte jenseits der Erde“ (`world-map-bodies.md`) für den Mars. Wer die Maschine ändert, bitte dort mitdenken.
-
 ## Geprüft und nicht geprüft
 
 - Geprüft: Kachelmathematik und Vereinfachung mit Tests; die Ansicht im Browser mit einer künstlichen Stadt (Laden, Laufen über Kachelgrenzen, Zoomen, keine Fehler).
@@ -859,7 +857,3 @@ Thomas, 05.11.2026: „Brauchen wir Polizei? Feuerwehr, Krankenhaus?“ – „j
 
 - `lib/worldlab/roofRegion.ts`: `roofRegion(lat, lon)` → flat | low | normal | steep. Flach: warme Breiten unter 36° (Gujarat, Sahel, Tropen), ohne Kirchturm. Flach geneigt (Faktor 0,45): Mittelmeerraum 35,5–46° N, 10° W–45° O (Spanien bis Istanbul). Normal: gemäßigte Breiten. Steil (1,2): ab 58°.
 - Moscheen unverändert (Flachdach, Kuppel, Minarette). Offen: Dachfarbe/Material je Region (Ziegel, Lehm, Schiefer).
-
-## Timetravel-Agencys (06.11.2026)
-
-- Normale Reisebüros buchen nur normale Reisen. Chronotrips gibt es nur in eigenen Timetravel-Agencys (neue Ortsart, später); zusätzlich ein Button am historischen Ort. Details und Inhaltsgrundsatz (Wissensgraph zuerst, Bücher ergänzend, Konsistenzprüfung) in `chronomap-dvaraka.md`.

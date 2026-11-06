@@ -11,7 +11,6 @@ export type BuildingEntryKind =
   | 'residents'
   | 'foundation'
   | 'hospitality'
-  | 'immersion'
 
 export type BuildingEntryDefinition = {
   kind: BuildingEntryKind
@@ -24,16 +23,9 @@ export type BuildingEntryRequest = {
   buildingTypeId: string
   buildingName: string
   kind: BuildingEntryKind
-  /** Lage des Gebäudes (Erlebnis-Studio: welche Zeitreisen der Gegend) */
-  at?: { lat: number; lon: number }
 }
 
 const ENTRY_BY_BUILDING: Readonly<Record<string, BuildingEntryDefinition>> = {
-  immersion_studio: {
-    kind: 'immersion',
-    label: 'Studio betreten',
-    hint: 'Pods für Zeitreisen, Spielwelten und Abstraktes',
-  },
   school: {
     kind: 'academy',
     label: 'Akademie betreten',

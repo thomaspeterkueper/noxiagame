@@ -12,7 +12,6 @@ import { passengerOffers, type PassengerOffer } from '@/lib/game/passengerOffers
 import { getPlayerUnlocks } from '@/lib/knowledge/unlocks'
 import { navigationProficiencyFromUnlocks } from '@/lib/knowledge/navigationProficiency'
 import { hasPilotTraining, pilotFee } from '@/lib/game/pilotQualification'
-import { availablePilots, hiredPilotFee, pilotByIndex, pilotDay, type HiredPilot } from '@/lib/game/pilots'
 import {
   completePassengerTransitCommand,
   completeTransitCommand,
@@ -399,7 +398,7 @@ export async function getPlayerTransitState(profileId: string): Promise<PlayerTr
  * (Migration 20261106010000). Das Schiff muss am Ort des Spielers liegen; das
  * Honorar fällt immer an, weil nicht der Spieler fliegt.
  */
-export async function dispatchParkedShip(profileId: string, destination: string, shipId?: string, pilotIndex = 1): Promise<AtomicTransitStartResult> {
+export async function dispatchParkedShip(profileId: string, destination: string, shipId?: string): Promise<AtomicTransitStartResult> {
   const supabase = createServiceClient()
   const { data: profile } = await supabase.from('profiles').select('aboard_ship_id, current_location').eq('id', profileId).maybeSingle()
   if (!profile) throw new Error('NOXIA_PROFILE_NOT_FOUND')
@@ -417,9 +416,7 @@ export async function dispatchParkedShip(profileId: string, destination: string,
   const ship = (ships?.[0] as unknown as ActiveShip | undefined)
   if (!ship) throw new Error(aboard && (!shipId || shipId === aboard) ? 'NOXIA_DISPATCH_PLAYER_ABOARD' : 'NOXIA_SHIP_NOT_FOUND')
 
-  const { quote } = await quoteForShip(profileId, ship, destination)
-  const pilot = pilotByIndex(ship.id, ship.location, pilotDay(), pilotIndex)
-  if (!pilot) throw new Error('NOXIA_PILOT_NOT_FOUND')
+  const { quote, tick } = await quoteForShip(profileId, ship, destination)
   const { data, error: rpcError } = await supabase.rpc('noxia_dispatch_ship', {
     p_profile_id: profileId,
     p_ship_id: ship.id,
@@ -427,10 +424,10 @@ export async function dispatchParkedShip(profileId: string, destination: string,
     p_duration_seconds: quote.durationSeconds,
     p_energy_needed: quote.energy,
     p_docking_idle_hours: DOCKING_IDLE_EXPIRE_HOURS,
-    p_pilot_fee: hiredPilotFee(quote, pilot),
+    p_pilot_fee: pilotFee(quote, false, tick),
   })
   if (rpcError) throw new Error(rpcError.message)
-  return { ...(data as AtomicTransitStartResult), pilot_name: pilot.name } as AtomicTransitStartResult
+  return data as AtomicTransitStartResult
 }
 
 /** Schiffe ohne Spieler an Bord, deren Flug fällig ist, landen lassen. */
@@ -448,61 +445,4 @@ export async function settleDueParkedShips(profileId: string): Promise<number> {
     landed++
   }
   return landed
-}
-
-export type FleetShip = {
-  id: string
-  name: string | null
-  shipTypeId: string | null
-  location: string
-  status: string
-  destination: string | null
-  arrivesAt: string | null
-  aboard: boolean
-  /** Am Ort des Spielers angedockt und nicht an Bord: kann mit Pilot losgeschickt werden. */
-  canDispatch: boolean
-  cargo: Array<{ resource: string; amount: number }>
-  pilots: HiredPilot[]
-}
-
-/** Alle eigenen Schiffe mit Ladung und den heute verfügbaren Piloten. */
-export async function getFleet(profileId: string): Promise<{ location: string | null; ships: FleetShip[] }> {
-  await settleDueParkedShips(profileId).catch(() => 0)
-  const supabase = createServiceClient()
-  const { data: profile } = await supabase.from('profiles').select('aboard_ship_id, current_location').eq('id', profileId).maybeSingle()
-  if (!profile) return { location: null, ships: [] }
-  const aboardId = (profile as { aboard_ship_id?: string | null }).aboard_ship_id ?? null
-  const { data: ships } = await supabase
-    .from('ships')
-    .select('id, name, ship_type_id, location, status, dest_location, arrives_at')
-    .eq('profile_id', profileId)
-    .order('created_at', { ascending: true })
-  const ids = (ships ?? []).map(s => String((s as { id: string }).id))
-  const { data: cargoRows } = ids.length
-    ? await supabase.from('ship_cargo').select('ship_id, resource, amount').in('ship_id', ids)
-    : { data: [] }
-  const day = pilotDay()
-  // Spieler an Bord: sein Ort ist der des Schiffs (current_location folgt per Trigger).
-  const here = String((profile as { current_location: string }).current_location)
-  return {
-    location: here,
-    ships: (ships ?? []).map(row => {
-      const s = row as { id: string; name: string | null; ship_type_id: string | null; location: string; status: string; dest_location: string | null; arrives_at: string | null }
-      const aboard = s.id === aboardId
-      return {
-        id: s.id,
-        name: s.name,
-        shipTypeId: s.ship_type_id,
-        location: s.location,
-        status: s.status,
-        destination: s.dest_location,
-        arrivesAt: s.arrives_at,
-        aboard,
-        canDispatch: !aboard && s.status === 'docked' && s.location === here,
-        cargo: (cargoRows ?? []).filter(c => (c as { ship_id: string }).ship_id === s.id && Number((c as { amount: number }).amount) > 0)
-          .map(c => ({ resource: String((c as { resource: string }).resource), amount: Number((c as { amount: number }).amount) })),
-        pilots: availablePilots(s.id, s.location, day),
-      }
-    }),
-  }
 }

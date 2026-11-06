@@ -66,22 +66,6 @@ export async function GET(req: NextRequest) {
   for (const r of playerRows as Array<InsightRow & { safety_flags?: string[] }>) for (const f of r.safety_flags ?? []) bump(f, 'npc')
   for (const r of roomFlags ?? []) for (const f of (r.flags as string[] | null) ?? []) bump(f, 'room')
 
-  // KI-Prüfungen (Stufe 2): nur Ergebnisse, kein Wortlaut.
-  const { data: reviews, error: reviewError } = await db.from('safety_reviews')
-    .select('verdict,category,detected_language,screen_language').gte('created_at', since).limit(20000)
-  if (reviewError) return NextResponse.json({ error: 'KI-Prüfungen nicht verfügbar' }, { status: 503 })
-  const tally = (key: (r: NonNullable<typeof reviews>[number]) => string | null) => {
-    const m = new Map<string, number>()
-    for (const r of reviews ?? []) { const k = key(r); if (k) m.set(k, (m.get(k) ?? 0) + 1) }
-    return [...m].map(([k, n]) => ({ key: k, count: n })).sort((a, b) => b.count - a.count)
-  }
-  const aiReviews = {
-    total: reviews?.length ?? 0,
-    byVerdict: tally(r => r.verdict),
-    byCategory: tally(r => r.verdict === 'real_world' || r.verdict === 'unclear' ? r.category : null),
-    byLanguage: tally(r => r.detected_language || r.screen_language),
-  }
-
   // Was Figuren von Spielern gelernt haben (NOXIA-LEARN-0001): nur Umfang.
   const { data: claims, error: claimError } = await db.from('npc_learned_claims')
     .select('npc_person_id,source_profile_id').limit(50000)
@@ -127,7 +111,6 @@ export async function GET(req: NextRequest) {
     testTurns: testTurns ?? [],
     safety: [...safetyCounts].map(([signal, c]) => ({ signal, ...c })).sort((a, b) => (b.npc + b.room) - (a.npc + a.room)),
     learning,
-    aiReviews,
     reports: (reports ?? []).map(({ reporter_profile_id, subject_profile_id, ...rest }) => { void reporter_profile_id; void subject_profile_id; return rest }),
   }, { headers })
 }

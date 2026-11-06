@@ -5,7 +5,6 @@
 // gameStore still abbrechen (location === dest), das Overlay schloss sich
 // aber trotzdem -> wirkte wie "Navigation starten tut nichts". Erde jetzt
 // aus der Zielliste gefiltert, analog zur Kolonien-Tab-Variante.
-import ImmersionStudioInterior from './ImmersionStudioInterior'
 import { useEffect, useState, type ReactNode } from 'react'
 import SchoolOverlay from '@/app/dashboard/SchoolOverlay'
 import WarehouseOverlay from '@/app/dashboard/WarehouseOverlay'
@@ -332,10 +331,6 @@ export default function EarthBuildingAccessLayer({
         </div>
       </FacilityPanel>
     )
-  }
-
-  if (request.kind === 'immersion') {
-    return <ImmersionStudioInterior entityId={request.entityId} name={request.buildingName} at={request.at} onClose={onClose} />
   }
 
   if (request.kind === 'hospitality') {

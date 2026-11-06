@@ -247,7 +247,7 @@ const bystander = venueConversationFacts({ layout: cafe, buildingName: 'Sol', se
 check(bystander.includes('Dein Gegenüber hat hier eben bestellt: Getränk') && !bystander.some(f => /ausgegeben/.test(f)), 'a bystander only saw an order')
 
 const guestMenuFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: g1, figures: pair, playerPos: cafe.start, arrivalPoint: true, menu: cafeMenu })
-check(guestMenuFacts.some(f => f === 'Wer sitzt, wird vom Personal am Tisch bedient; du holst nichts selbst am Tresen. Die Preise hast du nicht im Kopf' && f.length <= 140 && /Preise hast du nicht im Kopf/.test(f)) && !guestMenuFacts.some(f => /Karte:|\d Credits/.test(f)), 'a guest in a cafe knows staff serves at the table, fetches nothing himself and knows no prices')
+check(guestMenuFacts.includes('Bestellt und bezahlt wird am Tresen beim Personal; die Preise hast du nicht im Kopf') && !guestMenuFacts.some(f => /Karte:|\d Credits/.test(f)), 'a guest knows where to order but not the prices')
 const automat = placeVenueFigures(cafe, guests(2))
 const automatFacts = venueConversationFacts({ layout: cafe, buildingName: 'Sol', self: automat[0], figures: automat, playerPos: cafe.start, arrivalPoint: true, menu: cafeMenu })
 check(automatFacts.includes('Hier bedient kein Personal; bestellt und bezahlt wird am Automaten am Tresen'), 'in a self-service cafe guests point to the machine')
