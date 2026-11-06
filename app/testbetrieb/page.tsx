@@ -11,7 +11,7 @@ export default function TestbetriebInformation() {
       <p className="mt-4 text-lg">Gespräche in NOXIA werden automatisch ausgewertet, um die Welt und ihre Figuren zu verbessern. Kein Mensch liest sie – außer ein automatischer Schutzfilter erkennt den Verdacht auf Straftaten in der realen Welt. NPCs merken sich in Kurzform, was ihr miteinander erlebt habt, und lernen aus dem, was ihr über die Welt erzählt. Wenn du willst, dass wir ein Gespräch ansehen, nutze „Gespräch melden“.</p>
 
       <h2 className="mt-6 text-lg font-semibold">Was ausgewertet wird</h2>
-      <p className="mt-2">Gespräche mit NPCs und Nachrichten an andere Spieler im Raum. Ein Programm erkennt daraus Themen, Gesprächsausgang, Fehler der Figuren, Wünsche und ausgelöste Aktionen in der Spielwelt. Das Team sieht davon nur zusammengefasste Zahlen, und zwar erst, wenn mindestens fünf verschiedene Spieler beteiligt sind – nie, was ein einzelner Spieler gesagt hat.</p>
+      <p className="mt-2">Gespräche mit NPCs und Nachrichten an andere Spieler – im Raum und im Freundes-Chat. Ein Programm erkennt daraus Themen, Gesprächsausgang, Fehler der Figuren, Wünsche und ausgelöste Aktionen in der Spielwelt. Das Team sieht davon nur zusammengefasste Zahlen, und zwar erst, wenn mindestens fünf verschiedene Spieler beteiligt sind – nie, was ein einzelner Spieler gesagt hat.</p>
 
       <h2 className="mt-6 text-lg font-semibold">Was nicht passiert</h2>
       <p className="mt-2">Es gibt im Adminbereich keine Ansicht, keinen Export und keine Schnittstelle, über die der Wortlaut deiner Gespräche gelesen werden kann. Die Datenbankrechte sind entsprechend gesetzt; die Zusage ist technisch umgesetzt, nicht nur versprochen.</p>
