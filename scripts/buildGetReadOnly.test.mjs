@@ -32,3 +32,9 @@ test('GET building endpoint does not write directly to game tables', () => {
     'GET must not directly mutate credits, entities, or build orders',
   );
 });
+
+test('GET keeps read-only build snapshot and sale quotation', () => {
+  const get = getHandlerBody(route);
+  assert.match(get, /if \(!action\)/, 'existing build snapshot must remain available');
+  assert.match(get, /action\s*===\s*['"]sellQuote['"]/, 'read-only sale quote must remain available');
+});
