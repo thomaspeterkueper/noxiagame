@@ -34,7 +34,8 @@ function parseTileInteger(raw: string | null): number {
   // values must not be coerced, truncated or interpreted as hexadecimal.
   if (raw === null) return 0
   if (!/^-?\d+$/.test(raw)) return Number.NaN
-  return Number(raw)
+  const value = Number(raw)
+  return Number.isSafeInteger(value) ? value : Number.NaN
 }
 
 async function getUserFromRequest(req: NextRequest) {
