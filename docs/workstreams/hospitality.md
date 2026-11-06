@@ -254,6 +254,23 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
     - WASD gehen nach Bildschirmrichtung.
     - Einrichten per Ziehen rechnet über drei Bezugspunkte zurück in Raumkoordinaten.
   - Die Spiellogik bleibt unverändert. In der Kopfzeile lässt sich auf die Draufsicht zurückschalten (wird im Browser gemerkt).
+- **06.11.2026 – Größer, modernes Café, Servierroboter, lebendigere Bewegungen:**
+  - Thomas: „sieht noch nicht wirklich gut aus, ich denke es sollte grösser sein, moderner, hier könnten wir uns ein Beispiel an modernen koreanischen Cafés nehmen, Bedienungsroboter, Bewegungen sind noch so einfach aktuell“.
+  - **Größer:**
+    - Die Kamera zoomt näher heran (Standard 1,35) und folgt der eigenen Figur.
+    - Zoom per Mausrad oder mit den Knöpfen +, − und „Raum“/„Nah“ (wird im Browser gemerkt).
+  - **Modernes Café** (eigener Entwurf, keine Kopie eines echten Lokals):
+    - Terrazzo-Boden, Holzlamellen an der unteren Wand, Bogenfenster mit schwarzem Rahmen.
+    - Runde Marmortische auf Beinen, pastellfarbene Hocker, weißer Tresen mit Lamellenfront, Glasregal, große Pflanzen.
+    - Hängelampen über den Tischen (nicht in Polizei, Wache, Praxis, Krankenhaus und Bank).
+    - Leuchtschrift mit dem Namen des Lokals auf der freien Wandfläche; Straßenadressen werden nicht angeschrieben.
+  - **Servierroboter** (Café und Restaurant, eigener Entwurf: weißer Körper, zwei Holztabletts, Bildschirmgesicht):
+    - Wartet am Tresen, fährt über die Wegfindung zu besetzten Plätzen und wieder zurück.
+    - Er ist nur Bild – er spricht nicht und weiß nichts; die Bedienung bleibt die Person am Tresen.
+  - **Bewegungen:**
+    - Neue Posen: trinken, plaudern (stehend und sitzend).
+    - Sitzende Gäste wechseln zwischen Sitzen, Trinken und Plaudern; Stehende plaudern.
+    - Leichtes Atmen der Figuren; Bewohner gleiten weich zu ihrem Platz.
   - Gilt für alle Räume des Motors: Lokale, Bank, Agentur, Reisebüro, Wache, Feuerwache, Praxis, Krankenhaus.
   - Im Browser geprüft (Metropol, Café, Wache; Laufen per Klick, Tasten, Einrichten).
   - **Später** (Thomas): eine 80er-/90er-Fassung für die Zeitreise in VR.
