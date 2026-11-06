@@ -78,6 +78,7 @@ export default defineConfig({
       'lib/game/lab/lab.test.ts',
       'lib/worldlab/dvarakaGrabung.test.ts',
       'lib/worldlab/grabungsbuch.test.ts',
+      'lib/worldlab/dvarakaNacht.test.ts',
       'lib/multiplayer/sitePresence.test.ts',
       'lib/worldlab/placeName.test.ts',
       'lib/worldlab/buildingOffer.test.ts',
