@@ -1,6 +1,6 @@
 // lib/game/business/establishments.ts
-// Aktualisiert: 26.10.2026 — Betriebe im Spiel aus realen Gewerbe-Orten: Funktion aus OSM-Tags, erfundener Name, Leistungen
-// Version:      1.0.0
+// Aktualisiert: 06.11.2026 — Betrieb aus Nutzungskennung der Weltkarte (s:/c:/o:/a:/b:), Fahrzeugleistungen (Kauf, Reparatur, Laden) sind jetzt buchbar; Betriebe im Spiel aus realen Gewerbe-Orten: Funktion aus OSM-Tags, erfundener Name, Leistungen
+// Version:      1.1.0
 //
 // Entscheidung (Thomas, 26.10.2026): Reale Gebäude bleiben reale Orte, aber die
 // Firma darin ist im Spiel (um 2086) eine erfundene Nachfolgerin mit passender
@@ -101,9 +101,9 @@ const FUNCTION: Record<EstablishmentKind, { label: string; room: 'shop' | 'works
 /** Was man dort tun kann. `available: false` ist ehrlich: die Mechanik fehlt noch, die Person weiß das. */
 export function establishmentServices(kind: EstablishmentKind): EstablishmentService[] {
   switch (kind) {
-    case 'autohaus': return [{ id: 'car-buy', label: 'Fahrzeug kaufen', note: 'Kauf und Zulassung – Mechanik folgt', available: false }, { id: 'car-view', label: 'Fahrzeuge ansehen', note: 'Ausstellung', available: true }]
-    case 'werkstatt': return [{ id: 'car-repair', label: 'Fahrzeug reparieren lassen', note: 'Reparatur und Wartung – Mechanik folgt', available: false }, { id: 'advice', label: 'Beratung', note: 'Was kaputt ist und was es kostet', available: true }]
-    case 'tankstelle': return [{ id: 'fuel', label: 'Tanken', note: 'Mechanik folgt', available: false }, { id: 'snack', label: 'Kleinigkeit kaufen', note: 'Mechanik folgt', available: false }]
+    case 'autohaus': return [{ id: 'car-buy', label: 'Fahrzeug kaufen', note: 'Kleinwagen 1 800, Kombi 3 200, Transporter 5 400 Cr', available: true }, { id: 'car-charge', label: 'Fahrzeug laden', note: '1 Cr je Prozent', available: true }]
+    case 'werkstatt': return [{ id: 'car-repair', label: 'Fahrzeug reparieren lassen', note: '6 Cr je fehlendem Prozent Zustand', available: true }, { id: 'car-charge', label: 'Fahrzeug laden', note: '1 Cr je Prozent', available: true }]
+    case 'tankstelle': return [{ id: 'car-charge', label: 'Fahrzeug laden', note: '1 Cr je Prozent', available: true }, { id: 'snack', label: 'Kleinigkeit kaufen', note: 'Mechanik folgt', available: false }]
     case 'tierbedarf': return [{ id: 'pet-adopt', label: 'Haustier aussuchen', note: 'Vermittlung – Mechanik folgt', available: false }, { id: 'pet-supplies', label: 'Futter und Zubehör', note: 'Mechanik folgt', available: false }]
     case 'tierarzt': return [{ id: 'pet-care', label: 'Haustier behandeln lassen', note: 'braucht zuerst ein Haustier', available: false }]
     case 'baeckerei': case 'metzgerei': case 'supermarkt': return [{ id: 'food', label: 'Lebensmittel kaufen', note: 'Mechanik folgt – heute isst man im Lokal', available: false }]
@@ -184,4 +184,17 @@ export function establishmentKnowledge(e: Establishment, placeName: string) {
     open.length ? `Hier geht heute: ${open.join(', ')}.` : '',
     later.length ? `Noch nicht möglich (sag das ehrlich, wenn jemand danach fragt): ${later.join(', ')}.` : '',
   ].filter(Boolean)
+}
+
+/**
+ * Betrieb aus der Nutzungskennung der Weltkarte („s:bakery“, „c:carpenter“,
+ * „o:company“, „a:fuel“, „b:industrial“ – lib/worldlab/buildingUse.ts), ergänzt
+ * um Tags eines Wahrzeichens im Haus und den heutigen Namen.
+ */
+export function establishmentFromUse(useCode: string | null | undefined, sourceId: string, extra: Tags = {}, realName?: string): Establishment | null {
+  const [prefix, value = ''] = String(useCode ?? '').split(':')
+  const key = prefix === 's' ? 'shop' : prefix === 'c' ? 'craft' : prefix === 'o' ? 'office' : prefix === 'a' ? 'amenity' : prefix === 't' ? 'tourism' : prefix === 'b' ? 'building' : null
+  const tags: Tags = { ...extra, ...(key && value ? { [key]: value } : {}), ...(realName ? { name: realName } : {}) }
+  if (!key) return null
+  return establishmentFor(tags, sourceId)
 }

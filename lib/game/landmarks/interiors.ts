@@ -1,7 +1,9 @@
 import { serviceKindFor } from '../services/publicServices'
 // lib/game/landmarks/interiors.ts
-// Aktualisiert: 26.10.2026 — CAMALEO-ArtLounge als dreigeschossiges Stadthaus (EG ArtLounge mit Flügel, Sitzreihen, Ausstellung, Büro im Hinterzimmer; Galerie und Dachstudio oben, Treppe); Räume für Betriebe: Laden (Tresen, Regale, Auslage) und Werkstatt (Hebebühne, Werkbank, Tor); Wegsuche um die Möbel herum (landmarkPath) für Spieler und Personal, Ziele im Raum (landmarkWaypoints); jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
-// Version:      1.7.0
+// Aktualisiert: 06.11.2026 — Betriebe (Laden, Werkstatt) aus der Nutzungskennung realer Gebäude; 26.10.2026 — CAMALEO-ArtLounge als dreigeschossiges Stadthaus (EG ArtLounge mit Flügel, Sitzreihen, Ausstellung, Büro im Hinterzimmer; Galerie und Dachstudio oben, Treppe); Räume für Betriebe: Laden (Tresen, Regale, Auslage) und Werkstatt (Hebebühne, Werkbank, Tor); Wegsuche um die Möbel herum (landmarkPath) für Spieler und Personal, Ziele im Raum (landmarkWaypoints); jedes Regal ist stöberbar (hohe Regale: Romane, niedrige: Sachbücher); Bibliothek als bewohnter Ort: Zonen (Teppich, Fliesen), Deko (Pflanzen, Sessel, Globus), Lampen, Ausleihtresen am Eingang, Bibliothekarin als Ansprechperson
+// Version:      1.8.0
+
+import { establishmentFromUse } from '@/lib/game/business/establishments'
 
 export type LandmarkRoomKind =
   | 'library' | 'worship' | 'shop' | 'workshop' | 'artlounge'
@@ -676,6 +678,9 @@ export function buildingRoomKind(useCode?: string | null, source?: string | null
   if (prefix === 'a' && value === 'community_centre') return 'community_hall'
   if (prefix === 'a' && HOSPITALITY_CLASSES.has(value)) return 'hospitality'
   if ((prefix === 'a' || prefix === 'b') && serviceKindFor(value)) return serviceKindFor(value)
+  // Gewerbe: Laden oder Werkstatt mit erfundenem Betrieb (NOXIA-Entscheidung 26.10.2026)
+  const business = establishmentFromUse(useCode, source ?? '', tags ?? {})
+  if (business) return business.room
   if (prefix === 'b' && ['church', 'chapel', 'cathedral'].includes(value)) return 'worship'
   if (prefix === 'b' && ['mosque', 'synagogue', 'temple'].includes(value)) return worshipRoomKind(tags?.religion, value)
   return null

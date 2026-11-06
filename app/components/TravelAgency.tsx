@@ -1,6 +1,8 @@
 'use client'
 
 // app/components/TravelAgency.tsx
+// Aktualisiert: 06.11.2026 — „Hinfahren“ mit eigenem Fahrzeug je Ziel (onDrive)
+// Version:      1.1.0
 // Reisebüro (Thomas, 27.10.2026): Reisen auf der Erde (Bahn bis 400 km, darüber
 // Flug) und Linienflüge ins All (TicketCounter). Abfahrtsort ist `from` – das
 // Reisebüro bzw. der Ort, an dem man steht (Heimreise aus der Ferne).
@@ -8,6 +10,7 @@
 import { useEffect, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import TicketCounter from './TicketCounter'
+import { DriveButton } from './VehicleDesk'
 import { flightDurationText } from '@/lib/game/passengerOffers'
 import type { EarthTripOffer, GeoPoint } from '@/lib/game/earthTrips'
 
@@ -16,7 +19,7 @@ type Data = { offers: EarthTripOffer[]; home: EarthTripOffer | null; trip: Earth
 
 const MODE: Record<string, string> = { rail: '🚆 Bahn', air: '✈ Flug' }
 
-export default function TravelAgency({ from, onBooked, homeOnly = false }: { from: GeoPoint; onBooked: (trip: EarthTrip) => void; homeOnly?: boolean }) {
+export default function TravelAgency({ from, onBooked, homeOnly = false, onDrive }: { from: GeoPoint; onBooked: (trip: EarthTrip) => void; homeOnly?: boolean; onDrive?: (at: GeoPoint, note: string) => void }) {
   const [tab, setTab] = useState<'earth' | 'space'>('earth')
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState('')
@@ -54,6 +57,7 @@ export default function TravelAgency({ from, onBooked, homeOnly = false }: { fro
   const row = (offer: EarthTripOffer, label?: string) => <li key={offer.slug}>
     <div><b>{label ?? offer.name}</b><span>{MODE[offer.mode]} · {offer.distanceKm.toLocaleString('de-DE')} km · {flightDurationText(offer.durationSeconds)}{offer.country && !label ? ` · ${offer.country}` : ''}</span></div>
     <button disabled={Boolean(booking) || credits < offer.price} title={credits < offer.price ? 'Nicht genug Credits' : undefined} onClick={() => void book(offer)}>{booking === offer.slug ? '…' : `${offer.price.toLocaleString('de-DE')} Cr`}</button>
+    {onDrive && <DriveButton from={() => from} to={offer.at} onArrived={onDrive}/>}
   </li>
 
   return <div className="agency">

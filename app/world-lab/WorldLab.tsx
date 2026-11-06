@@ -1,6 +1,8 @@
 'use client'
 
 // app/world-lab/WorldLab.tsx
+// Aktualisiert: 06.11.2026 — Fahrzeug: Ankunftsmeldung nach „Hinfahren“ (onNote an WorldPanels)
+// Version:      1.1.0
 // Weltkarte „eine Welt“ mit PixiJS – eigene Seite /world-lab und im Spiel
 // neben der bisherigen Erdszene. Personen, Ansprechen und Betreten in
 // WorldPanels.tsx (immer nur eine Tafel offen).
@@ -944,7 +946,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
         </>}
       </div>
       <TimeSlider plots={plots} asOf={asOf} onChange={setAsOf}/>
-      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { bust.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick} onTripBooked={booked => { setTrip(booked); setTripNow(Date.now()); choosePanel({ kind: 'none' }) }} presence={surfacePeople} worship={worship}/>
+      <WorldPanels engine={engineReady} panel={panel} setPanel={next => { setTargetId(''); choosePanel(next) }} residents={residents} noxia={noxia} sites={sites} plots={plots} onWorldChanged={() => { setBuildsVersion(value => value + 1); void engine.current?.reloadNoxia() }} onParcelsChanged={() => { bust.current = String(Date.now()); engine.current?.reloadTiles(); setBuildsVersion(value => value + 1) }} placeName={placeName || 'Erde'} route={routeFar ? hud?.route ?? null : null} tick={tick} onNote={setPlayerNote} onTripBooked={booked => { setTrip(booked); setTripNow(Date.now()); choosePanel({ kind: 'none' }) }} presence={surfacePeople} worship={worship}/>
     </div>
     <style jsx>{`
       .world-lab{position:fixed;inset:0;background:#a9bd8c;font-family:system-ui;color:#eef2ed}

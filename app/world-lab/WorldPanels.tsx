@@ -1,8 +1,8 @@
 'use client'
 
 // app/world-lab/WorldPanels.tsx
-// Aktualisiert: 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd)
-// Version:      1.1.0
+// Aktualisiert: 06.11.2026 — Betriebe (Laden, Werkstatt) aus realen Gewerbe-Häusern mit erfundenem Namen, Personal und Leistungen; Fahrzeugtresen im Autohaus, in der Werkstatt und an der Ladestation; „Hinfahren“ mit eigenem Fahrzeug zu fernen Zielen (onNote); 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd)
+// Version:      1.2.0
 // Tafeln der Weltkarte: Person, Gebäude, Innenraum.
 //
 // Grundsatz (Thomas, 25.10.2026 – in der alten Szene lagen Tafeln übereinander):
@@ -20,7 +20,9 @@ import EarthBuildingAccessLayer from '@/app/earth/EarthBuildingAccessLayer'
 import LandmarkWalkableInterior from '@/app/earth/LandmarkWalkableInterior'
 import RealVenueInterior from '@/app/earth/RealVenueInterior'
 import PublicServiceInterior from '@/app/earth/PublicServiceInterior'
-import { ARTLOUNGE_OSM_ID, buildingRoomKind, landmarkRoomKind, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
+import { ARTLOUNGE_OSM_ID, buildingRoomKind, landmarkRoomKind, landmarkStaffName, type LandmarkRoomKind } from '@/lib/game/landmarks/interiors'
+import { establishmentFor, establishmentKnowledge, establishmentServices } from '@/lib/game/business/establishments'
+import { DriveButton, VehicleDesk, vehicleServiceIds } from '@/app/components/VehicleDesk'
 import { peopleAtPlace, type PresenceRow } from '@/lib/game/population/placePresence'
 import { landmarkFacts, landmarkLabel } from '@/lib/worldlab/landmarks'
 import { isResonanceBuilding, meetingPlaces } from '@/lib/worldlab/meetingPlaces'
@@ -126,13 +128,15 @@ type Buildable = { id: string; name: string; cost: number; footprint?: { widthM:
 /** Die wichtigsten Gebäude, die alle Einwohner kennen: Eine Person führt den Spieler auch über größere Entfernung dorthin (31.10.2026). */
 const FAR_GUIDE_KINDS = new Set(['job_agency', 'bank', 'travel_agency', 'school', 'admin', 'spaceport_core', 'cafe', 'restaurant', 'bar', 'resonance_place', 'ssf_headquarters_sundern'])
 
-export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, presence = [], worship = [] }: {
+export default function WorldPanels({ engine, panel, setPanel, residents, noxia, sites, plots, onWorldChanged, onParcelsChanged, placeName, route, tick, onTripBooked, onNote, presence = [], worship = [] }: {
   /** Wer laut Simulation wo ist (für Innenräume realer Orte, 28.10.2026). */
   presence?: PresenceRow[]
   /** Gottesdienste und Gebete mit laufendem und nächstem Termin (28.10.2026). */
   worship?: WorshipItem[]
   /** Reise auf der Erde gebucht (Reisebüro) – die Karte zeigt die Fahrt und springt bei Ankunft. */
   onTripBooked?: (trip: EarthTrip) => void
+  /** Kurze Meldung über der Figur (z. B. Ankunft nach einer Fahrt). */
+  onNote?: (note: string) => void
   engine: WorldEngine | null
   panel: Panel
   setPanel: (panel: Panel) => void
@@ -275,12 +279,29 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
   // mit den Personen, die laut Simulation drinnen sind (28.10.2026).
   const resonance = own && isResonanceBuilding(own.typeId) ? meetingPlaces(noxia).find(place => place.noxiaId === own.id) ?? null : null
   const buildingRoom = building && !building.noxiaId ? buildingRoomKind(building.use, building.source, { ...infoTags, ...(building.poi?.tags ?? {}) }) : resonance ? 'resonance_place' as const : null
+  /** „Hinfahren“ mit eigenem Fahrzeug – erscheint nur ab einigen hundert Metern (DriveButton prüft selbst). */
+  function driveRow(to: { lat: number; lon: number }) {
+    if (!engine) return null
+    return <div className="row drive-row"><DriveButton from={() => engine.position()} to={to} onArrived={(at, note) => { engine.jump(at); onNote?.(note) }}/></div>
+  }
+  /** Nutzungskennung (s:bakery, c:carpenter, o:company, a:fuel, b:industrial) als OSM-Tag. */
+  function codeAsTags(code: string | null | undefined): Record<string, string> {
+    const [prefix, value = ''] = String(code ?? '').split(':')
+    const key = prefix === 's' ? 'shop' : prefix === 'c' ? 'craft' : prefix === 'o' ? 'office' : prefix === 'a' ? 'amenity' : prefix === 't' ? 'tourism' : prefix === 'b' ? 'building' : null
+    return key && value ? { [key]: value } : {}
+  }
   function buildingAsLandmark(): WorldLandmark | null {
     if (!building || !buildingRoom) return null
     if (resonance) return { at: building.at, name: resonance.name, kind: 'resonance_place', tags: { ...(resonance.round ? { opening_hours: 'Offene Resonanzrunde ' + resonance.round } : {}), description: 'Offen für alle – Gespräch, Lesen, Stille. Niemand muss etwas glauben.' } }
     // Lokal: die Art aus der Nutzung (a:cafe, a:pub …) – sonst würde es als Gotteshaus geführt.
     const kind = buildingRoom === 'hospitality' ? (building.poi?.kind ?? String(building.use ?? '').split(':')[1] ?? 'cafe') : buildingRoom === 'community_hall' ? 'community_centre' : buildingRoom === 'artlounge' ? 'artlounge' : buildingRoom === 'police' || buildingRoom === 'fire_station' || buildingRoom === 'doctors' || buildingRoom === 'hospital' ? buildingRoom : 'place_of_worship'
     const religion = buildingRoom === 'mosque' ? 'muslim' : buildingRoom === 'synagogue' ? 'jewish' : buildingRoom === 'hindu_temple' ? 'hindu' : buildingRoom === 'buddhist_temple' ? 'buddhist' : buildingRoom === 'worship' ? 'christian' : undefined
+    // Betrieb: erfundener Name im Spiel, der reale nur zur Einordnung; die Nutzung als OSM-Tag für den Innenraum
+    if (buildingRoom === 'shop' || buildingRoom === 'workshop') {
+      const tags = { ...codeAsTags(building.use), ...(building.poi?.tags ?? {}), ...(building.osmName ? { name: building.osmName } : {}) }
+      const business = establishmentFor(tags, building.source ?? '')
+      if (business) return { at: building.at, name: business.name, kind: 'business', tags }
+    }
     const name = building.source === ARTLOUNGE_OSM_ID ? 'CAMALEO-ArtLounge' : building.osmName ?? info?.name ?? building.poi?.name ?? building.title
     return { at: building.at, name, kind, tags: { ...(religion ? { religion } : {}), ...infoTags, ...(building.poi?.tags ?? {}) } }
   }
@@ -643,6 +664,16 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
     return <PublicServiceInterior kind={panel.room} placeRef={panel.source ?? landmarkRef(panel.landmark)} name={panel.landmark.name} present={residents.filter(r => here.has(r.id) && r.id !== companion?.id)}
       companion={companion} companionHistory={companionHistory} onClose={() => { releaseCompanion(panel.companionId); close() }}/>
   }
+  if (panel.kind === 'landmarkInside' && (panel.room === 'shop' || panel.room === 'workshop')) {
+    const business = establishmentFor(panel.landmark.tags ?? {}, panel.source ?? '')
+    const services = business ? establishmentServices(business.kind) : []
+    const vehicleIds = vehicleServiceIds(services)
+    const staffName = landmarkStaffName(panel.landmark.name)
+    return <LandmarkWalkableInterior placeRef={panel.source} kind={panel.room} name={panel.landmark.name} typeLabel={business?.function ?? (panel.room === 'shop' ? 'Laden' : 'Werkstatt')} facts={landmarkFacts(panel.landmark.tags)} onClose={close}
+      knowledge={business ? establishmentKnowledge(business, placeName) : []} services={services.filter(service => !vehicleIds.includes(service.id))} staffRole={business?.staffRole} realName={business?.realName || undefined}
+      desk={vehicleIds.length > 0 ? <VehicleDesk services={vehicleIds} staffName={staffName}/> : undefined}
+      people={peopleAtPlace(presence, { osm: panel.source, at: panel.landmark.at, radiusM: 45 })}/>
+  }
   if (panel.kind === 'landmarkInside') {
     const service = worshipAt(worship, { source: panel.source, at: panel.landmark.at })
     const occasion = service?.running ? { ...service.running, tradition: service.tradition, host: service.host } : undefined
@@ -685,18 +716,18 @@ export default function WorldPanels({ engine, panel, setPanel, residents, noxia,
           {here.length > 0 && <p className="muted">Gerade drinnen: {here.map(person => person.name).join(', ')}{here[0]?.doing ? ` · ${here[0].doing}` : ''}</p>}
           {buildingDistance !== null && buildingDistance <= ENTER_RANGE_M + 6
             ? <div className="row"><span>Du stehst davor.</span><button onClick={() => enterLandmark(buildingRoom, inside, placeSource)}>Betreten</button></div>
-            : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, ENTER_RANGE_M + 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
+            : <><div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, ENTER_RANGE_M + 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>{driveRow(building.at)}</>}
           {resonance && <p className="muted">{resonance.round ? `Offene Resonanzrunde ${resonance.round}${resonance.host ? ' mit ' + resonance.host : ''}.` : 'Offener Resonanzplatz.'} Alle sind willkommen.</p>}
         </>
       })()}
       {own && entry && !resonance
         ? (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
           ? <div className="row"><span>Du stehst davor.</span><button onClick={enter}>{entry.label}</button></div>
-          : <div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>)
-        : !buildingRoom && <div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>}
+          : <><div className="row"><span>{away(buildingDistance, building.at)}</span><button onClick={() => walkTo(() => building.at, (own ? Math.max(own.w, own.d) / 2 : 6) + ENTER_RANGE_M - 3)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>{driveRow(building.at)}</>)
+        : !buildingRoom && <><div className="row"><span>{own ? 'Dieses Gebäude kann man nicht betreten.' : building.address ? 'Privathaus.' : 'Keine Anschrift bekannt.'}</span><button onClick={() => walkTo(() => building.at, 10)}>{walking ? 'Gehe …' : 'Gehe hin'}</button></div>{driveRow(building.at)}</>}
       {own?.typeId === 'travel_agency' && (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M
         ? (showAgency
-          ? <><TravelAgency from={building.at} onBooked={trip => { setShowAgency(false); onTripBooked?.(trip) }}/><div className="row"><span/><button onClick={() => setShowAgency(false)}>Schließen</button></div></>
+          ? <><TravelAgency from={building.at} onBooked={trip => { setShowAgency(false); onTripBooked?.(trip) }} onDrive={(at, note) => { setShowAgency(false); engine?.jump(at); onNote?.(note) }}/><div className="row"><span/><button onClick={() => setShowAgency(false)}>Schließen</button></div></>
           : <div className="row"><span>Bahn und Flug auf der Erde, Linienflüge ins All.</span><button onClick={() => setShowAgency(true)}>Reise buchen …</button></div>)
         : <div className="row"><span>Hier kann man Reisen buchen – auf der Erde und ins All.</span></div>)}
       {own && /^spaceport/.test(own.typeId) && (buildingDistance !== null && buildingDistance <= ENTER_RANGE_M

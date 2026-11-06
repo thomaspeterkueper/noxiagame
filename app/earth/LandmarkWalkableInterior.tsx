@@ -1,8 +1,8 @@
 'use client'
 
 // app/earth/LandmarkWalkableInterior.tsx
-// Aktualisiert: 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd); Laufweg der Spielfigur für die Verhaltensaufzeichnung; 26.10.2026: ArtLounge-Raum (Flügel, Sitzreihen, Büro); Betriebe: Laden und Werkstatt als Raum, Leistungen mit ehrlichem Status, Personal kennt seinen Betrieb (knowledge), eigener Begrüßungstext und Rollenname; Porträt der Ansprechperson oben in der Seitenleiste (NpcPortrait); „Gehe zu …“ mit Wegsuche; Bibliothekar(in) bringt das versprochene Buch wirklich an den Platz, sortiert zwischendurch Regale ein und geht auf Gesprächsziele; Lesegast in der Leseecke; an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
-// Version:      2.7.0
+// Aktualisiert: 06.11.2026 — Tresen-Einschub (desk) für buchbare Leistungen, z. B. Fahrzeugkauf, Reparatur, Laden (VehicleDesk); 28.10.2026 — Gesprächsende sperrt das Eingabefeld (useConversationEnd); Laufweg der Spielfigur für die Verhaltensaufzeichnung; 26.10.2026: ArtLounge-Raum (Flügel, Sitzreihen, Büro); Betriebe: Laden und Werkstatt als Raum, Leistungen mit ehrlichem Status, Personal kennt seinen Betrieb (knowledge), eigener Begrüßungstext und Rollenname; Porträt der Ansprechperson oben in der Seitenleiste (NpcPortrait); „Gehe zu …“ mit Wegsuche; Bibliothekar(in) bringt das versprochene Buch wirklich an den Platz, sortiert zwischendurch Regale ein und geht auf Gesprächsziele; Lesegast in der Leseecke; an jedem Regal stöbern: Liste öffnet sich beim Herantreten, hohe Regale Romane, niedrige Sachbücher; Buchtipp springt zum passenden Regal; Bewohnter Raum: Bodenzonen, Lichtkegel, Schatten, Pflanzen, Sessel, Globus, Pinnwand; Bibliothekarin am Ausleihtresen mit Buchtipp und Gespräch über /api/game/npc-conversation
+// Version:      2.8.0
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
@@ -37,6 +37,7 @@ import RoundTalk from './RoundTalk'
 import RoundBubbles from './RoundBubbles'
 import { RoomAudioControls, useLoungeMusic, useSpeech } from './RoomAudio'
 import { nextReadingChunk, readingSource } from '@/lib/game/landmarks/readAloud'
+import type { ReactNode } from 'react'
 import { useRoundTalk } from './useRoundTalk'
 import ConversationReport from '@/app/components/ConversationReport'
 
@@ -58,6 +59,8 @@ type Props = {
   /** Betrieb: Leistungen, mit ehrlichem Status. */
   services?: Array<{ id: string; label: string; note: string; available: boolean }>
   staffRole?: string
+  /** Betrieb: eigener Tresen (z. B. Fahrzeuge) – wird neben den Leistungen gezeigt. */
+  desk?: ReactNode
   /** Realer Name laut OSM – nur zur Einordnung in der Seitenleiste. */
   realName?: string
   /** Personen der Simulation, die gerade an diesem Ort sind (Arbeit, Termin, Besuch). */
@@ -129,7 +132,7 @@ export default function LandmarkWalkableInterior(props: Props) {
   return <LandmarkRoom key={floor.level} {...props} level={floor.level} byStairs={floor.byStairs} onLevel={level => setFloor({ level, byStairs: true })}/>
 }
 
-function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, realName, people = [], occasion, placeRef, level, byStairs, onLevel }: Props & { level: number; byStairs: boolean; onLevel: (level: number) => void }) {
+function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], services = [], staffRole, desk, realName, people = [], occasion, placeRef, level, byStairs, onLevel }: Props & { level: number; byStairs: boolean; onLevel: (level: number) => void }) {
   const layout = useMemo(() => { const base = landmarkRoomLayout(kind, level, byStairs); return staffRole && base.staff ? { ...base, staff: { ...base.staff, role: staffRole } } : base }, [kind, staffRole])
   const isLibrary = kind === 'library'
   const staffName = useMemo(() => landmarkStaffName(name), [name])
@@ -707,6 +710,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
           {tip && <button className="tipcard" onClick={() => { setBookId(tip.id); setTalking(false) }}>
             <span>{tip.author}</span><b>{tip.title}</b><i>{tip.genre}</i><small>Klappentext lesen →</small>
           </button>}
+          {!partner && desk}
           {!partner && services.length > 0 && <div className="services">{services.map(service => <button key={service.id} className={'act' + (service.available ? '' : ' quiet')} onClick={() => setStatus(service.available ? `${service.label}: ${service.note}.` : `${staffName}: „${service.label} – das geht hier noch nicht. ${service.note}.“`)}>{service.label}{!service.available && <small> · bald</small>}</button>)}</div>}
           <div className="row">{isLibrary && !partner && <button className="act" onClick={giveTip}>Buchtipp erbitten</button>}<button className="act quiet" onClick={() => setTalking(false)}>Gespräch beenden</button></div>
           <div className="chat"><textarea value={message} rows={3} maxLength={500} disabled={talkEnded} onChange={event => setMessage(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void talk() } }} placeholder={talkEnded ? CONVERSATION_ENDED_PLACEHOLDER : 'Deine Nachricht …'}/><button disabled={sending || talkEnded || !message.trim()} onClick={() => void talk()}>{sending ? '…' : 'Sprechen'}</button></div>
