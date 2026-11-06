@@ -7,8 +7,8 @@ export interface GeoPt { lat: number; lon: number }
 
 export interface Chronomap {
   id: string
-  /** chronotrip: Zeitreise an einen Ort der Erde; game: ein Spiel (z. B. Endia); abstract: reine Erfahrungswelt */
-  category: 'chronotrip' | 'game' | 'abstract'
+  /** chronotrip: Zeitreise an einen Ort der Erde; site: begehbarer Ort der Gegenwart (z. B. die Grabung); game: ein Spiel (z. B. Endia); abstract: reine Erfahrungswelt */
+  category: 'chronotrip' | 'site' | 'game' | 'abstract'
   title: string
   /** Epoche, frei lesbar */
   era: string
@@ -26,6 +26,11 @@ export const CHRONOMAPS: Chronomap[] = [
     id: 'dvaraka-1600-bc', category: 'chronotrip', title: 'Dvārakā – die Stadt vor dem Bruch', era: 'um 1600 v. Chr.',
     start: { lat: 22.2394, lon: 68.9678 }, placeNames: ['dvaraka', 'dwarka', 'hafen dvaraka'],
     agencyArea: { center: { lat: 22.2394, lon: 68.9678 }, radiusM: 4000 }, status: 'planned',
+  },
+  {
+    id: 'dvaraka-grabung', category: 'site', title: 'Dvārakā – die Grabung', era: 'Gegenwart (2086)',
+    start: { lat: 22.2394, lon: 68.9678 }, placeNames: [],
+    agencyArea: { center: { lat: 22.2394, lon: 68.9678 }, radiusM: 4000 }, status: 'playable',
   },
   {
     id: 'konstantinopel-hafen', category: 'chronotrip', title: 'Konstantinopel – der Hafen', era: 'Spätantike bis Mittelalter',
@@ -47,7 +52,7 @@ export function chronomapsForPlace(name: string | undefined): Chronomap[] {
 
 /** Chronomaps, deren Studio-Gegend `at` einschließt. */
 export function chronomapsNear(at: GeoPt): Chronomap[] {
-  return CHRONOMAPS.filter(map => map.category === 'chronotrip').filter(map => {
+  return CHRONOMAPS.filter(map => map.category === 'chronotrip' || map.category === 'site').filter(map => {
     const dy = (at.lat - map.agencyArea.center.lat) * 111320
     const dx = (at.lon - map.agencyArea.center.lon) * 111320 * Math.cos(at.lat * Math.PI / 180)
     return Math.hypot(dx, dy) <= map.agencyArea.radiusM
@@ -56,5 +61,5 @@ export function chronomapsNear(at: GeoPt): Chronomap[] {
 
 /** Was ein Erlebnis-Studio bei `at` anbietet: Zeitreisen der Gegend plus alle Spiele und abstrakten Welten. */
 export function experiencesAt(at: GeoPt): Chronomap[] {
-  return [...chronomapsNear(at), ...CHRONOMAPS.filter(map => map.category !== 'chronotrip')]
+  return [...chronomapsNear(at), ...CHRONOMAPS.filter(map => map.category === 'game' || map.category === 'abstract')]
 }

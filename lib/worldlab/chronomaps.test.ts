@@ -16,5 +16,8 @@ describe('Chronomaps', () => {
     expect(experiencesAt({ lat: 41.01, lon: 28.97 }).map(m => m.id)).toEqual(['konstantinopel-hafen', 'endia', 'abstrakt-1'])
     expect(experiencesAt({ lat: 50.26, lon: 8.41 }).map(m => m.id)).toEqual(['endia', 'abstrakt-1'])
   })
+  it('Dvārakā-Studio bietet Grabung und Zeitreise', () => {
+    expect(experiencesAt({ lat: 22.238, lon: 68.968 }).map(m => m.id)).toEqual(['dvaraka-1600-bc', 'dvaraka-grabung', 'endia', 'abstrakt-1'])
+  })
   it('Kennungen eindeutig', () => { expect(new Set(CHRONOMAPS.map(m => m.id)).size).toBe(CHRONOMAPS.length) })
 })

@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from 'react'
 import { getToken } from '@/lib/supabase/auth'
 import { landmarkStaffName } from '@/lib/game/landmarks/interiors'
 import { immersionPrice, partyLabel, receptionGreeting } from '@/lib/game/immersion'
+import DvarakaGrabungScene from './DvarakaGrabungScene'
 import { experiencesAt, type Chronomap } from '@/lib/worldlab/chronomaps'
 
 type Category = Chronomap['category']
-const CATEGORY_LABEL: Record<Category, string> = { chronotrip: 'Zeitreise', game: 'Spielwelt', abstract: 'Abstrakte Erfahrung' }
+const CATEGORY_LABEL: Record<Category, string> = { chronotrip: 'Zeitreise', site: 'Begehbarer Ort', game: 'Spielwelt', abstract: 'Abstrakte Erfahrung' }
 const INTRO: Record<Category, string> = {
   chronotrip: 'Der Pod stellt deinen Körper ruhig und legt dir die Vergangenheit des Ortes unter die Füße. Du gehst, schaust und entdeckst; was belegt ist, ist als Fund gekennzeichnet, was ergänzt wurde, als Rekonstruktion oder Buchwelt.',
+  site: 'Der Pod schließt sich, und du stehst am Ort, wie er heute ist. Geh umher und sieh dir die Fundstellen an; jede trägt einen Fundzettel mit dem, was die Grabung belegt hat.',
   game: 'Der Pod schließt sich, die Stimmen im Studio werden leise. Du trittst in eine fertige Spielwelt ein und kehrst zurück, wenn du den Pod öffnest.',
   abstract: 'Der Pod schließt sich. Es gibt keinen Ort und keine Zeit, nur Form, Klang und Bewegung. Du entscheidest, wann du auftauchst.',
 }
@@ -106,6 +108,7 @@ export default function ImmersionStudioInterior({ entityId, name, at, onClose }:
           <small style={{ color: '#d8bd68', fontWeight: 900, letterSpacing: '.08em' }}>POD · {CATEGORY_LABEL[category].toUpperCase()}</small>
           <strong style={{ display: 'block', fontSize: 16, margin: '3px 0 8px' }}>{preview?.title ?? lyingOffer?.title ?? lying?.experience_id}</strong>
           <p>{INTRO[category]}</p>
+          {lying?.experience_id === 'dvaraka-grabung' && <DvarakaGrabungScene onLeave={() => void post({ action: 'end' })} />}
           {preview && <p style={{ color: '#d8bd68' }}>Dieses Erlebnis ist noch in Vorbereitung. Der Pod bleibt dunkel, bis die Welt fertig ist.</p>}
           {lying && <p style={{ color: '#9fc6b2' }}>Sitzung läuft bis {new Date(lying.ends_at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr{(data?.parties.find(party => party.partyId === lying.party_id)?.names.length ?? 1) > 1 ? ' · ihr liegt gemeinsam in einer Gruppe' : ''}.</p>}
           {error && <p style={{ color: '#e0a0a0' }}>{error}</p>}

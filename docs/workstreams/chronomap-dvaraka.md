@@ -227,3 +227,12 @@ Offen: Startpunkt der Konstantinopel-Chronomap (Hagia Sophia, Hippodrom, Hafen?)
 - **Bewusst gesperrt:** Gebucht werden kann nur, was `playable` ist; bis dahin gibt es kostenlos nur „Pod ansehen". Damit wird nichts verkauft, was es noch nicht gibt.
 - Nicht geprüft: die Buchung im echten Spiel (kein spielbares Erlebnis, daher keine Livebuchung); getestet sind Preislogik (Vitest), Typen und das SQL im Trockenlauf.
 - Noch offen: Begleiter-NPCs im Pod, Treffpunkt im Erlebnis selbst (gemeinsame Anwesenheit in der Welt), Weitergabe des Erlöses.
+
+## Erste spielbare Welt: Grabung Dvārakā (06.11.2026)
+
+- **Erlebnis `dvaraka-grabung`** (neue Kategorie `site`, „Begehbarer Ort", 45 Cr / 20 Min, Status `playable`). Im Dvārakā-Studio buchbar; liegt man im Pod, startet die Szene `app/earth/DvarakaGrabungScene.tsx`.
+- **Inhalt:** Lageplan aus Kap. 3 (Ursprung Mitte des inneren Hafenbeckens, Meer im Westen): äußeres und inneres Becken (tief, gesperrt), Molen (begehbar), Flachwasser (watend, halbe Geschwindigkeit), Land. Camp und Labor am Start. Die Fundpunkte **G1–G14** mit Fundzetteln (Etikett R belegt / S erschlossen, Buchstelle als Verweis). Daten und Regeln in `lib/worldlab/dvarakaGrabung.ts` (5 Tests).
+- **Steuerung:** Pfeiltasten/WASD oder Klick; in der Nähe eines Fundes (14 m) erscheint „Fundzettel lesen"; Zähler „gefundene Stellen x von 14".
+- **Geprüft:** Szene in einem Headless-Browser: zeichnet, Laufen per Taste und Klick, Wasser sperrt/bremst, Fundzettel öffnet. Nicht geprüft: Buchung und Pod im echten Spiel.
+- **Datenbank:** Migration `20261106120000_immersion_category_site.sql` (Constraint um `site` erweitert, Trockenlauf ok, live).
+- **Noch nicht:** Gemeinsame Anwesenheit mehrerer Spieler in der Szene (Gruppen buchen schon zusammen, sehen sich aber noch nicht), Begleiter-NPCs, Grabungsbuch, Labor als eigener Raum, Gebäude/Gelände jenseits des Rasters (Himmel/Boote), Etikett F erst in der Chronomap.

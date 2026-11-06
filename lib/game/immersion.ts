@@ -2,13 +2,13 @@
  * Erlebnis-Studio (immersion_studio): Preise, Dauer, Gruppenrabatt und Empfangstexte.
  * Der Server rechnet (app/api/game/immersion); der Client zeigt nur an.
  */
-export type ImmersionCategory = 'chronotrip' | 'game' | 'abstract'
+export type ImmersionCategory = 'chronotrip' | 'site' | 'game' | 'abstract'
 
 /** Grundpreis je Person in Credits (Vergleich: Bahnreise 8 Cr + 0,15 Cr/km, Flug ab 60 Cr). */
-export const IMMERSION_BASE_PRICE: Record<ImmersionCategory, number> = { chronotrip: 90, game: 60, abstract: 30 }
+export const IMMERSION_BASE_PRICE: Record<ImmersionCategory, number> = { chronotrip: 90, site: 45, game: 60, abstract: 30 }
 
 /** Sitzungsdauer in echten Minuten. */
-export const IMMERSION_MINUTES: Record<ImmersionCategory, number> = { chronotrip: 30, game: 45, abstract: 15 }
+export const IMMERSION_MINUTES: Record<ImmersionCategory, number> = { chronotrip: 30, site: 20, game: 45, abstract: 15 }
 
 /** Höchstzahl Pods in einer gemeinsamen Sitzung. */
 export const IMMERSION_PARTY_MAX = 6
