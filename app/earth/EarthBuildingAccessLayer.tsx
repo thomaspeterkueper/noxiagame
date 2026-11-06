@@ -105,6 +105,28 @@ const actionButton: React.CSSProperties = {
   cursor: 'pointer',
 }
 
+// Ortsdaten für Gebäude (06.11.2026, Thomas: „können wir das Laden von Gebäuden noch beschleunigen?“):
+// einmal holen und 90 s behalten statt bei jedem Betreten neu – gleichzeitige Anfragen teilen sich eine.
+const ACCESS_TTL_MS = 90_000
+let accessCache: { at: number; data: AccessData } | null = null
+let accessPending: Promise<AccessData> | null = null
+function loadAccess(): Promise<AccessData> {
+  if (accessCache && Date.now() - accessCache.at < ACCESS_TTL_MS) return Promise.resolve(accessCache.data)
+  if (accessPending) return accessPending
+  accessPending = (async () => {
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Nicht angemeldet')
+      const response = await fetch('/api/game/building-access?location=earth', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+      const json = await response.json() as AccessData
+      if (!response.ok) throw new Error(json.error ?? 'Gebäudedaten konnten nicht geladen werden')
+      accessCache = { at: Date.now(), data: json }
+      return json
+    } finally { accessPending = null }
+  })()
+  return accessPending
+}
+
 export default function EarthBuildingAccessLayer({
   request,
   onClose,
@@ -136,6 +158,9 @@ export default function EarthBuildingAccessLayer({
   // Von der Agentur direkt in ein Lokal vermittelt (referral.ts): dorthin weiter.
   const [handoff, setHandoff] = useState<BuildingEntryRequest | null>(null)
 
+  // Vorladen: Die Ortsdaten liegen meist schon bereit, wenn man das erste Gebäude anklickt.
+  useEffect(() => { void loadAccess().catch(() => {}) }, [])
+
   useEffect(() => {
     if (!request) return
     setSpaceportMode('hub')
@@ -146,17 +171,12 @@ export default function EarthBuildingAccessLayer({
     setMessage(null)
     setHandoff(null)
     let cancelled = false
+    const fresh = accessCache && Date.now() - accessCache.at < ACCESS_TTL_MS ? accessCache.data : null
+    if (fresh) { setData(fresh); setLoading(false); return }
     setLoading(true)
     ;(async () => {
       try {
-        const token = await getToken()
-        if (!token) throw new Error('Nicht angemeldet')
-        const response = await fetch('/api/game/building-access?location=earth', {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: 'no-store',
-        })
-        const json = await response.json() as AccessData
-        if (!response.ok) throw new Error(json.error ?? 'Gebäudedaten konnten nicht geladen werden')
+        const json = await loadAccess()
         if (!cancelled) setData(json)
       } catch (error) {
         if (!cancelled) setData({ error: error instanceof Error ? error.message : String(error) })
@@ -169,7 +189,9 @@ export default function EarthBuildingAccessLayer({
 
   if (!request) return null
 
-  if (loading && !data) {
+  // Begehbare Räume öffnen sofort; die Ortsdaten (Markt, Navigation, Schalter) kommen im Hintergrund.
+  const walkableFirst = Boolean(handoff) || (['job_agency', 'administration', 'academy', 'warehouse', 'hospitality'].includes(request.kind) && !deskOpen && !schoolOpen) || (request.kind === 'bank' && !deskOpen) || (request.kind === 'spaceport' && spaceportMode === 'hub' && !hubOpen)
+  if (loading && !data && !walkableFirst) {
     return <div style={{ position: 'fixed', inset: 0, zIndex: 2300, background: 'rgba(2,7,12,.82)', display: 'grid', placeItems: 'center', color: '#eef4f1', font: '700 13px system-ui' }}>Gebäude wird betreten …</div>
   }
 

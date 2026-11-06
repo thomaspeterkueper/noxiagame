@@ -309,6 +309,15 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
   - **Pfeiltasten** gehen in Gebäuden wie WASD; die Tasten werden abgefangen, damit die Figur draußen auf der Karte nicht mitläuft.
   - **Gesten auf Tasten 1–6:** Winken, Jubeln, Klatschen, Verbeugen, Prost, Tanzen; die Ziffer steht auf dem Knopf.
   - **Testbetrieb:** Statt dauerhaft unten rechts erscheint der Hinweis einmal je Anmeldung (Browsersitzung) mit „Verstanden“ und „Mehr dazu“; er verschwindet nach 20 s von selbst. Der Hinweis im Gespräch („Automatisch ausgewertet · Mehr dazu“) bleibt.
+- **06.11.2026 – Gebäude öffnen schneller** (Thomas: „können wir das Laden von Gebäuden noch beschleunigen?“):
+  - Bisher wartete jedes Betreten auf `/api/game/building-access` (Ortsdaten: Markt, Aufträge, Orte, Tick) und zeigte so lange „Gebäude wird betreten …“.
+  - **Jetzt:**
+    - Café, Agentur, Rathaus, Bank, Akademie, Warenhaus und Raumhafen-Halle öffnen sofort; die Ortsdaten kommen im Hintergrund.
+    - Gewartet wird nur noch, wo sie gebraucht werden (Schalter, Markt, Navigation).
+    - Die Ortsdaten werden beim Start vorgeladen und 90 s behalten; gleichzeitige Anfragen teilen sich eine.
+    - Im Test steht der Raum nach 0,2 s, auch wenn die Ortsdaten 4 s brauchen.
+  - Räume ohne Gebäudekennung (Wache, Bibliothek, Kirche …) fragen keine eingetragenen Bewohner mehr ab.
+  - Anfrage R-36 an Bevölkerung: `/api/game/population` arbeitet drei Stufen nacheinander ab, zwei davon könnten parallel laufen.
   - Gilt für alle Räume des Motors: Lokale, Bank, Agentur, Reisebüro, Wache, Feuerwache, Praxis, Krankenhaus.
   - Im Browser geprüft (Metropol, Café, Wache; Laufen per Klick, Tasten, Einrichten).
   - **Später** (Thomas): eine 80er-/90er-Fassung für die Zeitreise in VR.

@@ -405,6 +405,8 @@ export default function WalkableInterior({entityId,buildingName,companion=null,o
     let live=true
     ;(async()=>{
       try{
+        // Räume ohne Gebäudekennung (Wache, Bibliothek, Kirche …) haben keine eingetragenen Bewohner.
+        if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entityId)){if(live){setResidents(companion?[companion]:[]);setLoaded(true)}return}
         const{token}=await getSessionInfo()
         const response=await fetch('/api/game/population?includeDepth=1&tileEntityId='+encodeURIComponent(entityId),{headers:{Authorization:'Bearer '+token},cache:'no-store'})
         const data=await response.json()

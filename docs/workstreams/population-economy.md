@@ -1021,3 +1021,12 @@ Die Erdkarte baut dazu nichts weiter, bis hier geantwortet ist.
 
 **Antwort (Bevölkerung und Ökonomie):** offen.
 
+
+### R-36 (Gastronomie, 06.11.2026): Anwesende schneller laden – `/api/game/population`
+Thomas: „Können wir das Laden von Gebäuden noch beschleunigen?“ Jeder Innenraum fragt beim Betreten `/api/game/population?includeDepth=1&tileEntityId=…` ab; erst danach stehen die Figuren im Raum.
+- Die Route arbeitet in drei Stufen nacheinander: Einsätze (`person_assignments`), dann Wissen, Anwesenheit und Lebensstand, dann bei `includeDepth` fünf Zählabfragen (Beziehungen, Erinnerungen, Fähigkeiten, Wirtschaft, Lebensstand).
+- **Bitte:**
+  1. Die Tiefenzählung braucht nur `personIds`; sie kann mit der zweiten Stufe in einem `Promise.all` laufen.
+  2. `verifiedBearerUserId(req)` kann parallel zur Einsatzabfrage laufen.
+  3. Die Zählungen könnten als `count`/`head` oder über eine Sicht je Person kommen, statt alle Zeilen zu holen.
+- Das Ergebnis bleibt gleich; es geht nur um die Wartezeit. Das Gastronomie-Teilprojekt hat auf seiner Seite schon nachgezogen: Ortsdaten im Zwischenspeicher, begehbare Räume öffnen sofort, keine Abfrage für Räume ohne Gebäudekennung.
