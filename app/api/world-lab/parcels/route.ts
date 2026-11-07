@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
         const response = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { Accept: 'application/gml+xml, application/xml, text/xml' } })
         const text = await response.text()
         out.push({ service: service.key, status: response.status, exception: text.match(/<(?:\w+:)?ExceptionText>([^<]{0,300})/)?.[1] ?? null, returned: text.match(/numberReturned="(\d+)"/)?.[1] ?? null, pieces: parseUsePieces(text).slice(0, 3), parcels: parseParcels(await (await fetch(parcelRequestUrl(cell, 0, 3, service), { signal: AbortSignal.timeout(TIMEOUT_MS) })).text(), service.zone).map(parcel => parcel.props.flstkennz ?? parcel.id) })
-      } catch (error) { out.push({ service: service.key, error: error instanceof Error ? error.message : String(error) }) }
+      } catch (error) { out.push({ service: service.key, error: 'Katasterabfrage fehlgeschlagen.' }) }
     }
     return NextResponse.json({ cell, usage: out })
   }
