@@ -48,3 +48,21 @@ test('refund snapshot constraint is guarded for repeatable draft migrations', ()
   assert.match(migration, /conrelid\s*=\s*'public\.player_builds'::regclass/i)
   assert.match(migration, /conname\s*=\s*'player_builds_refund_snapshot_nonnegative'/i)
 })
+
+
+test('build start snapshots the agreed half-cost refund in its atomic insert', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/20261107001000_atomic_build_cancel.sql', import.meta.url), 'utf8')
+  const start = migration.split('create or replace function public.noxia_start_build(')[1]
+    ?.split('create or replace function public.noxia_cancel_build(')[0]
+  assert.ok(start, 'start RPC must be replaced in the same draft migration')
+  assert.match(start, /if p_cost_credits is null or p_cost_credits < 0 then/i)
+  assert.match(start, /insert into public\.player_builds\s*\([\s\S]*?refund_credits_snapshot[\s\S]*?\) values\s*\([\s\S]*?p_cost_credits\s*\/\s*2\s*,/i)
+  assert.match(start, /update public\.profiles\s+set credits = credits - p_cost_credits/i)
+  assert.doesNotMatch(start, /from public\.building_definitions/i)
+})
+
+test('refund constraint uses valid PostgreSQL DO dollar quoting', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/20261107001000_atomic_build_cancel.sql', import.meta.url), 'utf8')
+  assert.match(migration, /do\s+\$\$\s+begin[\s\S]*?end\s+\$\$;/i)
+  assert.doesNotMatch(migration, /do\s+\$\s+begin/i)
+})
