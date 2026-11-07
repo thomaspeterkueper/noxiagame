@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {intersectsViewport,selectEarthBuildings} from './building-viewport.mjs';
+const f=(id,coords)=>({type:'Feature',id,properties:{tags:{building:'yes'}},geometry:{type:'Polygon',coordinates:[coords]}});
+const square=(x,y,r=.1)=>[[x-r,y-r],[x+r,y-r],[x+r,y+r],[x-r,y+r],[x-r,y-r]];
+const viewport=[0,0,1,1];
+test('footprint surrounding entire viewport remains visible',()=>assert.equal(intersectsViewport(f('large',square(.5,.5,2)),viewport),true));
+test('building crossing edge with no vertex inside is visible',()=>assert.equal(intersectsViewport(f('cross',[[-1,.4],[2,.4],[2,.6],[-1,.6],[-1,.4]]),viewport),true));
+test('outside footprint and malformed polygons are rejected',()=>{assert.equal(intersectsViewport(f('far',square(8,8)),viewport),false);assert.equal(intersectsViewport(f('bad',[[NaN,0]]),viewport),false);});
+test('selected objects remain ahead of others when budget is small',()=>{const features=[f('near',square(.5,.5)),f('selected',square(.9,.9))];const result=selectEarthBuildings(features,viewport,{limit:1,selectedIds:['selected']});assert.deepEqual(result.features.map(x=>x.id),['selected']);assert.equal(result.culledByBudget,1);});
+test('simulated objects rank above neutral footprints',()=>{const a=f('neutral',square(.5,.5)),b=f('simulated',square(.8,.8));assert.equal(selectEarthBuildings([a,b],viewport,{limit:1,simulatedBuildings:{simulated:{buildingId:'cafe'}}}).features[0].id,'simulated');});
+test('selection is independent of ingestion order',()=>{const a=f('a',square(.2,.2)),b=f('b',square(.8,.8)),c=f('c',square(.5,.5));const x=[a,b,c];assert.deepEqual(selectEarthBuildings(x,viewport,{limit:2}).features.map(v=>v.id),selectEarthBuildings([...x].reverse(),viewport,{limit:2}).features.map(v=>v.id));});
