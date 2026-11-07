@@ -1,11 +1,44 @@
 import { describe, expect, it } from 'vitest'
-import { buildChronicle, buildingStateAt, type ChronicleEventRow } from './buildingChronicle'
+import { buildChronicle, buildingStateAt, verifiedBuildingStateAt, type ChronicleEventRow } from './buildingChronicle'
 
 const ev = (id: string, type: string, subject: string, at: string, extra: Partial<ChronicleEventRow> = {}): ChronicleEventRow => ({
   id, event_type: type, subject_id: subject, actor_id: null, occurred_at: at, effects: [], metadata: {}, ...extra,
 })
 
 describe('Gebäudechronik (Eventstore-Reader)', () => {
+
+  it('verwendet für Karten-Overlays ausschließlich Core-verifizierte Belege', () => {
+    const base = {
+      events: [
+        ev('build', 'entity.created', 'b1', '2026-10-01T10:00:00Z'),
+        ev('remodel', 'entity.updated', 'b1', '2026-10-02T10:00:00Z', {
+          effects: [{ from: { building_levels: 1 }, to: { building_levels: 2 } }],
+        }),
+        ev('remove', 'entity.deleted', 'b1', '2026-10-03T10:00:00Z', {
+          actor_id: 'p1', metadata: { deletion_kind: 'demolition' },
+        }),
+      ],
+      tombstones: [], existingEntityIds: new Set<string>(), viewerProfileId: 'p1',
+    }
+    const unverified = buildChronicle(base)
+    expect(buildingStateAt(unverified, { subjectId: 'b1' }, '2026-10-04T00:00:00Z')).toBe('demolished')
+    expect(verifiedBuildingStateAt(unverified, { subjectId: 'b1' }, '2026-10-04T00:00:00Z')).toBe('unknown')
+    const partial = buildChronicle({ ...base, verifiedReceiptIds: new Set(['build', 'remodel']) })
+    expect(verifiedBuildingStateAt(partial, { subjectId: 'b1' }, '2026-10-01T11:00:00Z')).toBe('standing')
+    expect(verifiedBuildingStateAt(partial, { subjectId: 'b1' }, '2026-10-02T11:00:00Z')).toBe('standing')
+    expect(verifiedBuildingStateAt(partial, { subjectId: 'b1' }, '2026-10-04T00:00:00Z')).toBe('unknown')
+    const verified = buildChronicle({ ...base, verifiedReceiptIds: new Set(['build', 'remodel', 'remove']) })
+    expect(verifiedBuildingStateAt(verified, { subjectId: 'b1' }, '2026-10-04T00:00:00Z')).toBe('demolished')
+  })
+
+  it('unverifizierte Grabsteine dürfen den Kartenstatus nicht festlegen', () => {
+    const base = { events: [], existingEntityIds: new Set<string>(), viewerProfileId: null,
+      tombstones: [{ source_ref: 'osm:way/2', profile_id: null, cleared_at: '2026-10-05T08:00:00Z' }] }
+    expect(verifiedBuildingStateAt(buildChronicle(base), { sourceRef: 'osm:way/2' }, '2026-10-06T00:00:00Z')).toBe('unknown')
+    expect(verifiedBuildingStateAt(buildChronicle({ ...base, verifiedTombstoneRefs: new Set(['osm:way/2']) }),
+      { sourceRef: 'osm:way/2' }, '2026-10-06T00:00:00Z')).toBe('demolished')
+  })
+
   it('ordnet Bau, Änderung, Eigentümerwechsel und Abriss nach Zeit', () => {
     const chronicle = buildChronicle({
       events: [
@@ -14,11 +47,22 @@ describe('Gebäudechronik (Eventstore-Reader)', () => {
         ev('e2', 'entity.updated', 'b1', '2026-10-02T10:00:00Z', { effects: [{ from: { profile_id: 'p0' }, to: { profile_id: 'p1' } }] }),
       ],
       tombstones: [], existingEntityIds: new Set(), viewerProfileId: 'p1',
+      verifiedReceiptIds: new Set(['e3']),
     })
     expect(chronicle.entries.map(e => e.kind)).toEqual(['built', 'owner_changed', 'demolished'])
     expect(chronicle.entries[2].authorized).toBe(true)
     expect(chronicle.entries[2].own).toBe(true)
     expect(chronicle.gaps).toEqual([])
+  })
+
+  it('Akteur und metadata allein belegen keine Core-Autorisierung', () => {
+    const event = ev('e1', 'entity.updated', 'b1', '2026-10-02T10:00:00Z', {
+      actor_id: 'p1', metadata: { committed: true, authorized: true },
+    })
+    const unverified = buildChronicle({ events: [event], tombstones: [], existingEntityIds: new Set(['b1']), viewerProfileId: 'p1' })
+    expect(unverified.entries[0].authorized).toBe(false)
+    const verified = buildChronicle({ events: [event], tombstones: [], existingEntityIds: new Set(['b1']), viewerProfileId: 'p1', verifiedReceiptIds: new Set(['e1']) })
+    expect(verified.entries[0].authorized).toBe(true)
   })
 
   it('allgemeine Löschung ist kein autorisierter Abriss', () => {
@@ -42,13 +86,24 @@ describe('Gebäudechronik (Eventstore-Reader)', () => {
     expect(chronicle.gaps).toEqual([])
   })
 
-  it('Grabstein zählt als autorisierter Abriss, bleibt aber ohne Gebäude-ID als „nicht zugeordnet“ markiert', () => {
+  it('Grabstein bleibt ohne Core-Nachweis unautorisiert und ohne Gebäude-ID nicht zugeordnet', () => {
     const chronicle = buildChronicle({
       events: [], existingEntityIds: new Set(), viewerProfileId: 'p2',
       tombstones: [{ source_ref: 'osm:way/1', profile_id: 'p2', display_name: 'Altes Haus', cleared_at: '2026-10-05T08:00:00Z' }],
     })
-    expect(chronicle.entries[0]).toMatchObject({ kind: 'demolished', authority: 'tombstone', authorized: true, own: true, sourceRef: 'osm:way/1' })
+    expect(chronicle.entries[0]).toMatchObject({ kind: 'demolished', authority: 'tombstone', authorized: false, own: true, sourceRef: 'osm:way/1' })
     expect(chronicle.gaps[0].code).toBe('tombstone_unlinked')
+    const verified = buildChronicle({
+      events: [], existingEntityIds: new Set(), viewerProfileId: 'p2',
+      tombstones: [{ source_ref: 'osm:way/1', profile_id: 'p2', cleared_at: '2026-10-05T08:00:00Z' }],
+      verifiedTombstoneRefs: new Set(['osm:way/1']),
+    })
+    expect(verified.entries[0].authorized).toBe(true)
+    expect(buildChronicle({
+      events: [], existingEntityIds: new Set(), viewerProfileId: 'p2',
+      tombstones: [{ source_ref: 'osm:way/1', profile_id: 'p2', cleared_at: '2026-10-05T08:00:00Z' }],
+      verifiedReceiptIds: new Set(['osm:way/1']),
+    }).entries[0].authorized).toBe(false)
   })
 
   it('Wiedergabe: vor dem Abriss steht das Haus, danach nicht (Schlüssel source_ref)', () => {
@@ -75,4 +130,177 @@ describe('Gebäudechronik (Eventstore-Reader)', () => {
     })
     expect(chronicle.entries[0].authorized).toBe(false)
   })
+
+  it('sortiert Ereignisse nach absoluten Zeitpunkten statt Zeitzonen-Text', () => {
+    const chronicle = buildChronicle({
+      events: [
+        ev('created', 'entity.created', 'b1', '2026-11-03T01:00:00+02:00'),
+        ev('removed', 'entity.deleted', 'b1', '2026-11-03T00:00:00Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+      ],
+      tombstones: [], existingEntityIds: new Set(), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['created', 'removed']),
+    })
+    expect(chronicle.entries.map(entry => entry.sourceId)).toEqual(['created', 'removed'])
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-03T01:30:00+02:00')).toBe('standing')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-03T00:30:00Z')).toBe('demolished')
+  })
+
+  it('bewahrt Mikrosekunden-Reihenfolge beim Umbau vor Abriss', () => {
+    const chronicle = buildChronicle({
+      events: [
+        ev('removed', 'entity.deleted', 'b1', '2026-11-03T00:00:00.123456Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+        ev('created', 'entity.created', 'b1', '2026-11-03T00:00:00.123455Z'),
+      ],
+      tombstones: [], existingEntityIds: new Set(), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['created', 'removed']),
+    })
+    expect(chronicle.entries.map(entry => entry.sourceId)).toEqual(['created', 'removed'])
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-03T00:00:00.123455Z')).toBe('standing')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-03T00:00:00.123456Z')).toBe('demolished')
+  })
+
+  it('ein verifizierter Umbau belebt ein abgerissenes Haus nicht wieder', () => {
+    const events = [
+      ev('build', 'entity.created', 'b1', '2026-10-01T10:00:00Z'),
+      ev('remove', 'entity.deleted', 'b1', '2026-10-02T10:00:00Z', {
+        actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+      }),
+      ev('remodel', 'entity.updated', 'b1', '2026-10-03T10:00:00Z', {
+        effects: [{ from: { building_levels: 1 }, to: { building_levels: 2 } }],
+      }),
+    ]
+    const chronicle = buildChronicle({
+      events, tombstones: [], existingEntityIds: new Set(), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['build', 'remove', 'remodel']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-10-02T12:00:00Z')).toBe('demolished')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-10-04T00:00:00Z')).toBe('unknown')
+    const rebuilt = buildChronicle({
+      events: [...events, ev('rebuild', 'entity.created', 'b1', '2026-10-04T10:00:00Z')],
+      tombstones: [], existingEntityIds: new Set(['b1']), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['build', 'remove', 'remodel', 'rebuild']),
+    })
+    expect(verifiedBuildingStateAt(rebuilt, { subjectId: 'b1' }, '2026-10-05T00:00:00Z')).toBe('standing')
+  })
+  it('fail-closed: gleichzeitiger Neubau und Abriss haben ohne Sequenz keine eindeutige Reihenfolge', () => {
+    const events = [
+      ev('a-create', 'entity.created', 'b1', '2026-11-04T12:00:00.123456Z'),
+      ev('z-delete', 'entity.deleted', 'b1', '2026-11-04T13:00:00.123456+01:00', {
+        actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+      }),
+    ]
+    const chronicle = buildChronicle({
+      events, tombstones: [], existingEntityIds: new Set(), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['a-create', 'z-delete']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('unknown')
+  })
+
+  it('fail-closed: gleichzeitiger Neubau und Abriss bleiben trotz dazwischenliegendem Umbau widersprüchlich', () => {
+    const events = [
+      ev('a-create', 'entity.created', 'b1', '2026-11-04T12:00:00.123456Z'),
+      ev('m-remodel', 'entity.updated', 'b1', '2026-11-04T12:00:00.123456Z', {
+        effects: [{ from: { building_levels: 1 }, to: { building_levels: 2 } }],
+      }),
+      ev('z-delete', 'entity.deleted', 'b1', '2026-11-04T13:00:00.123456+01:00', {
+        actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+      }),
+    ]
+    const chronicle = buildChronicle({
+      events, tombstones: [], existingEntityIds: new Set(), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['a-create', 'm-remodel', 'z-delete']),
+    })
+    expect(chronicle.entries.map(entry => entry.sourceId)).toEqual(['a-create', 'm-remodel', 'z-delete'])
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('unknown')
+  })
+
+  it('gleichzeitiger Konflikt bleibt unbekannt, spätere verifizierte Neugründung kann ihn auflösen', () => {
+    const events = [
+      ev('create', 'entity.created', 'b1', '2026-11-04T12:00:00Z'),
+      ev('delete', 'entity.deleted', 'b1', '2026-11-04T12:00:00Z', {
+        actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+      }),
+      ev('update', 'entity.updated', 'b1', '2026-11-04T12:00:01Z'),
+      ev('rebuild', 'entity.created', 'b1', '2026-11-04T12:00:02Z'),
+    ]
+    const chronicle = buildChronicle({
+      events, tombstones: [], existingEntityIds: new Set(['b1']), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['create', 'delete', 'update', 'rebuild']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:00Z')).toBe('unknown')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('unknown')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:02Z')).toBe('standing')
+  })
+
+  it('Konflikte anderer Gebäude beeinflussen eine verifizierte Gebäudehistorie nicht', () => {
+    const chronicle = buildChronicle({
+      events: [
+        ev('a-create', 'entity.created', 'a', '2026-11-04T12:00:00Z'),
+        ev('b-create', 'entity.created', 'b', '2026-11-04T12:00:00Z'),
+        ev('b-delete', 'entity.deleted', 'b', '2026-11-04T12:00:00Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+      ],
+      tombstones: [], existingEntityIds: new Set(['a']), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['a-create', 'b-create', 'b-delete']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'a' }, '2026-11-04T12:00:01Z')).toBe('standing')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b' }, '2026-11-04T12:00:01Z')).toBe('unknown')
+  })
+
+  it('eine spätere unverifizierte Neugründung löst einen Zeitkonflikt nicht auf', () => {
+    const chronicle = buildChronicle({
+      events: [
+        ev('create', 'entity.created', 'b1', '2026-11-04T12:00:00Z'),
+        ev('delete', 'entity.deleted', 'b1', '2026-11-04T12:00:00Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+        ev('rebuild', 'entity.created', 'b1', '2026-11-04T12:00:01Z'),
+      ],
+      tombstones: [], existingEntityIds: new Set(['b1']), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['create', 'delete']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('unknown')
+  })
+
+
+  it('ein späterer verifizierter Abriss kann einen früheren Zeitkonflikt auflösen', () => {
+    const chronicle = buildChronicle({
+      events: [
+        ev('create', 'entity.created', 'b1', '2026-11-04T12:00:00Z'),
+        ev('delete', 'entity.deleted', 'b1', '2026-11-04T12:00:00Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+        ev('later-delete', 'entity.deleted', 'b1', '2026-11-04T12:00:01Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+      ],
+      tombstones: [], existingEntityIds: new Set(), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['create', 'delete', 'later-delete']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:00Z')).toBe('unknown')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('demolished')
+  })
+
+  it('unverifizierte Änderung nach späterem Neubau setzt die Kartenprojektion wieder auf unknown', () => {
+    const chronicle = buildChronicle({
+      events: [
+        ev('create', 'entity.created', 'b1', '2026-11-04T12:00:00Z'),
+        ev('delete', 'entity.deleted', 'b1', '2026-11-04T12:00:00Z', {
+          actor_id: 'owner', metadata: { deletion_kind: 'demolition' },
+        }),
+        ev('rebuild', 'entity.created', 'b1', '2026-11-04T12:00:01Z'),
+        ev('unverified-remodel', 'entity.updated', 'b1', '2026-11-04T12:00:02Z'),
+      ],
+      tombstones: [], existingEntityIds: new Set(['b1']), viewerProfileId: null,
+      verifiedReceiptIds: new Set(['create', 'delete', 'rebuild']),
+    })
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:01Z')).toBe('standing')
+    expect(verifiedBuildingStateAt(chronicle, { subjectId: 'b1' }, '2026-11-04T12:00:02Z')).toBe('unknown')
+  })
+
 })

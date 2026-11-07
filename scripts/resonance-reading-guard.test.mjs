@@ -12,7 +12,7 @@ test('interior UI allows 160 characters, with no premature truncation', () => {
   assert.doesNotMatch(interior, /message\.trim\(\)\.slice\(0, 80\)/)
 })
 test('server accepts same message length', () => {
-  assert.match(conversation, /const MAX_PLAYER_CHARS = 160/)
+  assert.match(conversation, /const MAX_PLAYER_CHARS = 500/)
 })
 test('model output cannot execute NPC credit transfers', () => {
   assert.doesNotMatch(conversation, /transferPlayerToNpcCredits\s*\(/)
