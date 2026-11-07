@@ -44,6 +44,12 @@ const malformed = [
   { ...receipts[1], eventId: 'bad-domain', domain: 'unknown' },
   { ...receipts[1], eventId: 'bad-year', worldYear: Number.NaN },
   { ...receipts[1], eventId: 'bad-sequence', sequence: 'one' },
+  { ...receipts[1], eventId: 'negative-sequence', sequence: -1 },
+  { ...receipts[1], eventId: 'fractional-sequence', sequence: 1.5 },
+  { ...receipts[1], eventId: 'fractional-year', worldYear: 2050.5 },
+  { ...receipts[1], eventId: 'numeric-string-year', worldYear: '2050' },
+  { ...receipts[1], eventId: 'unsafe-sequence', sequence: Number.MAX_SAFE_INTEGER + 1 },
+  { ...receipts[1], eventId: 'unsafe-year', worldYear: Number.MAX_SAFE_INTEGER + 1 },
   { ...receipts[1], eventId: 'bad-provenance', domainEventRef: ' ' },
   { ...receipts[1], eventId: 'bad-actor', actorRef: null },
   { ...receipts[1], eventId: 'null-change', change: null },
@@ -198,6 +204,75 @@ for (const input of [[extraFields[1], extraTwin], [extraTwin, extraFields[1]]]) 
   assert(projected.action === 'establish' &&
     Object.keys(projected.asset).sort().join(',') === 'districtId,id,introducedYear,kind,name',
     'public history shape must not depend on duplicate input order')
+}
+
+// A failed or uncommitted attempt must not reserve a domain source reference
+// or event identity and thereby veto a later genuinely committed transition.
+// Only successfully committed, valid receipts participate in ambiguity checks.
+const failedSameSource = receipt('failed-attempt', 2090, false,
+  { action: 'rename', assetId: 'hall', name: 'Nicht genehmigt' })
+const committedSameSource = {
+  ...receipt('valid-attempt', 2090, true,
+    { action: 'rename', assetId: 'hall', name: 'Genehmigt' }),
+  domainEventRef: failedSameSource.domainEventRef,
+}
+for (const input of [[failedSameSource, committedSameSource],
+  [committedSameSource, failedSameSource]]) {
+  const result = adaptCommittedWorldEvents(input)
+  assert(result.events.length === 1 && result.events[0].id === 'valid-attempt',
+    'uncommitted attempt must not poison independently committed source')
+  assert(result.rejected.length === 1 && result.rejected[0].reason === 'not_committed',
+    'uncommitted attempt remains explicitly rejected')
+}
+
+// Legacy sequence is not yet an authenticated, uniquely scoped commit order.
+// Two distinct Core events can share it; do not silently reject either while
+// the authoritative persisted ordering contract is under review.
+const sharedLegacySequence = [
+  receipt('same-seq-rename', 2090, true, { action: 'rename', assetId: 'hall', name: 'Bürgerhaus' }),
+  receipt('same-seq-retire', 2090, true, { action: 'retire', assetId: 'lab' }),
+]
+for (const input of [sharedLegacySequence, [...sharedLegacySequence].reverse()]) {
+  const result = adaptCommittedWorldEvents(input)
+  assert(result.events.length === 2 && result.rejected.length === 0,
+    'legacy sequence collision alone must not reject independent committed receipts')
+  assert(result.events.every(event => event.sequence === 1),
+    'adapter must preserve legacy sequence without inventing commit precedence')
+}
+// This adapter only sorts a display/replay projection; the server reader must
+// independently verify both receipts and their authoritative commit ordering.
+
+
+// A source reference is scoped by settlement AND owning domain. Different
+// domains may use the same external reference string without authorizing the
+// same transition twice; neither receipt may be discarded by deduplication.
+const sharedRefAcrossDomains = adaptCommittedWorldEvents([
+  { ...receipt('building-ref', 2091, true, { action: 'rename', assetId: 'hall', name: 'Haus' }),
+    domainEventRef: 'core:shared-ref' },
+  { ...receipt('service-ref', 2091, true, { action: 'establish', asset: {
+    id: 'tour-guide', kind: 'service', name: 'Stadtführung',
+    districtId: 'center', introducedYear: 2091,
+  } }), domain: 'services', domainEventRef: 'core:shared-ref' },
+])
+assert(sharedRefAcrossDomains.events.length === 2 &&
+  sharedRefAcrossDomains.rejected.length === 0,
+  'source reference identity must include owning Core domain')
+
+
+// A rejected proposal may reuse the eventual committed event ID. The rejected
+// row must not enter the signature index or suppress the authoritative result.
+const proposalReusesEventId = receipt('decision-event', 2092, false,
+  { action: 'rename', assetId: 'hall', name: 'Unapproved' })
+const approvedReusesEventId = receipt('decision-event', 2092, true,
+  { action: 'rename', assetId: 'hall', name: 'Approved' })
+for (const input of [[proposalReusesEventId, approvedReusesEventId],
+  [approvedReusesEventId, proposalReusesEventId]]) {
+  const result = adaptCommittedWorldEvents(input)
+  assert(result.events.length === 1 && result.events[0].change.action === 'rename' &&
+    result.events[0].change.name === 'Approved',
+    'uncommitted same-ID proposal must not poison committed event identity')
+  assert(result.rejected.length === 1 && result.rejected[0].reason === 'not_committed',
+    'same-ID proposal must remain explicitly rejected')
 }
 
 console.log('Committed city event adapter: tests passed')
