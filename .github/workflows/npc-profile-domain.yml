@@ -1,0 +1,30 @@
+name: NPC Profile Domain
+on:
+  pull_request:
+    paths:
+      - 'lib/game/population/npcProfile*.ts'
+      - 'lib/game/population/npcNarrativeTraits*.ts'
+      - 'lib/game/population/npcCharacterBootstrap*.ts'
+      - '.github/workflows/npc-profile-domain.yml'
+  workflow_dispatch:
+jobs:
+  profile-domain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Compile and exercise NPC profile contracts
+        run: |
+          pnpm exec tsc lib/game/population/npcProfileCoverage.test.ts lib/game/population/npcProfileProjection.test.ts lib/game/population/npcNarrativeTraits.test.ts lib/game/population/npcCharacterBootstrap.test.ts --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --rootDir lib --outDir .npc-profile-test
+          node .npc-profile-test/game/population/npcProfileCoverage.test.js
+          node .npc-profile-test/game/population/npcProfileProjection.test.js
+          node .npc-profile-test/game/population/npcNarrativeTraits.test.js
+          node .npc-profile-test/game/population/npcCharacterBootstrap.test.js
