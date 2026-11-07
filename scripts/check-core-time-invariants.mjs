@@ -196,6 +196,59 @@ if (suspiciousTimestampCommandLookup) {
   pass('timestamps are not used as retry identity');
 }
 
+// 15. A tile entity DELETE is a historical fact, not a civic demolition permit.
+// The SQL integration test must fail without a real disposable fixture, rather
+// than report a misleading green result when no temporal row was exercised.
+const deleteAudit = read('supabase/migrations/20261029133000_tile_entity_delete_audit.sql');
+const deleteAuditTest = read('supabase/tests/20261029133000_tile_entity_delete_audit.test.sql');
+const deleteFunction = functionBlock(deleteAudit, 'noxia_record_tile_entity_deletion');
+if (!deleteFunction) {
+  fail('tile entity DELETE audit remains event-linked', 'missing deletion audit function');
+} else {
+  requireTokens('tile entity DELETE audit remains event-linked', deleteFunction, [
+    "set valid_to = greatest(v_at, valid_from + interval '1 microsecond')",
+    'subject_id = old.id',
+    'and valid_to is null',
+    'insert into public.simulation_events',
+    "'entity.deleted', 'tile_entity', old.id, null, old.location_id",
+    "'type', 'entity_state', 'from', v_previous, 'to', null",
+    "'deletion_kind', 'unspecified'",
+  ]);
+}
+requireTokens('tile entity DELETE trigger is server-only', deleteAudit, [
+  'after delete on public.tile_entities',
+  'for each row execute function public.noxia_record_tile_entity_deletion()',
+  'revoke all on function public.noxia_record_tile_entity_deletion() from public, anon, authenticated',
+]);
+requireTokens('tile entity DELETE regression cannot silently skip', deleteAuditTest, [
+  'NOXIA_TEST_FIXTURE_MISSING',
+  "v_closed_at is distinct from v_event.occurred_at",
+  "v_event.effects->0->'to' is distinct from 'null'::jsonb",
+  'rollback;',
+]);
+
+// Reject malformed SQL test bodies even when their required tokens are present.
+// In particular, a duplicate tail after ROLLBACK or an unterminated OSM
+// source_ref regex must not be mistaken for an executable regression.
+const deleteSqlBody = deleteAuditTest.replace(/--[^\n]*/g, '');
+const sqlCount = (pattern) => [...deleteSqlBody.matchAll(pattern)].length;
+if (
+  sqlCount(/\bbegin\s*;/gi) === 1 &&
+  sqlCount(/\bdo\s+\$test\$/gi) === 1 &&
+  sqlCount(/\$test\$\s*;/gi) === 1 &&
+  sqlCount(/\brollback\s*;/gi) === 1 &&
+  deleteSqlBody.trim().endsWith('rollback;') &&
+  deleteSqlBody.includes("where te.source_ref ~ '^osm:(way|relation):[0-9]+$'") &&
+  deleteSqlBody.includes("and te.entity_id = 'acquired_building'") &&
+  deleteSqlBody.includes('and not exists (') &&
+  deleteSqlBody.includes('for update of te;')
+) {
+  pass('DELETE SQL regression is a single complete transaction with Earth fixture predicate');
+} else {
+  fail('DELETE SQL regression is a single complete transaction with Earth fixture predicate',
+    'malformed or duplicated SQL test, or missing purchased-Earth-building fixture gate');
+}
+
 if (failures.length > 0) {
   console.error('NOXIA Core time/tick/event/replay invariant check failed:');
   for (const failure of failures) console.error(`- ${failure}`);
