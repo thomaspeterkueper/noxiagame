@@ -21,3 +21,16 @@ test('cancellation never calculates refunds from mutable client-side prices', ()
   assert.ok(cancel)
   assert.doesNotMatch(cancel, /defForCancel|localBuildingDef|Math\.floor/)
 })
+
+// Guard against introducing a cancellation RPC that silently trusts mutable
+// building definitions or permits repeated payouts. This test remains RED until
+// the migration is committed and verified against a disposable database.
+test('cancellation SQL locks the build and fails closed without a refund snapshot', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/20261107001000_atomic_build_cancel.sql', import.meta.url), 'utf8')
+  assert.match(migration, /create or replace function public\.noxia_cancel_build\s*\(/i)
+  assert.match(migration, /for update/i)
+  assert.match(migration, /profile_id\s+is\s+distinct\s+from\s+p_profile_id/i)
+  assert.match(migration, /refund_credits_snapshot\s+is\s+null/i)
+  assert.match(migration, /status\s*=\s*'cancelled'/i)
+  assert.match(migration, /grant execute on function public\.noxia_cancel_build\(uuid,uuid\) to service_role/i)
+})
