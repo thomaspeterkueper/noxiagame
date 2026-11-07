@@ -1,0 +1,32 @@
+# Draft-only, dependency-free SQL source contract checks for #615 / PR #627.
+# Does not connect to Supabase or mutate world state.
+name: Build cancellation draft contracts
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/20261107002000_atomic_build_cancel.sql'
+      - 'supabase/migrations/20260910081500_atomic_game_commands.sql'
+      - 'scripts/buildCancelLegacyAudit*'
+      - 'scripts/buildCancelDatabasePreflight*'
+      - 'scripts/buildCancelStartParity.test.mjs'
+      - '.github/workflows/build-cancel-draft-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  draft-source-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run focused read-only source contracts (no database)
+        run: >-
+          node --test
+          scripts/buildCancelLegacyAudit.test.mjs
+          scripts/buildCancelDatabasePreflight.test.mjs
+          scripts/buildCancelStartParity.test.mjs
