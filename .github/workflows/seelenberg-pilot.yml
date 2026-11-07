@@ -1,0 +1,25 @@
+name: Seelenberg pilot checks
+on:
+  pull_request:
+    paths:
+      - 'experiments/seelenberg/**'
+      - '.github/workflows/seelenberg-pilot.yml'
+  push:
+    branches:
+      - 'feat/seelenberg-living-systems-pilot'
+    paths:
+      - 'experiments/seelenberg/**'
+      - '.github/workflows/seelenberg-pilot.yml'
+  workflow_dispatch:
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Offline tests (no network data, no DB)
+        run: node --test experiments/seelenberg/*.test.mjs
