@@ -8,6 +8,8 @@ export function chronicleLine(entry: ChronicleEntry): string {
     case 'built': return 'Gebaut' + mine
     case 'owner_changed': return 'Eigentümer gewechselt' + mine
     case 'changed': return 'Verändert' + mine
+    case 'remodeled': return 'Umgebaut' + mine
+    case 'repurposed': return 'Nutzung geändert' + mine
     case 'demolished':
       return (entry.authorized ? 'Abgerissen' : 'Entfernt, ohne Abrissbeleg') + mine
   }
