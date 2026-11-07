@@ -1,0 +1,31 @@
+name: NOXIA parcel replay robustness
+
+on:
+  pull_request:
+    paths:
+      - 'lib/game/evolution/parcelLifecycle.ts'
+      - 'lib/game/evolution/parcelLifecycle.test.ts'
+      - 'lib/game/evolution/parcelLifecycle.robustness.test.mjs'
+      - '.github/workflows/noxia-parcel-replay.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'lib/game/evolution/parcelLifecycle.ts'
+      - 'lib/game/evolution/parcelLifecycle.test.ts'
+      - 'lib/game/evolution/parcelLifecycle.robustness.test.mjs'
+      - '.github/workflows/noxia-parcel-replay.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  read-only-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      # Node 24 strips the erasable TypeScript types; no install or DB needed.
+      - run: node --test lib/game/evolution/parcelLifecycle.robustness.test.mjs
