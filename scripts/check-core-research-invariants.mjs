@@ -23,6 +23,7 @@ const knowledgeRoute = read('app/api/game/knowledge/route.ts');
 const buildRoute = read('app/api/game/build/route.ts');
 const unlocks = read('lib/knowledge/unlocks.ts');
 const researchCapability = read('lib/knowledge/researchCapability.ts');
+const catalog = read('lib/knowledge/learningCatalog.ts');
 const finance = read('supabase/migrations/20260910090000_atomic_finance_asset_commands.sql');
 
 check(
@@ -138,6 +139,29 @@ check(
   'knowledge points remain separate from player unlock persistence',
   knowledgeRoute.includes(".select('knowledge_points')") && knowledgeRoute.includes(".from('player_unlocks')") && knowledgeRoute.includes("award_knowledge"),
   'knowledge points and unlock persistence are no longer represented separately',
+);
+
+check(
+  'new physics permissions remain scoped to experimental research',
+  hasAll(registry, [
+    "'UNL:NOX:research:gold-transmutation-design'",
+    "'ACT:NOX:RESEARCH:GOLD-TRANSMUTATION-DESIGN'",
+    "'UNL:NOX:research:optomechanics-experiment-design'",
+    "'ACT:NOX:RESEARCH:OPTOMECHANICS-EXPERIMENT-DESIGN'",
+  ]),
+  'physics learning must not directly grant production buildings or commercialized technologies',
+);
+
+check(
+  'physics SSF exams map to NOXIA permission candidates without auto grants',
+  hasAll(catalog, [
+    "'PHY-L1-000031'",
+    "'SSF-PHY-LEVITATION-2026'",
+    "'UNL:NOX:research:gold-transmutation-design'",
+    "'UNL:NOX:research:optomechanics-experiment-design'",
+  ]) &&
+  hasAll(knowledgeRoute, ['parseExamAnswers', 'scoreExam', 'if (!exam.passed)', 'unlocksForModule(moduleId)', 'resolveGrantableUnlocks([...candidateIds], existingIds)']),
+  'physics unlocks must follow authenticated academy exam and prerequisite resolution',
 );
 
 if (failures.length) {
