@@ -34,3 +34,10 @@ test('cancellation SQL locks the build and fails closed without a refund snapsho
   assert.match(migration, /status\s*=\s*'cancelled'/i)
   assert.match(migration, /grant execute on function public\.noxia_cancel_build\(uuid,uuid\) to service_role/i)
 })
+
+
+test('cancellation rejects non-building targets and negative refund snapshots', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/20261107001000_atomic_build_cancel.sql', import.meta.url), 'utf8')
+  assert.match(migration, /target_type\s+is\s+distinct\s+from\s+'building'/i)
+  assert.match(migration, /check\s*\(refund_credits_snapshot\s+is\s+null\s+or\s+refund_credits_snapshot\s*>=\s*0\)/i)
+})
