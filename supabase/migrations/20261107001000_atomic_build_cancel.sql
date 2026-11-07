@@ -5,9 +5,19 @@ alter table public.player_builds
 
 -- A snapshot is optional for legacy rows, but must never be negative.
 -- A missing snapshot prevents cancellation rather than guessing a refund.
-alter table public.player_builds
-  add constraint player_builds_refund_snapshot_nonnegative
-  check (refund_credits_snapshot is null or refund_credits_snapshot >= 0);
+-- PostgreSQL does not support ADD CONSTRAINT IF NOT EXISTS. Avoid a duplicate
+-- constraint failure when the draft is re-applied in a disposable test DB.
+do $ begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.player_builds'::regclass
+      and conname = 'player_builds_refund_snapshot_nonnegative'
+  ) then
+    alter table public.player_builds
+      add constraint player_builds_refund_snapshot_nonnegative
+      check (refund_credits_snapshot is null or refund_credits_snapshot >= 0);
+  end if;
+end $;
 
 create or replace function public.noxia_cancel_build(p_profile_id uuid, p_build_id uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
