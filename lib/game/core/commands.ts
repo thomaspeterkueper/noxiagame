@@ -181,6 +181,22 @@ export async function startBuildCommand(input: StartBuildCommand): Promise<Atomi
   return data as AtomicBuildResult
 }
 
+/** Cancellation must be committed by the database in one transaction.
+ * The RPC is not deployed yet: this wrapper is deliberately not wired to HTTP.
+ * The database function must verify ownership, lock the build and credit rows,
+ * use a persisted refund basis, and make retries idempotent.
+ */
+export async function cancelBuildCommand(profileId: string, buildId: string): Promise<AtomicBuildResult> {
+  const supabase = createServiceClient()
+  const { data, error } = await supabase.rpc('noxia_cancel_build', {
+    p_profile_id: profileId,
+    p_build_id: buildId,
+  })
+
+  if (error) throw commandError('noxia_cancel_build', error)
+  return data as AtomicBuildResult
+}
+
 export async function completeBuildCommand(buildId: string, createEntity = true): Promise<AtomicBuildResult> {
   const supabase = createServiceClient()
   const { data, error } = await supabase.rpc('noxia_complete_build', {
