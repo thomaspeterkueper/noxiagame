@@ -6,7 +6,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 
 const baseline = readFileSync(new URL('../supabase/migrations/20260910081500_atomic_game_commands.sql', import.meta.url), 'utf8')
-const draft = readFileSync(new URL('../supabase/migrations/20261107001000_atomic_build_cancel.sql', import.meta.url), 'utf8')
+const draft = readFileSync(new URL('../supabase/migrations/20261107002000_atomic_build_cancel.sql', import.meta.url), 'utf8')
 
 function startBuildDefinition(sql) {
   const match = sql.match(/create or replace function public\.noxia_start_build\([\s\S]*?\n\$\$;/i)
