@@ -1,4 +1,5 @@
 import EarthRegionPreview from './EarthRegionPreview'
+import PlayerCivicSignalsPanel from './PlayerCivicSignalsPanel'
 import EarthInfrastructurePlanner from './EarthInfrastructurePlanner'
 import EarthLandmarkMap from './EarthLandmarkMap'
 import EarthLandmarkExplorer from './EarthLandmarkExplorer'
@@ -14,6 +15,7 @@ export const metadata = {
 export default function EarthPage() {
   return <>
     <EarthRegionPreview />
+    <PlayerCivicSignalsPanel />
     <EarthInfrastructurePlanner />
     <EarthLandmarkMap />
     <EarthLandmarkExplorer />
