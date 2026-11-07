@@ -94,6 +94,7 @@ export default defineConfig({
       'lib/worldlab/parcelGeometry.test.ts',
       'lib/worldlab/lineDetails.test.ts',
       'lib/worldlab/landUse.test.ts',
+      'lib/worldlab/landWork.test.ts',
       'lib/worldlab/alkis.test.ts',
       'lib/worldlab/parcelImportPolicy.test.ts',
       'lib/world/spatial/earthCoastline.test.ts',

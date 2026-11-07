@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { buildingLabel, earthBuildingName } from '@/lib/worldlab/earthNames'
+import { parcelLooks, type Cohort } from '@/lib/worldlab/landWork'
 
 export async function GET(req: NextRequest) {
   const profileId = await verifiedBearerUserId(req)
@@ -22,6 +23,13 @@ export async function GET(req: NextRequest) {
   ])
   // Abgerissene reale Gebäude: die Karte zeichnet dort eine freie Fläche (nur der Eigentümer darf bauen).
   const { data: parcelOwners } = await supabase.from('earth_parcel_owners').select('parcel_id,profile_id').limit(5000)
+  // Bewirtschaftung sichtbar machen (NOXIA-MAT-0001): Lichtung, Jungwald, Feld, Weide mit Tieren
+  const [{ data: forests }, { data: fields }, { data: herds }] = await Promise.all([
+    supabase.from('earth_parcel_forest').select('parcel_id,cleared_at,replanted_at').not('cleared_at', 'is', null).limit(2000),
+    supabase.from('earth_parcel_field').select('parcel_id,crop,sown_at,ripe_at,harvested_at').not('sown_at', 'is', null).limit(2000),
+    supabase.from('earth_parcel_herd').select('parcel_id,cohorts').limit(2000),
+  ])
+  const looks = parcelLooks(forests ?? [], fields ?? [], (herds ?? []) as Array<{ parcel_id: string; cohorts: Cohort[] | null }>)
   // W-18: Veranstaltungen in Lokalen (laufend oder in den nächsten 24 Stunden), auch in realen Lokalen
   const nowIso = new Date().toISOString(), dayIso = new Date(Date.now() + 86_400_000).toISOString()
   const { data: eventRows } = await supabase.from('venue_events').select('id,tile_entity_id,kind,title,note,starts_at,ends_at').eq('cancelled', false).gt('ends_at', nowIso).lt('starts_at', dayIso).order('starts_at').limit(100)
@@ -55,7 +63,7 @@ export async function GET(req: NextRequest) {
       return [{ id: row.id, tileEntityId: row.tile_entity_id, kind: row.kind, title: row.title, note: row.note ?? null, startsAt: row.starts_at, endsAt: row.ends_at,
         venueName: buildingLabel(String(tile.entity_id), names.get(String(tile.entity_id)), tile.display_name), lat: Number(tile.latitude_deg), lon: Number(tile.longitude_deg) }]
     }),
-    parcels: (parcelOwners ?? []).map(row => ({ id: String(row.parcel_id), own: row.profile_id === profileId })),
+    parcels: (parcelOwners ?? []).map(row => ({ id: String(row.parcel_id), own: row.profile_id === profileId, ...looks.get(String(row.parcel_id)) })),
     plots: (cleared ?? []).map(row => ({
       source: String(row.source_ref), own: row.profile_id === profileId, name: row.display_name ?? 'Freie Fläche',
       lat: Number(row.latitude_deg), lon: Number(row.longitude_deg), w: Number(row.footprint_width_m), d: Number(row.footprint_depth_m), rotation: Number(row.rotation_deg ?? 0),

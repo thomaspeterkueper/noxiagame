@@ -5,6 +5,10 @@
 // POST { action: 'list', id, price }  eigenes Flurstück zum Verkauf anbieten · { action: 'unlist', id } zurückziehen
 // POST { action: 'split', id, at: {lat, lon}, direction: 'across'|'along' }  teilen (Vermessungsgebühr)
 // POST { action: 'merge', id, with }  mit eigenem Nachbarflurstück zusammenlegen (Vermessungsgebühr)
+// POST { action: 'harvest', mode } · 'replant'           eigener Wald
+// POST { action: 'sow', crop } · 'reap'                   eigenes Ackerland (Weizen, Kartoffeln)
+// POST { action: 'cattle_buy', count } · 'cattle_sell'    eigene Weide (Jungrinder, Schlachtrinder)
+// POST { action: 'quarry' }                               eigener Steinbruch (Bruchstein ins Lager)
 // Preis, Häuser und neue Grenzen rechnet der Server (lib/worldlab/parcelOffer.server.ts, parcelGeometry.ts).
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -13,10 +17,13 @@ import { verifiedBearerUserId } from '@/lib/supabase/bearer'
 import { insideRing, parcelOffer } from '@/lib/worldlab/parcelOffer.server'
 import { forestFigures, landUseKind } from '@/lib/worldlab/landUse'
 import { FORESTRY } from '@/lib/game/construction/materials'
+import { CATTLE, CROPS, cropYield, FIELD, pastureCapacity, QUARRY, quarryReserve, sowFee, type CropId } from '@/lib/worldlab/landWork'
 import { areaM2, boundsOf, centreOf, mergeRings, splitRing, type GeoPoint } from '@/lib/worldlab/parcelGeometry'
 
 /** Vermessungsgebühr für Teilen und Zusammenlegen – geht an die Gemeinde. */
 const SURVEY_FEE = 200
+/** Bewirtschaften: Wald, Feld, Weide, Steinbruch */
+const WORK_ACTIONS = new Set(['harvest', 'replant', 'sow', 'reap', 'cattle_buy', 'cattle_sell', 'quarry'])
 /** Kleinstes Flurstück nach dem Teilen (m²). */
 const MIN_PART_M2 = 30
 
@@ -36,6 +43,15 @@ const ERRORS: Record<string, [number, string]> = {
   NOXIA_FOREST_NOT_GROWN: [409, 'Seit dem letzten Einschlag ist noch kein Kubikmeter nachgewachsen.'],
   NOXIA_FOREST_EMPTY: [409, 'Hier steht kein Holz mehr.'],
   NOXIA_FOREST_NOT_CLEARED: [409, 'Hier muss nicht aufgeforstet werden.'],
+  NOXIA_FIELD_BUSY: [409, 'Auf dem Feld wächst noch etwas.'],
+  NOXIA_FIELD_EMPTY: [409, 'Auf dem Feld wächst nichts.'],
+  NOXIA_FIELD_NOT_RIPE: [409, 'Noch nicht reif.'],
+  NOXIA_FIELD_SPOILED: [409, 'Zu spät – die Ernte ist verdorben. Das Feld kann neu bestellt werden.'],
+  NOXIA_PASTURE_FULL: [409, 'So viele Tiere trägt die Weide nicht.'],
+  NOXIA_CATTLE_NOT_READY: [409, 'Noch kein Tier schlachtreif.'],
+  NOXIA_QUARRY_EXHAUSTED: [409, 'Der Steinbruch ist erschöpft.'],
+  NOXIA_QUARRY_NOT_READY: [409, 'Seit dem letzten Abbau ist noch zu wenig Zeit vergangen.'],
+  NOXIA_BUYER_FUNDS: [409, 'Die Gemeindekasse reicht gerade nicht.'],
 }
 
 function failure(message: string, fallback: string) {
@@ -66,28 +82,57 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const profileId = await verifiedBearerUserId(req)
   if (!profileId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const body = await req.json().catch(() => ({})) as { id?: string; action?: string; price?: number; at?: GeoPoint; direction?: string; with?: string }
+  const body = await req.json().catch(() => ({})) as { id?: string; action?: string; price?: number; at?: GeoPoint; direction?: string; with?: string; mode?: string; crop?: string; count?: number }
   const supabase = createServiceClient()
   const id = String(body.id ?? '').slice(0, 64)
   if (!id) return NextResponse.json({ error: 'Flurstück fehlt.' }, { status: 400 })
 
-  // Holz schlagen (NOXIA-MAT-0001): nur eigener Wald; Startwerte aus Fläche und Waldart
-  if (body.action === 'harvest' || body.action === 'replant') {
+  // Bewirtschaften (NOXIA-MAT-0001): nur eigene Flurstücke, nach ihrer Nutzung im Kataster.
+  // Mengen, Zeiten und Preise aus lib/worldlab/landWork.ts; die Datenbank prüft Eigentum und bucht.
+  if (body.action && WORK_ACTIONS.has(body.action)) {
     const { data: row } = await supabase.from('earth_parcels').select('id,usage,area_m2,props').eq('id', id).is('retired_at', null).maybeSingle()
     if (!row) return NextResponse.json({ error: 'Flurstück nicht gefunden.' }, { status: 404 })
     const detail = typeof (row.props as Record<string, unknown> | null)?.nutzbez === 'string' ? String((row.props as Record<string, unknown>).nutzbez) : null
-    if (landUseKind(row.usage, detail) !== 'forest') return NextResponse.json({ error: 'Hier ist kein Wald.' }, { status: 400 })
-    const figures = forestFigures(detail, Number(row.area_m2 ?? 0))
-    if (body.action === 'replant') {
-      const fee = Math.max(10, Math.round(figures.areaHa * FORESTRY.replantFeePerHa))
-      const { data, error } = await supabase.rpc('replant_earth_forest', { p_profile_id: profileId, p_parcel_id: id, p_fee: fee })
-      if (error) return failure(error.message, 'Aufforsten fehlgeschlagen.')
-      return NextResponse.json(data)
+    const kind = landUseKind(row.usage, detail)
+    const area = Number(row.area_m2 ?? 0)
+    const rpc = async (fn: string, args: Record<string, unknown>, fallback: string) => {
+      const { data, error } = await supabase.rpc(fn, { p_profile_id: profileId, p_parcel_id: id, ...args })
+      return error ? failure(error.message, fallback) : NextResponse.json(data)
     }
-    const mode = (body as { mode?: string }).mode === 'clear' ? 'clear' : 'sustainable'
-    const { data, error } = await supabase.rpc('harvest_earth_forest', { p_profile_id: profileId, p_parcel_id: id, p_mode: mode, p_area_ha: figures.areaHa, p_stock_m3: figures.stockM3, p_growth_m3_year: figures.growthM3Year })
-    if (error) return failure(error.message, 'Holzeinschlag fehlgeschlagen.')
-    return NextResponse.json(data)
+    switch (body.action) {
+      case 'harvest': case 'replant': {
+        if (kind !== 'forest') return NextResponse.json({ error: 'Hier ist kein Wald.' }, { status: 400 })
+        const figures = forestFigures(detail, area)
+        if (body.action === 'replant') return rpc('replant_earth_forest', { p_fee: Math.max(10, Math.round(figures.areaHa * FORESTRY.replantFeePerHa)) }, 'Aufforsten fehlgeschlagen.')
+        const mode = body.mode === 'clear' ? 'clear' : 'sustainable'
+        return rpc('harvest_earth_forest', { p_mode: mode, p_area_ha: figures.areaHa, p_stock_m3: figures.stockM3, p_growth_m3_year: figures.growthM3Year }, 'Holzeinschlag fehlgeschlagen.')
+      }
+      case 'sow': case 'reap': {
+        if (kind !== 'farmland') return NextResponse.json({ error: 'Hier ist kein Ackerland.' }, { status: 400 })
+        const areaHa = Math.round(area / 100) / 100
+        if (body.action === 'sow') {
+          const crop = CROPS[body.crop as CropId]
+          if (!crop) return NextResponse.json({ error: 'Unbekannte Frucht.' }, { status: 400 })
+          if (cropYield(crop, areaHa) < 1) return NextResponse.json({ error: 'Das Feld ist dafür zu klein.' }, { status: 400 })
+          return rpc('sow_earth_field', { p_crop: crop.id, p_area_ha: areaHa, p_grow_days: crop.growDays, p_spoil_days: FIELD.spoilDays, p_fee: sowFee(crop, areaHa) }, 'Säen fehlgeschlagen.')
+        }
+        const { data: field } = await supabase.from('earth_parcel_field').select('crop').eq('parcel_id', id).maybeSingle()
+        const crop = CROPS[field?.crop as CropId]
+        if (!crop) return NextResponse.json({ error: 'Auf dem Feld wächst nichts.' }, { status: 409 })
+        return rpc('harvest_earth_field', { p_resource: crop.resource, p_t_per_ha: crop.tPerHa, p_late_days: FIELD.lateDays, p_spoil_days: FIELD.spoilDays }, 'Ernte fehlgeschlagen.')
+      }
+      case 'cattle_buy': case 'cattle_sell': {
+        if (kind !== 'grassland') return NextResponse.json({ error: 'Hier ist keine Weide.' }, { status: 400 })
+        if (body.action === 'cattle_sell') return rpc('sell_earth_cattle', { p_price: CATTLE.sellPrice, p_mature_days: CATTLE.matureDays }, 'Verkauf fehlgeschlagen.')
+        const count = Math.round(Number(body.count))
+        if (!(count >= 1 && count <= 500)) return NextResponse.json({ error: 'Wie viele Tiere?' }, { status: 400 })
+        return rpc('buy_earth_cattle', { p_count: count, p_price: CATTLE.buyPrice, p_capacity: pastureCapacity(area) }, 'Kauf fehlgeschlagen.')
+      }
+      case 'quarry': {
+        if (kind !== 'quarry') return NextResponse.json({ error: 'Hier ist kein Steinbruch.' }, { status: 400 })
+        return rpc('extract_earth_quarry', { p_area_ha: Math.round(area / 100) / 100, p_reserve_t: quarryReserve(area), p_t_per_ha_day: QUARRY.tPerHaDay, p_max_days: QUARRY.maxDays, p_fee_share: QUARRY.feeShare, p_unit_price: QUARRY.stoneBuyPrice }, 'Abbau fehlgeschlagen.')
+      }
+    }
   }
 
   if (body.action === 'list' || body.action === 'unlist') {

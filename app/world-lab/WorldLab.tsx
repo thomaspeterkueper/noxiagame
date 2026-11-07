@@ -46,7 +46,7 @@ import { hasCadastre, parcelCell } from '@/lib/worldlab/alkis'
 import type { GeoPoint } from '@/lib/worldlab/mercator'
 import type { SimplifiedTile } from '@/lib/worldlab/simplify'
 import type { EarthTrip } from '@/app/components/TravelAgency'
-import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine, type WorldPerson, type WorldPick, type WorldPlot, type WorldSite } from './worldEngine'
+import { startWorldEngine, type Hud, type NoxiaBuilding, type WorldEngine, type WorldParcelOwner, type WorldPerson, type WorldPick, type WorldPlot, type WorldSite } from './worldEngine'
 
 /** Ein laufender Bau aus /api/game/build/spatial (nur die Felder, die die Karte braucht). */
 type BuildRow = { id: string; name?: string; buildable_id: string; status?: string; created_at?: string; completes_at?: string; latitude_deg?: number | null; longitude_deg?: number | null; footprint_width_m?: number | null; footprint_depth_m?: number | null; rotation_deg?: number | null }
@@ -157,7 +157,7 @@ export default function WorldLab({ embedded = false, onLeave, onPlanning, reside
   const [events, setEvents] = useState<Array<VenueEvent & { lat: number; lon: number }>>([])
   // Zeitregler: Stand der Abrisse zu einem früheren Zeitpunkt (null = jetzt)
   const [asOf, setAsOf] = useState<string | null>(null)
-  const [parcelOwners, setParcelOwners] = useState<Array<{ id: string; own: boolean }>>([])
+  const [parcelOwners, setParcelOwners] = useState<WorldParcelOwner[]>([])
   const [buildsVersion, setBuildsVersion] = useState(0)
 
   // Bewohner: im Spiel vom Dashboard gereicht, auf der eigenen Seite selbst geholt.

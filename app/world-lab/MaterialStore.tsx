@@ -1,8 +1,8 @@
 'use client'
 
 // app/world-lab/MaterialStore.tsx
-// Baustofflager des Spielers (NOXIA-MAT-0001): Bestand, an die Gemeinde verkaufen,
-// Rundholz im Sägewerk schneiden lassen. Baustoffe im Lager senken den Preis beim Bauen.
+// Lager des Spielers auf der Erde (NOXIA-MAT-0001): Bestand, an die Gemeinde verkaufen,
+// Rundholz im Sägewerk schneiden, Bruchstein zu Schotter brechen lassen. Baustoffe im Lager senken den Preis beim Bauen.
 
 import { useCallback, useEffect, useState } from 'react'
 import { getSessionInfo } from '@/lib/supabase/auth'
@@ -12,6 +12,7 @@ type Row = { resource: string; name: string; unit: string; amount: number; buyPr
 export default function MaterialStore({ version = 0 }: { version?: number }) {
   const [rows, setRows] = useState<Row[] | null>(null)
   const [sawFee, setSawFee] = useState(2)
+  const [crushFee, setCrushFee] = useState(1)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
   const [reload, setReload] = useState(0)
@@ -27,6 +28,7 @@ export default function MaterialStore({ version = 0 }: { version?: number }) {
         if (!live || !json) return
         setRows(Array.isArray(json.stock) ? json.stock : [])
         if (Number.isFinite(json.sawFeePerM3)) setSawFee(Number(json.sawFeePerM3))
+        if (Number.isFinite(json.crushFeePer2t)) setCrushFee(Number(json.crushFeePer2t))
       } catch { if (live) setRows([]) }
     })()
     return () => { live = false }
@@ -46,11 +48,12 @@ export default function MaterialStore({ version = 0 }: { version?: number }) {
 
   if (!rows) return null
   return <div className="store">
-    <small>DEIN BAUSTOFFLAGER</small>
-    {rows.length === 0 && <p>Leer. Holz aus eigenem Wald landet hier; beim Bauen wird zuerst aus dem Lager genommen.</p>}
+    <small>DEIN LAGER</small>
+    {rows.length === 0 && <p>Leer. Holz, Ernte und Stein von eigenen Flurstücken landen hier; beim Bauen wird zuerst aus dem Lager genommen.</p>}
     {rows.map(row => <div key={row.resource} className="row">
       <span>{row.amount.toLocaleString('de-DE')} {row.unit} {row.name}</span>
       {row.resource === 'roundwood' && row.amount >= 2 && <button disabled={busy} title={`Ausbeute 60 %, ${sawFee} Cr je m³`} onClick={() => void act({ action: 'saw', amount: row.amount }, json => `Geschnitten: ${json.lumber} m³ Schnittholz (Gebühr ${json.fee} Cr).`)}>Sägen lassen</button>}
+      {row.resource === 'stone' && <button disabled={busy} title={`1 t Bruchstein → 1 t Schotter, ${crushFee} Cr je angefangene 2 t`} onClick={() => void act({ action: 'crush', amount: row.amount }, json => `Gebrochen: ${json.out} t Schotter (Gebühr ${json.fee} Cr).`)}>Brechen lassen</button>}
       {row.buyPrice && <button disabled={busy} onClick={() => void act({ action: 'sell', resource: row.resource, amount: row.amount }, json => `Verkauft für ${json.total?.toLocaleString('de-DE')} Cr.`)}>Verkaufen ({(row.amount * row.buyPrice).toLocaleString('de-DE')} Cr)</button>}
     </div>)}
     {note && <p>{note}</p>}
