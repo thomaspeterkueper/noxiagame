@@ -43,7 +43,7 @@ export type EarthLandmark = {
   externalUrl?: string
   externalLinkLabel?: string
   /** Begehbarer Innenraum (Raumart aus lib/game/landmarks/interiors.ts). */
-  walkableInterior?: 'artlounge'
+  walkableInterior?: 'artlounge' | 'cave'
 }
 
 /**
@@ -132,6 +132,22 @@ export const EARTH_LANDMARKS: readonly EarthLandmark[] = [
       { project: 'NOXIA', relation: 'setting', note: 'Kanonischer Kulturort in Frankfurt am Main.' },
       { project: 'CAMALEO', relation: 'setting', note: 'Physischer Referenzort von CAMALEO in Frankfurt.' },
     ],
+  },
+  {
+    id: 'earth-de-balve-balver-hoehle',
+    name: 'Balver Höhle',
+    countryCode: 'DE',
+    locality: 'Balve (Sauerland)',
+    locator: { kind: 'address', value: 'Helle 2, 58802 Balve, Germany' },
+    tags: ['archaeology', 'culture'],
+    walkableInterior: 'cave',
+    presentDayRole: 'Europas größte Kulturhöhle im Hönnetal: Festspiele, Konzerte, Märchenwochen und das Schützenfest; einer der wichtigsten Fundplätze der Mittleren Altsteinzeit (Neandertaler).',
+    noxiaRole: 'Besonderer Ort im Sauerland: begehbare Kulturhöhle mit Bühne, Festbänken, Nebenarmen und Fundstelle. Eine Höhlenführerin erzählt, was über die Höhle belegt ist.',
+    sourceProjects: [
+      { project: 'NOXIA', relation: 'setting', note: 'Besonderer Ort im Sauerland (07.11.2026).' },
+    ],
+    externalUrl: 'https://de.wikipedia.org/wiki/Balver_H%C3%B6hle',
+    externalLinkLabel: 'Balver Höhle bei Wikipedia',
   },
   {
     id: 'earth-de-friedrichsdorf-krokusweg-10',

@@ -338,6 +338,19 @@ Maßgeblich: `docs/gameplay/hospitality-venues.md`, `docs/gameplay/settlement-ti
     - Ein Klick zeigt die Pose groß an der eigenen Figur; dazu der Knopf „Zufällig“.
     - Stilvergleich und Leistungsprobe der Werkstatt waren für die Entscheidung gedacht und bleiben im Artefakt.
 - **06.11.2026 – Abmelden im Profil** (Thomas: „Abmelden sollte auch beim Figurenprofil sein, nicht unten bei Aktionen“): „↪ Abmelden“ steht im Kopf des Profilfensters neben „Figur gestalten …“; unter „Aktionen“ in der unteren Leiste ist es entfernt. Der Eintrag im Reiter „Einstellungen“ bleibt.
+- **07.11.2026 – Besonderer Ort: Balver Höhle** (Thomas: „Können wir einen Special Place einbauen? Die Balver Höhle im Sauerland?“):
+  - **Auf der Karte:** neuer kanonischer Ort `earth-de-balve-balver-hoehle` (Helle 2, 58802 Balve), Punkt am Höhleneingang, begehbar wie die ArtLounge. Anfrage W-22 an die Weltkarte (eigenes Kartenzeichen; ein veralteter Landmark-Test).
+  - **Raumart `cave`:**
+    - Tunnelhalle mit Felswänden, nach hinten schmaler; links der Dechenarm, rechts der Virchowarm.
+    - Dreistufige Terrasse quer durch die Halle, Bühne hinten, Festbänke in zwei Blöcken mit Mittelgang, Ausschank, Infotafel.
+    - Abgesteckte Fundstelle vorn links.
+  - **Höhlenführerin:** spricht nur aus belegten Fakten (`staffFacts` im Grundriss):
+    - Maße und Gestein, die beiden Nebenarme.
+    - Neandertaler (vor etwa 100.000 bis 40.000 Jahren), Funde und Museen.
+    - Festspiele seit 1985, Märchenwochen, Schützenfest, über 2.000 Plätze, Zweiter Weltkrieg.
+    - Sie erfindet keine Termine oder Preise.
+  - Quellen: Wikipedia „Balver Höhle“, sauerland.com („Europas größte Kulturhöhle“).
+  - **Nebenbei behoben (betraf alle Orte seit dem Umzug auf einen Motor):** Bodenflächen hatten keine Größe (Stilangaben `x/y/w/h` statt `left/top/width/height`). Teppiche, Fliesen, Altarraum, Wege und Bühnenflächen fehlten in Bibliothek, Gotteshäusern, ArtLounge, Friedhof usw.; sie sind wieder da.
   - Gilt für alle Räume des Motors: Lokale, Bank, Agentur, Reisebüro, Wache, Feuerwache, Praxis, Krankenhaus.
   - Im Browser geprüft (Metropol, Café, Wache; Laufen per Klick, Tasten, Einrichten).
   - **Später** (Thomas): eine 80er-/90er-Fassung für die Zeitreise in VR.
