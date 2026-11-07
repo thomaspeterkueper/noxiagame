@@ -36,6 +36,7 @@ export type VenueFurnitureKind =
   | 'shelf-low' | 'pew' | 'altar' | 'font' | 'candles' | 'armchair' | 'plant' | 'globe' | 'pinboard' | 'goods' | 'lift' | 'bench' | 'gate' | 'crate' | 'piano' | 'artwork'
   | 'grave' | 'tap' | 'tree' | 'memorial'
   | 'mihrab' | 'minbar' | 'ablution' | 'shoerack' | 'ark' | 'bimah' | 'eternal-light' | 'shrine' | 'bell' | 'diya' | 'buddha' | 'cushion' | 'incense' | 'gong' | 'stage'
+  | 'rock'
 
 export interface VenueFurniture {
   id: string

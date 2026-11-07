@@ -21,11 +21,14 @@ export type LandmarkRoomKind =
   | 'police' | 'fire_station' | 'doctors' | 'hospital'
   // Reihenhausserie Krokusweg 2–14, Friedrichsdorf; Nr. 10 ist die WG aus „Der Duft der bleibt“ (06.11.2026).
   | 'rowhouse' | 'rowhouse_wg' | 'rowhouse_duplex' | 'rowhouse_duplex_corner'
+  // Besonderer Ort: Balver Höhle im Hönnetal, Europas größte Kulturhöhle (07.11.2026).
+  | 'cave'
 export type LandmarkPoint = { x: number; y: number }
 export type LandmarkFurnitureKind = 'shelf' | 'shelf-low' | 'table' | 'desk' | 'pew' | 'altar' | 'font' | 'candles' | 'lectern' | 'armchair' | 'sofa' | 'plant' | 'globe' | 'pinboard' | 'counter' | 'goods' | 'lift' | 'bench' | 'vehicle' | 'gate' | 'crate' | 'piano' | 'chair' | 'wall' | 'artwork' | 'stairs'
   | 'grave' | 'tap' | 'tree' | 'memorial'
   | 'bed' | 'wardrobe' | 'bathtub' | 'shower' | 'sink' | 'toilet' | 'stove' | 'fridge' | 'pillar' | 'railing' | 'boiler' | 'washer'
   | 'mihrab' | 'minbar' | 'ablution' | 'shoerack' | 'ark' | 'bimah' | 'eternal-light' | 'shrine' | 'bell' | 'diya' | 'buddha' | 'cushion' | 'incense' | 'gong' | 'stage'
+  | 'rock'
 export type LandmarkFurniture = { id: string; kind: LandmarkFurnitureKind; x: number; y: number; w: number; h: number }
 export type LandmarkSpot = { id: string; label: string; x: number; y: number; text: string; action?: 'books' | 'learn' | 'candle' | 'sit' | 'staff' | 'stairs' | 'memorial'; /** Bei action 'stairs': Zielgeschoss (0 = Erdgeschoss). */ toLevel?: number; /** Beschriftung des Treppenknopfs, z. B. „In den Keller“. */ toName?: string }
 /** Bodenzone – rein optisch, blockiert nicht. */
@@ -34,7 +37,7 @@ export type LandmarkZone = { id: string; kind: LandmarkZoneKind; x: number; y: n
 export type LandmarkLamp = { x: number; y: number; r: number; warm?: boolean }
 /** Angestellte Person im Raum – steht an einem festen Platz und ist ansprechbar. */
 export type LandmarkStaff = { id: string; role: string; x: number; y: number; greeting: string }
-export type LandmarkZoneKind = 'carpet' | 'tiles' | 'rug' | 'chancel' | 'concrete' | 'oilstain' | 'parquet' | 'grass' | 'gravel'
+export type LandmarkZoneKind = 'carpet' | 'tiles' | 'rug' | 'chancel' | 'concrete' | 'oilstain' | 'parquet' | 'grass' | 'gravel' | 'cave' | 'step' | 'dig'
 export type LandmarkRoomLayout = {
   kind: LandmarkRoomKind
   noun: string
@@ -54,6 +57,8 @@ export type LandmarkRoomLayout = {
   gatherAt?: LandmarkPoint[]
   /** Gastraum: Stehplätze am Tresen. */
   counterAt?: LandmarkPoint[]
+  /** Was die angestellte Person über den Ort weiß, wenn kein Betrieb dahintersteht (besondere Orte). */
+  staffFacts?: string[]
 }
 
 export const LANDMARK_ROOM = { width: 760, height: 480, left: 24, right: 736, top: 28, bottom: 456 }
@@ -641,6 +646,73 @@ function artLoungeLayout(level: number, byStairs: boolean): LandmarkRoomLayout {
   }
 }
 
+/**
+ * Balver Höhle (Balve, Hönnetal) – besonderer Ort, Thomas 07.11.2026: „Können wir einen Special Place
+ * einbauen? Die Balver Höhle im Sauerland?“ Typischer Grundriss nach den belegten Maßen: tunnelförmige
+ * Halle (Tonnengewölbe), hinten schmaler, zwei Nebenarme (Dechenarm, Virchowarm), dreistufige Terrasse,
+ * Bühne für Festspiele und Konzerte, Festbänke, Fundstelle der Mittleren Altsteinzeit.
+ * Quellen: Wikipedia „Balver Höhle“; sauerland.com (Kulturhöhle, Helle 2, 58802 Balve). Nichts erfunden.
+ */
+function caveLayout(): LandmarkRoomLayout {
+  const furniture: LandmarkFurniture[] = [
+    // Fels: links und rechts, zur Tiefe hin enger; Lücken sind die Nebenarme.
+    { id: 'rock-l1a', kind: 'rock', x: 24, y: 28, w: 160, h: 50 }, { id: 'rock-l1b', kind: 'rock', x: 24, y: 112, w: 160, h: 40 },
+    { id: 'rock-l2', kind: 'rock', x: 24, y: 152, w: 90, h: 128 }, { id: 'rock-l3', kind: 'rock', x: 24, y: 280, w: 44, h: 120 },
+    { id: 'rock-r1a', kind: 'rock', x: 576, y: 28, w: 160, h: 50 }, { id: 'rock-r1b', kind: 'rock', x: 576, y: 112, w: 160, h: 40 },
+    { id: 'rock-r2', kind: 'rock', x: 646, y: 152, w: 90, h: 128 }, { id: 'rock-r3', kind: 'rock', x: 692, y: 280, w: 44, h: 120 },
+    // Bühne hinten in der Halle
+    { id: 'stage', kind: 'stage', x: 262, y: 36, w: 236, h: 70 },
+    // Ausschank vorn rechts, Infotafel am Eingang, Grabungskiste an der Fundstelle
+    { id: 'counter', kind: 'counter', x: 560, y: 336, w: 110, h: 28 },
+    { id: 'info', kind: 'pinboard', x: 92, y: 420, w: 90, h: 10 },
+    { id: 'dig-crate', kind: 'crate', x: 96, y: 336, w: 34, h: 26 },
+  ]
+  // Festbänke: drei Reihen links und rechts des Mittelgangs, Blick zur Bühne
+  for (let row = 0; row < 3; row++) for (let col = 0; col < 2; col++) {
+    furniture.push({ id: `bench-${row}-${col}`, kind: 'bench', x: col ? 392 : 228, y: 262 + row * 42, w: 140, h: 16 })
+  }
+  const zones: LandmarkZone[] = [
+    { id: 'floor', kind: 'cave', x: 24, y: 28, w: 712, h: 428 },
+    // Dreistufige Terrasse quer durch die Halle (etwa 15 m breit)
+    { id: 'step-1', kind: 'step', x: 184, y: 150, w: 392, h: 26 },
+    { id: 'step-2', kind: 'step', x: 168, y: 176, w: 424, h: 26 },
+    { id: 'step-3', kind: 'step', x: 152, y: 202, w: 456, h: 26 },
+    { id: 'dig', kind: 'dig', x: 76, y: 300, w: 130, h: 80 },
+  ]
+  const lamps: LandmarkLamp[] = [{ x: 380, y: 80, r: 130, warm: true }, { x: 380, y: 300, r: 150, warm: true }, { x: 140, y: 340, r: 70 }, { x: 615, y: 350, r: 70, warm: true }]
+  const spots: LandmarkSpot[] = [
+    { id: 'stage', label: 'BÜHNE', x: 380, y: 128, text: 'Hier spielen die Festspiele Balver Höhle (seit 1985), Konzerte von Klassik bis Rock und die Märchenwochen. Der Fels trägt jeden Ton.' },
+    { id: 'benches', label: 'FESTBÄNKE', x: 300, y: 250, action: 'sit', text: 'Bei Veranstaltungen sitzen und stehen hier über 2.000 Menschen. Jedes Jahr feiert die Schützenbruderschaft St. Sebastian ihr Schützenfest in der Halle.' },
+    { id: 'dechen', label: 'DECHENARM', x: 60, y: 95, text: 'Der linke Nebenarm, benannt nach Heinrich von Dechen, der ihn 1871 erkundete. 1997 wurde er mit Landesmitteln gesichert.' },
+    { id: 'virchow', label: 'VIRCHOWARM', x: 700, y: 95, text: 'Der rechte Nebenarm, benannt nach Rudolf Virchow, der 1870 hier forschte. Seitengänge führen bis zur Oberfläche.' },
+    { id: 'dig', label: 'FUNDSTELLE', x: 150, y: 290, text: 'Einer der wichtigsten Fundplätze der Mittleren Altsteinzeit: Neandertaler lagerten hier vor etwa 100.000 bis 40.000 Jahren. Gefunden wurden Knochen von Mammut, Wollnashorn und Rentier und Tausende Steinwerkzeuge.' },
+    { id: 'vault', label: 'GEWÖLBE', x: 380, y: 236, text: 'Ein Tonnengewölbe im Massenkalk des Mitteldevons, am Eingang bis 12 m hoch und bis 18 m breit. Wie es entstand, ist bis heute nicht geklärt.' },
+    { id: 'info', label: 'INFOTAFEL', x: 137, y: 444, text: 'Die meisten Funde liegen im LWL-Museum für Archäologie in Herne und auf Schloss Werdringen in Hagen; weitere im Museum für Vor- und Frühgeschichte in Balve-Wocklum.' },
+    { id: 'desk', label: 'AUSSCHANK', x: 615, y: 388, action: 'staff', text: 'Der Ausschank für Festspiele und Schützenfest. Hier wartet die Höhlenführung.' },
+  ]
+  return {
+    kind: 'cave', noun: 'Höhle', start: { x: 380, y: 430 }, exit: { x: 380, y: 452 },
+    furniture, spots, zones, lamps,
+    staff: { id: 'guide', role: 'Höhlenführer(in)', x: 615, y: 318, greeting: 'Willkommen in der Balver Höhle! Bei Veranstaltungen sind hier über zweitausend Leute – jetzt ist es still. Frag ruhig, was du wissen willst.' },
+    hostAt: { x: 380, y: 118 },
+    gatherAt: [{ x: 300, y: 250 }, { x: 460, y: 250 }, { x: 380, y: 236 }, { x: 300, y: 380 }, { x: 460, y: 380 }],
+    staffFacts: [
+      'Du führst Besucher durch die Balver Höhle im Hönnetal bei Balve, Europas größte Kulturhöhle (Helle 2, 58802 Balve).',
+      'Die Halle ist ein Tonnengewölbe: knapp 90 m tief, bis 18 m breit, am Eingang bis 12 m hoch; eine dreistufige Terrasse gleicht die Höhen aus.',
+      'Sie liegt im Massenkalk des Mitteldevons. Wie das Gewölbe entstand, ist nicht geklärt: Frostsprengung oder Wasser werden diskutiert.',
+      'Zwei Nebenarme: der Dechenarm (Heinrich von Dechen, 1871; 1997 gesichert) und der Virchowarm (Rudolf Virchow, 1870).',
+      'Neandertaler und Jägergruppen lagerten hier in über sieben Phasen, etwa vor 100.000 bis 40.000 Jahren.',
+      'Gefunden wurden Knochen von Mammut, Wollnashorn und Rentier und Tausende Steinwerkzeuge.',
+      'Die meisten Funde liegen im LWL-Museum für Archäologie in Herne und auf Schloss Werdringen in Hagen; mehr im Museum in Balve-Wocklum.',
+      'Seit 1922 gibt es hier Konzerte und Theater; seit 1985 die Festspiele Balver Höhle, seit 1991 die Märchenwochen.',
+      'Jedes Jahr feiert die Schützenbruderschaft St. Sebastian hier ihr Schützenfest; sie hat die Höhle von der Stadt Balve gepachtet.',
+      'Bei Veranstaltungen passen über 2.000 Menschen hinein. Sonst kommt man nur mit einer angemeldeten Führung hinein.',
+      'Im Zweiten Weltkrieg war hier ein Rüstungsbetrieb mit Zwangsarbeitern; eine Sprengung danach wurde wegen der Funde abgewendet.',
+      'Erfinde keine Veranstaltungen, Termine, Preise oder Funde, die du nicht kennst; sag lieber, dass du es nicht weißt.',
+    ],
+  }
+}
+
 /** Raum eines Gotteshauses nach Religion (OSM `religion`) oder Bauart (`building=mosque` …). */
 export function worshipRoomKind(religion?: string | null, buildingType?: string | null): LandmarkRoomKind {
   const r = String(religion ?? '').toLowerCase(), b = String(buildingType ?? '').toLowerCase()
@@ -660,6 +732,7 @@ export function landmarkRoomKind(landmarkClass: string, tags?: Record<string, st
   if (landmarkClass === 'library') return 'library'
   if (landmarkClass === 'place_of_worship') return worshipRoomKind(tags?.religion, tags?.building)
   if (landmarkClass === 'artlounge') return 'artlounge'
+  if (landmarkClass === 'cave') return 'cave'
   if (landmarkClass === 'rowhouse' || landmarkClass === 'rowhouse_wg' || landmarkClass === 'rowhouse_duplex' || landmarkClass === 'rowhouse_duplex_corner') return landmarkClass
   if (landmarkClass === 'community_centre') return 'community_hall'
   if (landmarkClass === 'resonance_place') return 'resonance_place'
@@ -706,6 +779,7 @@ export function landmarkRoomLayout(kind: LandmarkRoomKind, level = 0, byStairs =
     case 'resonance_place': return resonancePlaceLayout()
     case 'cemetery': return cemeteryLayout()
     case 'hospitality': return hospitalityLayout()
+    case 'cave': return caveLayout()
     default: return workshopLayout()
   }
 }

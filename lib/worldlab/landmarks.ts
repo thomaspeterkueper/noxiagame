@@ -8,7 +8,7 @@ const LANDMARK_LABEL: Record<string, string> = {
   archaeological_site: 'Ausgrabungsstätte', monument: 'Denkmal', memorial: 'Gedenkstätte', university: 'Universität',
   townhall: 'Rathaus', theatre: 'Theater', arts_centre: 'Kulturzentrum', hospital: 'Krankenhaus', station: 'Bahnhof',
   tower: 'Turm', lighthouse: 'Leuchtturm', observatory: 'Sternwarte',
-  community_centre: 'Gemeindezentrum', artlounge: 'Kultur · ArtLounge',
+  community_centre: 'Gemeindezentrum', artlounge: 'Kultur · ArtLounge', cave: 'Kulturhöhle',
   resonance_place: 'Omnizedenz-Begegnungsstätte',
 }
 

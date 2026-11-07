@@ -49,7 +49,7 @@ const HEIGHT_PX=12
 // Earth scenes zoom the ground in; figures and labels keep their screen size.
 const SCENE_ZOOM=2.4
 const LANDMARK_LABEL:Record<string,string>={library:'Bibliothek',place_of_worship:'Gotteshaus',museum:'Museum',gallery:'Galerie',attraction:'Sehenswürdigkeit',viewpoint:'Aussichtspunkt',castle:'Burg / Schloss',fort:'Festung',city_gate:'Stadttor',ruins:'Ruine',archaeological_site:'Ausgrabungsstätte',monument:'Denkmal',memorial:'Gedenkstätte',university:'Universität',townhall:'Rathaus',theatre:'Theater',arts_centre:'Kulturzentrum',hospital:'Krankenhaus',station:'Bahnhof',tower:'Turm',lighthouse:'Leuchtturm',observatory:'Sternwarte'}
-function landmarkLabel(kind:string,tags?:Record<string,any>){if(kind==='artlounge')return'Kultur · ArtLounge';if(kind==='place_of_worship'){const religion=String(tags?.religion??'');return religion==='christian'?'Kirche':religion==='muslim'?'Moschee':religion==='jewish'?'Synagoge':religion==='buddhist'||religion==='hindu'?'Tempel':'Gotteshaus'}return LANDMARK_LABEL[kind]??'Landmark'}
+function landmarkLabel(kind:string,tags?:Record<string,any>){if(kind==='artlounge')return'Kultur · ArtLounge';if(kind==='cave')return'Kulturhöhle';if(kind==='place_of_worship'){const religion=String(tags?.religion??'');return religion==='christian'?'Kirche':religion==='muslim'?'Moschee':religion==='jewish'?'Synagoge':religion==='buddhist'||religion==='hindu'?'Tempel':'Gotteshaus'}return LANDMARK_LABEL[kind]??'Landmark'}
 // One plain glyph per landmark class, drawn inside a 20 px badge.
 function landmarkGlyph(kind:string,tags?:Record<string,any>){
   const ink={fill:'none',stroke:'#17313c',strokeWidth:1.5,strokeLinecap:'round' as const,strokeLinejoin:'round' as const}

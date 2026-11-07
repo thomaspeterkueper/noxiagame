@@ -43,4 +43,10 @@ assert.ok(artLounge.tags.includes('culture'))
 assert.ok(artLounge.locator.value.includes('Mörfelder Landstraße 103'))
 assert.equal(getEarthLandmark('does-not-exist'), undefined)
 
+// Balver Höhle (besonderer Ort, 07.11.2026): begehbar als Höhle, Punkt am Höhleneingang
+const balve = getEarthLandmark('earth-de-balve-balver-hoehle')
+assert.ok(balve)
+assert.equal(balve.walkableInterior, 'cave')
+assert.ok(balve.tags.includes('archaeology'))
+
 console.log('earth landmark registry tests passed')

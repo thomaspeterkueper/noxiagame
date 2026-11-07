@@ -450,7 +450,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
     ].filter(Boolean)
   }
   function staffFacts(ctx: InteriorContext) {
-    if (!isLibrary) return knowledge.slice(0, 16)
+    if (!isLibrary) return (knowledge.length ? knowledge : layout.staffFacts ?? []).slice(0, 16)
     const fiction = LIBRARY_BOOKS.filter(entry => entry.shelf === 'romane')
     return [
       `Du arbeitest an der Ausleihe der ${name} und kennst den Bestand genau.`,
@@ -642,7 +642,7 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
       return { x: v.x, y: v.y, posture: item.sitting ? 'sitting' : 'standing', spotId: item.spotId, label: item.person.doing ?? (item.stance ? STANCE_LABEL[item.stance] : item.person.host ? 'vorn' : 'im Raum') }
     },
     floorLayer: <>
-      {layout.zones.map(zone => <div key={zone.id} className={'zone ' + zone.kind} style={rectV(zone)}/>)}
+      {layout.zones.map(zone => { const r = rectV(zone); return <div key={zone.id} className={'zone ' + zone.kind} style={{ left: r.x, top: r.y, width: r.w, height: r.h }}/> })}
       {layout.lamps.map((lamp, index) => { const c = toV(lamp); return <div key={index} className={'lm-lamp' + (lamp.warm ? ' warm' : '')} style={{ left: c.x - lamp.r, top: c.y - lamp.r, width: lamp.r * 2, height: lamp.r * 2 }}/> })}
     </>,
     furnitureDressing: item => item.kind === 'shelf' ? <i className="spines"/> : item.kind === 'shelf-low' ? <i className="spines low"/> : item.kind === 'table' && isLibrary ? <><i className="book-open"/><i className="lamp-small"/></> : item.kind === 'pinboard' ? <><i className="note n1"/><i className="note n2"/><i className="note n3"/></> : null,
@@ -661,6 +661,15 @@ function LandmarkRoom({ kind, name, typeLabel, facts, onClose, knowledge = [], s
 
 // Möbel und Böden der Orte (aus dem früheren Landmark-Raum übernommen), in 2,5D mit Höhe.
 const LM_CSS = `
+.walkable-interior .room.lm.cave{--floor:#6e6458;--plank:#6e6458}.walkable-interior .room.iso.lm.cave{--accent:#ffb36a}
+.walkable-interior .room.iso.cave .wall3d{background:radial-gradient(ellipse at 30% 40%,#8a7f70,#5d5449 60%,#3f3830)!important;box-shadow:inset 0 -30px 60px #0007}
+.walkable-interior .room.iso.cave .wall3d *{display:none}
+.walkable-interior .zone.cave{background:#6e6458;background-image:radial-gradient(#7d7366 1.2px,transparent 1.6px),radial-gradient(#5f564b 1px,transparent 1.4px);background-size:11px 11px,17px 17px}
+.walkable-interior .zone.step{background:linear-gradient(#8a7f70,#7a6f62);border-bottom:3px solid #4f463c;box-shadow:0 2px 0 #0003}
+.walkable-interior .zone.dig{background:repeating-linear-gradient(0deg,#9b7a55 0 10px,#8a6a48 10px 20px);border:2px dashed #e9c46a;opacity:.9}
+.walkable-interior .room.lm .f.rock{background:radial-gradient(ellipse at 35% 30%,#8f8476,#625a4e 55%,#433c34);border:0;border-radius:14px}
+.walkable-interior .room.iso.lm .f.rock{--h:120px}
+.walkable-interior .room.iso.lm .f.rock>.fs,.walkable-interior .room.iso.lm .f.rock>.fw{background:linear-gradient(#5b5247,#3f3830);filter:none;border-radius:6px}
 .walkable-interior .room.lm{--wall:#e8e2d4;--panel:#b7a98f;--rail:#6b5a43;--floor:#cdbf9f;--plank:#bfb08f;--top:#efe6d2}
 .walkable-interior .room.iso.lm{--accent:#e9c46a;--wallTop:#efe7d6;--wallBase:#d9ccb3}
 .walkable-interior .room.library{--floor:#b99d76;--plank:#b2956d}

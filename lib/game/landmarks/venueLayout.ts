@@ -41,7 +41,7 @@ export function toVenueLayout(l: LandmarkRoomLayout): VenueLayout {
     exit: toV(l.exit),
     playerRoomId: 'service',
     servicePoint,
-    windows: l.kind === 'cemetery' ? [] : [{ x: 150, w: 90 }, { x: 520, w: 90 }],
+    windows: l.kind === 'cemetery' || l.kind === 'cave' ? [] : [{ x: 150, w: 90 }, { x: 520, w: 90 }],
     furniture,
     spots,
     roomFact: `Du bist in ${l.noun}.`,

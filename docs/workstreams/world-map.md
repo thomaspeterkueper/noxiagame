@@ -962,3 +962,8 @@ Ohne echte Hausnummern, auf freien oder ersetzten Grundstücken. 2086 wohnen dor
 ## Timetravel-Agencys (06.11.2026)
 
 - Normale Reisebüros buchen nur normale Reisen. Chronotrips gibt es nur in eigenen Timetravel-Agencys (neue Ortsart, später); zusätzlich ein Button am historischen Ort. Details und Inhaltsgrundsatz (Wissensgraph zuerst, Bücher ergänzend, Konsistenzprüfung) in `chronomap-dvaraka.md`.
+
+### W-22 (Gastronomie, 07.11.2026): Balver Höhle auf der Karte – und ein veralteter Landmark-Test
+- **Neu:** `earth-de-balve-balver-hoehle` in `lib/world/spatial/earthLandmarks.ts` (Tags `archaeology`, `culture`, `walkableInterior: 'cave'`). Kartenpunkt am Höhleneingang laut Wikipedia (51° 20′ 21″ N, 7° 52′ 19″ O) in `EARTH_LANDMARK_MAP_POINTS`. Begehbar wie die ArtLounge; Raumart `cave` im Innenraum-Motor (Gastronomie).
+- **Bitte prüfen:** Soll die Höhle auf der Karte ein eigenes Zeichen bekommen (Höhleneingang statt Hauszeichen)? Die Karte gehört euch.
+- **Gefunden, nicht verursacht:** `lib/world/spatial/earthLandmarks.test.ts` bricht schon auf `main` ab. Die Erwartung zu `getEarthLandmarksByTag('archaeology')` kennt die beiden Menden-Orte (Gesamtschule, Hexenteich) noch nicht. Die Datei läuft in keiner Testsuite (nicht in `vitest.config.mts`, nicht in `package.json`), deshalb fiel es nicht auf. Die neue Höhlenprüfung steht hinter dieser Stelle.
