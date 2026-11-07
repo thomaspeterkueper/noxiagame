@@ -2,7 +2,8 @@
 
 // app/dashboard/DashboardClient.tsx
 // Erstellt:     30.05.2026
-// Aktualisiert: 27.10.2026 — Oberflächenorte ohne eigene Bahn werden für die Reiseberechnung angemeldet (registerLocationBodies).
+// Aktualisiert: 07.11.2026 — Kennzeichnung „Simulierte Welt“ mit Spieldatum aus dem Core-Tick (#623).
+// Vorher:       27.10.2026 — Oberflächenorte ohne eigene Bahn werden für die Reiseberechnung angemeldet (registerLocationBodies).
 // Vorher:       09.10.2026 — Hinweise des neuen Händlerwegs (Spediteur → Qualifikation → Schiff).
 // Vorher:       09.10.2026 — Direkthandel: Stationsmarkt öffnet das Warenhaus, Auktion entfernt.
 // Vorher:       09.10.2026 — ColonyDetail erhält den aktuellen Tick für die Flugkosten.
@@ -24,7 +25,7 @@
 //               blieb erfolglos. GlobalErrorBoundary fängt JEDEN Render-
 //               Fehler im Dashboard ab und zeigt Komponente + Stack, statt
 //               dass die Seite ohne jede Meldung stirbt.
-// Version:      2.25.0-debug
+// Version:      2.26.0-debug
 
 import { useAblyChannel } from '@/lib/ably/client'
 import ChatOverlay from './ChatOverlay'

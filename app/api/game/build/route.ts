@@ -1,6 +1,7 @@
 // route.ts
-// Aktualisiert: 10.09.2026 — atomare Core-Commands für Start/Abschluss/Verkaufsabschluss
-// Version:      1.6.0
+// Aktualisiert: 07.11.2026 — Verkaufsmodus und Kachelkoordinaten werden vor jeder Mutation strikt geprüft (#620, #621)
+// Vorher:       10.09.2026 — atomare Core-Commands für Start/Abschluss/Verkaufsabschluss
+// Version:      1.6.1
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSaleQuote, BUILDING_SALE, type SaleMode, type DBBuildingDef } from '@/lib/game/buildingSale'
