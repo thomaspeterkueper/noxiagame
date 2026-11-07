@@ -1,5 +1,6 @@
 // lib/game/tick.ts
 // Erstellt:     01.06.2026
+// Aktualisiert: 07.11.2026 — Versorgung bezahlen: Einwohner mit Konto zahlen ihren Anteil, Rest ausgewiesene Emission (run_supply_settlement)
 // Aktualisiert: 06.11.2026 — Linienfracht jede Woche (run_liner_sailings) und Anlaufhilfe für die Kolonien (run_colony_fund)
 // Aktualisiert: 06.11.2026 — Miete nach Kaufpreis, einmal am Tag angepasst (noxia_refresh_rents)
 // Aktualisiert: 06.11.2026 — Förderabgabe je Ort; Förderanlagen brauchen Bedienung (Mensch oder Roboter), run_facility_operation
@@ -15,7 +16,7 @@
 //               zählt nicht mehr als Firmenbestand (wurde ein zweites Mal verkauft); Bau wird nur
 //               gebucht, wenn das Gebäude auf einer freien Kachel wirklich entsteht
 // Vorher:       09.10.2026 — Lagergrenzen (lib/game/storageCapacity.ts)
-// Version:      3.14.0
+// Version:      3.15.0
 
 import { gateProduction } from './production/inputGate'
 import {
@@ -867,12 +868,15 @@ export async function runTick(supabase: SB, tickNumber: number) {
   const immigration = await runColonyImmigrationTick(supabase, tickNumber)
   // Bedienung der Förderanlagen (06.11.2026): Wartung, Menschen am Ort, sonst nach 7 Tagen Roboter
   const facilityOperation = await runFacilityOperationTick(supabase, tickNumber)
+  // Versorgung (07.11.2026): einmal am Tag bezahlen, was Firmen ins Lager geliefert haben –
+  // Einwohner mit Konto zahlen ihren Anteil, der Rest ist ausgewiesene Emission (NOXIA-FIN-0002 Teil D)
+  const supply = tickNumber % 24 === 0 ? await supabase.rpc('run_supply_settlement', { p_tick: tickNumber }).then(r => r.error ? { ok: false, code: r.error.code } : r.data) : { skipped: true }
   // Miete nach Kaufpreis (06.11.2026): laufende Verträge einmal am Tag an die Regel anpassen
   const rents = tickNumber % 24 === 0 ? await supabase.rpc('noxia_refresh_rents', { p_tick: tickNumber }).then(r => r.error ? { ok: false } : r.data) : { skipped: true }
   const landValues = await runLandValueTick(supabase, locationSnapshot ?? [])
   // Wünsche und Gebete (29.10.2026): einordnen, Figuren wünschen sich, was fehlt
   const wishes = await runWishTick(supabase, tickNumber)
-  return { tickNumber, liner, colonyFund, crew, immigration, facilityOperation, rents, wishes, dreams, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
+  return { tickNumber, liner, colonyFund, supply, crew, immigration, facilityOperation, rents, wishes, dreams, population, livingPopulation, namedPeople, surfacePresence, encounters, interoception, socialLife, prices, npc, venueStaffing, payroll, consumption, propertyMarket, housingShadow, npcBuilding, orders, bank, landValues }
 }
 
 export async function runDueTicks(supabase: SB) {
