@@ -10,7 +10,7 @@ import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import { deriveEarthSurfaceTheme } from '@/lib/world/render/earthSurfaceTheme'
 import { EARTH_LOCAL_ENRICHMENT_PROFILE, buildEarthLocalScene, type EarthLocalScene, type ScenePoint } from '@/lib/world/spatial/earthLocalScene'
-import { advanceAlongLocalSceneRoute, distanceToBuildingFootprint, resolveLocalSceneStep, routeAcrossLocalScene, targetAccessDistance } from '@/lib/game/spatial/localSceneRuntime'
+import { advanceAlongLocalSceneRoute, distanceToBuildingFootprint, isLocalScenePointWalkable, nearestWalkableLocalScenePoint, resolveLocalSceneStep, routeAcrossLocalScene, targetAccessDistance } from '@/lib/game/spatial/localSceneRuntime'
 import { geoToLocalMeters, localMetersToGeo } from '@/lib/world/spatial/earthSpatial'
 import { awarenessConversationForResident } from '@/lib/game/npcAwarenessConversation'
 import { useEarthPlayerPositionStore } from '@/lib/store/earthPlayerPositionStore'
@@ -282,6 +282,21 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
   },[data?.region,origin,playerGeo,playerRegionId,player,setSharedPlayerPosition,viewDecided])
   const theme=useMemo(()=>deriveEarthSurfaceTheme(Number(origin?.lat??0),features),[origin?.lat,features])
   const scene=useMemo<EarthLocalScene|null>(()=>origin?buildEarthLocalScene({origin,features,radiusM:SCENE_RADIUS_M}):null,[origin,features])
+  // Reconcile a persisted WGS84 position only after the final scene geometry arrives.
+  const lastSpawnCheck=useRef('')
+  useEffect(()=>{
+    if(!scene||!origin||!viewDecided||detailStatus==='loading'||!playerGeo)return
+    const local=geoToLocalMeters(playerGeo,origin)
+    const current={xM:local.eastM,yM:local.northM}
+    if(isLocalScenePointWalkable(scene,current))return
+    const key=`${origin.lat}:${origin.lon}:${playerGeo.lat}:${playerGeo.lon}:${scene.buildings.length}`
+    if(lastSpawnCheck.current===key)return
+    lastSpawnCheck.current=key
+    const safe=nearestWalkableLocalScenePoint(scene,current)
+    if(safe&&Math.hypot(safe.xM-current.xM,safe.yM-current.yM)>0.01){
+      setSharedPlayerPosition((data?.region as any)?.id??null,safe,localMetersToGeo({eastM:safe.xM,northM:safe.yM},origin))
+    }
+  },[scene,origin,viewDecided,detailStatus,playerGeo,data?.region,setSharedPlayerPosition])
   // Kanonische Landmarks mit begehbarem Innenraum (z. B. CAMALEO-ArtLounge) wie Gebäude betretbar.
   const canonicalInteriorTargets=useMemo(()=>origin?(data?.narrativeLandmarks??[]).flatMap(landmark=>{
     if(!landmark.walkableInterior)return[]
@@ -672,7 +687,8 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
     }finally{setSending(false)}
   }
 
-  if(!data)return <div className="earth-walkable-loading">{detailStatus==='loading'?'Gebäude, Wege und Gewässer dieses Ortes werden geladen …':'Lokale Earth-Szene wird aufgebaut …'}</div>
+  if(detailStatus==='loading')return <div className="earth-walkable-loading">Gebäude, Wege und Gewässer dieses Ortes werden geladen …</div>
+  if(!data)return <div className="earth-walkable-loading">Lokale Earth-Szene wird aufgebaut …</div>
   if(!data.ok||!scene)return <div className="earth-walkable-loading">Earth-Szene nicht verfügbar: {data.error??'keine Region'}</div>
   // Steht die Spielfigur vom letzten Besuch weit vom Mittelpunkt dieser ersten
   // Szene entfernt, wird gleich um sie herum neu geladen – die erste Szene nicht zeigen.
@@ -809,7 +825,7 @@ export default function EarthWalkableSurface({residents,onClose}:Props){
       <div className="earth-walkable-help"><b>WASD</b> bewegen · <b>Shift</b> schneller · NPC anklicken · lokale 2.5D-Szene aus realer Geographie</div>
       <div className="earth-walkable-provenance">Gebäude ohne reale Footprints werden vorläufig als <b>abgeleitete Bebauungsmasse</b> dargestellt. Straßen, Wasser, Landnutzung und Routen stammen aus dem persistierten Orts-Snapshot.</div>
 
-      {detailStatus!=='idle'&&<div className="earth-walkable-detail">{detailStatus==='loading'?'Gebäude, Wege und Gewässer dieses Ortes werden geladen …':<>Kartendienst nicht erreichbar – Gebäude, Wege und Gewässer fehlen noch. <button onClick={()=>{if(data?.localDetail)localEnrichmentAttempted.current.delete(data.localDetail.slug);setDetailRetry(count=>count+1)}}>Erneut versuchen</button></>}</div>}
+      {detailStatus!=='idle'&&<div className="earth-walkable-detail">{<>Kartendienst nicht erreichbar – Gebäude, Wege und Gewässer fehlen noch. <button onClick={()=>{if(data?.localDetail)localEnrichmentAttempted.current.delete(data.localDetail.slug);setDetailRetry(count=>count+1)}}>Erneut versuchen</button></>}</div>}
 
       {ambientConversation&&!selected&&<div className="earth-overheard">
         <small>GESPRÄCH IN HÖRWEITE · {ambientConversation.conversation.item.kind==='colony'?'NOXIA':'HEUTE'}</small>
