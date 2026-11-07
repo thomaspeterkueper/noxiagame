@@ -39,6 +39,8 @@ Vorgaben Thomas für diesen Entwurf (06.11.2026): Roman gehört zum NOXIA-Univer
 | Verbleib der Kette | Depot (passt zu OTA-TEC-0035 I „→ Depot“), im Museum eine Nachbildung |
 | Hör-Stein, Splitterlupe 2086 | OTA führt den Hör-Stein „bei Tim (durchgehend)“ und die Lupe „in Besitz“ Antons – beides nur bis Romanende. **Entschieden:** Hör-Stein im Museum als „Leihgabe aus Privatbesitz“ ohne Namen, Splitterlupe leere Vitrine „Verbleib unbekannt“ |
 
+Requests an die Erdkarte für alle Orte des Romans: `world-map.md`, W-21 bis W-31 (07.11.2026).
+
 ## 1. Zwei Schichten, ein Ort
 
 | Schicht | Zeit | Was man sieht | Begehbar |

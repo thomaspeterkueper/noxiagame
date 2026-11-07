@@ -866,6 +866,94 @@ Thomas, 05.11.2026: „Brauchen wir Polizei? Feuerwehr, Krankenhaus?“ – „j
 4. Auf Kolonie, Mars und Raumschiff statt Wache und Feuerwehr ein Sicherheitszentrum und eine Medizinstation.
 
 
+### W-21 bis W-31 (Bücher / Chronomap „Die Kette vom Hexenteich“, 07.11.2026): Orte des Romans auf der Erdkarte
+
+Herkunft: Thomas, 07.11.2026: „Stelle auch immer Requests für alle Orte ein, die im Buch eine Rolle spielen.“ Grundlage: Master-Fassung des Romans (`buecherwelten/works/kette-vom-hexenteich/manuscript/die-kette-vom-hexenteich-v11-1.md`, V11.7) und die Chronomap (`docs/workstreams/chronomap-kette-vom-hexenteich.md`, Abschnitt 0a und 3).
+
+Für alle Einträge gilt:
+- **Zwei Schichten.** Was hier verlangt wird, ist die **Gegenwart 2086** auf der normalen Erdkarte. Die begehbare Zeitreise in den Herbst 2024 ist die Chronomap. Sie baut ihre eigene Szene und braucht von der Erdkarte nur die Lage.
+- **Etiketten:** [R] steht für einen realen Ort mit realer Adresse, [F] für eine Freiheit des Romans (erfundene Gebäude, schematische Lage). Wo der Roman einen Ort verlangt, den es real nicht gibt, ist [F] erlaubt. Das Spiel liegt in der Zukunft, ein altes Haus darf ersetzt werden.
+- **Keine echten Privatadressen für Romanfiguren.** Die Wohnhäuser (W-27) kommen auf freie oder ersetzte Grundstücke in passenden Straßen, ohne echte Hausnummer.
+- Die vier Hauptfiguren trifft man 2086 nicht (Entscheidung Thomas, 06.11.2026).
+- Landmarken nach dem Muster in `lib/world/spatial/earthLandmarks.ts` (`sourceProjects` mit `project: 'Die Kette vom Hexenteich'`, `relation: 'setting'`, Kapitel als `references`), Koordinaten löst die Karte selbst auf.
+
+#### W-21 Hexenteich und Skulpturenpark [R] – Eintrag ergänzen
+
+- Gibt es schon (`earth-de-menden-hexenteich`, Oesberner Weg). Kapitelverweise ergänzen: 1 (Fund unter den Wurzeln an der Bär-Skulptur), 9 (Streit), 24 (Eigentümerin ist die Gemeinde).
+- Am Ufer: die Bär-Skulptur und eine Bank am gegenüberliegenden Ufer, dazu ein Parkplatz mit Fahrradständer und ein Waldweg hinunter zur Stadt.
+- 2086: kein Fundmarker und keine Grabungsstelle. Das volle Artefakt des Hexenteichs wird nie gefunden. Nur eine kleine Tafel des Museums: „Fundort einer bronzezeitlichen Kette (2024). Verwahrt im Landesdepot.“
+- Einstieg der Chronomap, Folge 1 („Der Fund“): Zugang über die Timetravel-Agency, Knopf am Ort.
+
+#### W-22 Städtische Gesamtschule Menden [R] mit Brunnenraum [F] – Eintrag ergänzen
+
+- Gibt es schon (`earth-de-menden-gesamtschule`, Windthorststraße 36). Im Roman ist es ein Schulbau von 1890 mit Brunnen im Keller, der 1978 vom LWL als „potentiell denkmalwürdig“ begutachtet wurde. Kapitel 7 (Aula), 19 (Kunstkeller, Brunnen), 20 (Lehrerzimmer, Brunnenraum bei Nacht), 21.
+- 2086: ein Neubau, unter dem der alte Kellerteil erhalten ist. Der **Brunnenraum ist ein Denkmal und bei Führungen begehbar**: Treppe mit fünfzehn Stufen, runder Raum, Brunnenrand mit eingemeißelten Zeichen. Der Brunnen selbst bleibt zugemauert. Führungen bucht man über das Museum (W-24).
+- Der Text in `presentDayRole` sagt heute nur „Reale weiterführende Schule“. Bitte ergänzen: Der Keller des Romans ist [F].
+
+#### W-23 St. Vincenz mit Pfarrfriedhof [R/F]
+
+- Kirche [R]: St. Vincenz, Kirchplatz in der Altstadt, neben dem Alten Rathaus. Kapitel 6: Messe am 31. Sonntag im Jahreskreis, fünfte Bank links, Marienstatue links vom Altar.
+- Pfarrfriedhof direkt an der Kirche [F] (eine Vereinfachung des Romans, real nicht belegt): rund vierzig Gräber, eine alte Mauer aus grauem Stein. In der Mauer, hinter einer Kletterrose, ein Stein mit **Kreis und zwei Wellenlinien**. Ein Grab „Helene Kowalski“ nur, wenn W-19/R-23 Namen zulässt. Sonst ohne Namen.
+- Der „alte Briefkasten“ gegenüber, am Übergang in die Innenstadt [F].
+- Innenraum: ruhiger, begehbarer Kirchenraum. Die Gastronomie hat schon Innenräume für Kirchen, bitte dort mitnutzen.
+
+#### W-24 Museum Menden für Stadt- und Kulturgeschichte [R] mit OTA-Raum [F]
+
+- Real: Marktplatz 3, Biggelebenhaus. Im Roman heißt es „Heimatmuseum“, das 1987 die Funde vom Teich bekam. Leon ruft am Dienstag 29.10. um 14:43 an, niemand nimmt ab (Kap. 4).
+- **2086, Herz der Chronomap.** Begehbar, Eintritt frei, Öffnungszeiten wie Museen. Im Obergeschoss ein Raum zum OTA-Kanon:
+  - **Wand der sieben Orte:** sieben Plätze für Balver Höhle, Bilsteinhöhle, Reckenhöhle, Hexenteich, St. Vincenz, Brunnen unter der Schule und Felsenmeer. Der Platz der Reckenhöhle ist belegt (Hör-Stein), fünf tragen „verschollen“, **einer hat kein Schild** (Hexenteich).
+  - **Hör-Stein**, flach, oval, matt-schwarz, als „Leihgabe aus Privatbesitz“ ohne Namen.
+  - **Kette** als Nachbildung, das Original liegt im Landesdepot.
+  - **Splitterlupe:** leere Vitrine „Verbleib unbekannt“.
+  - **Leons Wand:** eine Korkwand mit Zetteln. Die Chronik der Zeitreisen (siehe Chronomap Abschnitt 5) bekommt nie einen grünen Zettel.
+  - Biografie-Tafeln der vier Hauptfiguren, ohne Begegnung.
+- Ausgang zur Chronomap, Folge 2 („Die sieben Orte“), über die Timetravel-Agency.
+
+#### W-25 Hauptstraße Menden: Läden des Romans [R/F]
+
+- Straße [R]. Läden [F], ohne echte Firmennamen an echten Häusern zu ersetzen: Café Lindenhof (Holztische, Spitzendeckchen, Vitrine mit Schwarzwälder Kirsch), links ein Optiker, rechts ein Blumenladen (Kap. 8). Dazu die Bäckerei Schäfer (Kap. 13), eine Bude in einer Passage und ein Handyladen an der Ecke (Kap. 18).
+- Bushaltestelle „beim Eiscafé“ (Kap. 12), Linie Richtung Werler Straße.
+- 2086: Das Café Lindenhof kann ein echtes Lokal der Gastronomie werden. Wenn es kein Personal hat, ist es nach der Regel geschlossen oder ein Automatencafé. Request an die Gastronomie folgt, wenn die Erdkarte die Fläche hat.
+
+#### W-26 Dorte-Hilleke-Bücherei im Alten Rathaus [R]
+
+- Real: Hauptstraße 48, Altes Rathaus am Marktplatz. Im Roman „Stadtbibliothek im Alten Rathaus“: Leon recherchiert dort bis 15:52 (Kap. 13) und sitzt über Kirchenbüchern und Bauplänen (Kap. 20).
+- Begehbar als Bücherei mit Lesecafé. Romane in NOXIA-Büchereien kommen nur aus `buecherwelten`. Der Roman selbst kann im Regal stehen, wenn Thomas ihn freigibt.
+
+#### W-27 Wohnhäuser der Romanfiguren [F]
+
+Ohne echte Hausnummern, auf freien oder ersetzten Grundstücken. 2086 wohnen dort andere Menschen. Keine Klingel mit Romannamen, nur in der Chronomap 2024.
+
+| Haus | Lage laut Roman | Gestalt |
+| --- | --- | --- |
+| Kowalski-Doppelhaushälfte | Rand der Innenstadt, eine Siedlung zwischen Teich und Zentrum, zwölf Minuten zu Fuß von St. Vincenz | zwei Geschosse, Garage, schmaler Garten nach hinten, Vorgarten mit Gartentor und Briefkasten |
+| Bergmann-Haus (Tim) | „am Rand von Menden, wo die Straßen schmaler wurden und die Gärten größer“ | Backsteinhaus aus den Sechzigern, Werkstatt im Anbau, Garten mehr Gemüsebeet als Rasen |
+| Haus der Schultes (Leon) | Wohnstraße, Tischlerei im Hof | Leons Zimmer im ersten Stock über der Garage |
+| Yaras Doppelhaus | rund dreißig Meter von der Hauptstraße weg | die Großmutter wohnt im Erdgeschoss |
+| Antons Fachwerkhaus | Stadtrand, Felder, Richtung Werler Straße [S] | großer Keller mit Regalen und Schildern „Ort, Jahr“. 2086 verkauft und umgebaut, der Keller ist leer |
+| Brüggemanns Reihenhaus | Wohnstraße | Kap. 24 |
+
+#### W-28 Felsenmeer Hemer [R]
+
+- Real: Naturschutzgebiet und Geotop in Hemer. Kapitel 7 (im Vortrag), 10 (Leon, Tim und Yara am 13.11. im Nebel, der Wanderer).
+- Landmarke mit Wegen zwischen den Felsen. Klettern ist auch 2086 verboten. Ein Ort der sieben Orte.
+
+#### W-29 Ebbergturm bei Balve-Eisborn [R]
+
+- Real: Aussichtsturm aus Holz auf dem Ebberg, 390 m. Kapitel 14 (der Pakt der vier am 16.11., Abenddämmerung) und 19 (Treffen am 19.11.).
+- Sicht vom Turm, wie im Roman korrigiert: Menden im Nordwesten, das Felsenmeer im Westen, die Reckenhöhle unten im Hönnetal, die Bilsteinhöhle weit im Osten.
+
+#### W-30 Reckenhöhle, Balve-Binolen [R]
+
+- Real: Schauhöhle im Hönnetal. Kapitel 16: Parkplatz mit Infotafel, Haupteingang für Besucher, Wartungseingang mit grüner Metalltür. Gesperrter Nordgang mit Kammer und Steinsockel [F], dort lag der Hör-Stein.
+- 2086: Schauhöhle mit Führungen. Der Nordgang bleibt gesperrt, an der Absperrung eine Tafel „Fundort des Hör-Steins“.
+
+#### W-31 Balver Höhle und Bilsteinhöhle Warstein [R]
+
+- **Balver Höhle** (Balve): Kulturhöhle mit Veranstaltungen. Kapitel 7 (Vortrag), 8 (Anton verirrt sich mit zehn Jahren in ihr). Ein Ort der sieben Orte.
+- **Bilsteinhöhle** (Warstein, Tropfsteinhöhle mit Wildpark): Kapitel 8 und 12. Hier fand Anton mit 23 die Splitterlupe. Ein Ort der sieben Orte.
+- Beide als Landmarken. Innenräume erst, wenn die Chronomap sie braucht (vorerst nicht).
+
 ## Regionale Dachformen (06.11.2026)
 
 - `lib/worldlab/roofRegion.ts`: `roofRegion(lat, lon)` → flat | low | normal | steep. Flach: warme Breiten unter 36° (Gujarat, Sahel, Tropen), ohne Kirchturm. Flach geneigt (Faktor 0,45): Mittelmeerraum 35,5–46° N, 10° W–45° O (Spanien bis Istanbul). Normal: gemäßigte Breiten. Steil (1,2): ab 58°.
