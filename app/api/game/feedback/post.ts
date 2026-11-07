@@ -1,3 +1,6 @@
+// app/api/game/feedback/post.ts
+// Aktualisiert: 07.11.2026 — Freie Texte werden vor dem Speichern maskiert (Kontaktdaten, Selbstauskünfte; feedbackMask)
+// Version:      1.0.0
 /** Authenticated direct feedback intake; review-only, no world/Core writes.
  * Requires the separately reviewed SQL migration including its atomic rate trigger.
  * Conversation provenance is checked server-side against the authenticated owner.
@@ -10,6 +13,7 @@ import { parseAuthenticatedFeedbackPost } from '@/lib/game/evolution/feedbackAut
 import type { ConversationLogReader } from '@/lib/game/evolution/conversationSourceOwnership.server'
 import { classifyFeedbackRetry } from '@/lib/game/evolution/feedbackIdempotency'
 import { projectFeedbackReceipt } from '@/lib/game/evolution/feedbackReceipt'
+import { maskFeedbackDraft } from '@/lib/game/evolution/feedbackMask'
 
 const PRIVATE = { 'Cache-Control': 'private, no-store' }
 const reply = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
@@ -60,12 +64,15 @@ export async function POST(req: NextRequest) {
     body, req.headers.get('idempotency-key'), ownerId, db as unknown as ConversationLogReader,
   )
   if (!parsed.ok) return reply({ error: parsed.error }, parsed.error === 'conversation_source_unavailable' ? 422 : 400)
+  // Freie Spielertexte: Kontaktdaten und Selbstauskünfte werden vor dem Speichern maskiert.
+  const feedback = maskFeedbackDraft(parsed.feedback)
+  if (!feedback) return reply({ error: 'invalid_request' }, 400)
 
   // Bind the idempotency fingerprint to the verified private source; retain
   // the original direct-feedback fingerprint format for stable retries.
   const fingerprint = createHash('sha256')
     .update(JSON.stringify({
-      feedback: parsed.feedback,
+      feedback,
       source: parsed.sourceKind === 'direct' ? 'direct' : { kind: 'conversation', ref: parsed.privateSourceRef },
     }))
     .digest('hex')
@@ -88,13 +95,13 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await db.from('player_feedback_submissions').insert({
       owner_user_id: ownerId,
-      destination: parsed.feedback.destination ?? 'development',
-      category: parsed.feedback.category,
-      title: parsed.feedback.title,
-      description: parsed.feedback.description,
-      location_hint: parsed.feedback.locationRef ?? null,
-      requested_visibility: parsed.feedback.visibility,
-      publication_consent: parsed.feedback.consentToPublish === true,
+      destination: feedback.destination ?? 'development',
+      category: feedback.category,
+      title: feedback.title,
+      description: feedback.description,
+      location_hint: feedback.locationRef ?? null,
+      requested_visibility: feedback.visibility,
+      publication_consent: feedback.consentToPublish === true,
       source_kind: parsed.sourceKind,
       private_source_ref: parsed.privateSourceRef,
       status: 'submitted_for_review',
