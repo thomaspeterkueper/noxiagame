@@ -99,7 +99,10 @@ Maßgeblich: `docs/decisions/NOXIA-LIVING-0006` bis `0010`, `NOXIA-FIN-0001`, `N
     - Crew geht mit an Bord. Mit jeder Ankunft kann eine Person zuziehen; sie zahlt 100 Cr Ticket an Epona.
     - Zuzug nimmt die günstigste Stelle bei einem zahlungsfähigen Arbeitgeber, auf dem Mond zuerst Boanns Eisbohrer.
     - Anlaufhilfe für Mond, Mars und Phobos: 8 Wochen, abnehmend, mit Obergrenze (`run_colony_fund`, Migration `20261106150000_colony_fund.sql`, live).
-    - **Offen, Entscheidung Thomas:** Wasser ohne Käufer (NOXIA-FIN-0002 Teil D, neu gerechnet).
+    - Wasser ohne Käufer (NOXIA-FIN-0002 Teil D), entschieden: „Teilen nach Konto“.
+      - Einwohner mit Konto zahlen ihren Anteil an dem, was Firmen ins Lager liefern.
+      - Der Rest ist ausgewiesene Emission, gedeckelt durch den Verbrauch.
+      - `run_supply_settlement`, Migration `20261107010000_supply_paid_by_households.sql`, live 07.11.2026.
 
 ## Requests aus anderen Teilprojekten
 

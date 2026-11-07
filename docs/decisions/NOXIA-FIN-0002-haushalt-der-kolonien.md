@@ -1,6 +1,6 @@
 # NOXIA-FIN-0002 – Haushalt der Kolonien
 
-Status: **weitgehend entschieden** – A1–A3, B, C, Miete und Linienfracht live (06.11.2026); offen: Teil D (Wasser ohne Käufer), Erde in der Anlaufhilfe
+Status: **weitgehend entschieden** – A1–A3, B, C, Miete und Linienfracht live (06.11.2026); Teil D live seit 07.11.2026; offen: Erde in der Anlaufhilfe, Spieler in der Versorgung
 Datum: 29.10.2026
 Bezug: NOXIA-FIN-0001 (Geldregeln), NOXIA-OMNI-0001 (Spielraum), NOXIA-ETHICS-0001, Essay „Warum der Mars Henry George recht gibt“, population-economy Aufgabe 23 (Zuzug mit der Fracht)
 Wunsch Thomas (29.10.2026): „ja bitte“ – ein Vorschlag, wie die Kolonien zu einem Haushalt kommen, damit der Zuzug in Gang kommt.
@@ -146,6 +146,25 @@ Thomas: „Ich denke 4 ist wichtig, damit dann auch 1 gelöst werden kann – we
 - Dagegen stehen auf dem Mars 16 Menschen mit eigenem Konto bei 651 Einwohnern. Je Kopf sind es etwa 12 Cr am Tag – für jemanden mit Lohn tragbar. Die übrigen 635 Einwohner haben aber kein Konto, also gibt es für ihren Anteil keinen Zahler.
 - Weg 2 („die Kolonie kauft“) ist darum so nicht machbar. Vorschlag in der Antwort an Thomas: Wer ein Konto hat, zahlt seinen Anteil selbst (Transfer). Der Anteil der Einwohner ohne Konto wird als Emission „Haushalte ohne Konto“ ausgewiesen, mit Obergrenze je Woche.
 
+## Entschieden (06.11.2026) – Teil D „Teilen nach Konto“, live seit 07.11.2026
+
+- **Regel:** Was Firmen ins Lager eines Ortes liefern (`produce`, `sell`), bezahlen die Einwohner nach Köpfen, einmal am Tag (`run_supply_settlement`).
+  - Wer ein Konto hat, zahlt seinen Anteil selbst, höchstens sein Guthaben. Das ist ein Transfer.
+  - Den Anteil der Einwohner ohne Konto zahlt die Versorgungskasse des Ortes aus ausgewiesener Emission (`bootstrap:supply-households:<ort>:<tick>`).
+  - Obergrenze der Emission ist das, was die Einwohner ohne Konto in der Zeit wirklich verbrauchen. Was darüber geliefert wird, kauft niemand – die Firmen geben es zurück (`supply-unpaid`).
+- **Test (Rollback, Mars, ein Tag):**
+  - offen 2 116 Cr;
+  - 654 Einwohner, davon 16 mit Konto;
+  - je Kopf 3 Cr, also 48 Cr von Figuren;
+  - 2 068 Cr Emission, Obergrenze 7 538 Cr, zurück 0.
+- **Was das heißt:**
+  - Die Geldmenge wächst weiter um rund 14 500 Cr je Woche, ist jetzt aber belegt und durch den Verbrauch gedeckelt.
+  - Sie schrumpft in dem Maß, wie mehr Einwohner ein Konto haben – also mit dem Zuzug.
+- **Offen:**
+  - Spieler zahlen noch nicht mit.
+  - Gutschriften vor dem 07.11.2026 bleiben, wie sie sind.
+  - Tabellen `supply_settlements` und `supply_household_actors`, Migration `20261107010000_supply_paid_by_households.sql`.
+
 ## Nachtrag zum Befund (06.11.2026)
 
 - **Die Erde gerät selbst ins Minus.** In der letzten Woche nahm ihre öffentliche Kasse 786 Cr ein und zahlte 9 955 Cr Lohn. Die Kasse fiel von 20 500 auf 11 357 Cr; in etwa neun Tagen ist sie leer. Ein Fiskaltransfer von der Erde in die Kolonien (Frage 4, zweite Möglichkeit) scheidet damit aus. Die Erde braucht selbst eine Antwort.
@@ -157,7 +176,7 @@ Thomas: „Ich denke 4 ist wichtig, damit dann auch 1 gelöst werden kann – we
 2. ~~Miete in staatlichen Wohnungen (A2) und Konsumsteuer 19 % (A3)~~ – **entschieden 06.11.2026**, dazu Mietsteuer 10 %.
 3. ~~Private Stellen an Förderanlagen (B1/B2)~~ – **entschieden 06.11.2026:** Mensch oder Roboter, der Eigentümer entscheidet.
 4. ~~Anlaufhilfe (C)~~ – **entschieden 06.11.2026:** wie vorgeschlagen, ohne die Erde. Ursprünglich: ja? Höhe und Dauer wie vorgeschlagen? Emittent Solar Central Bank – die Kasse der Erde kommt nicht mehr in Frage (Nachtrag). Und: Soll die Anlaufhilfe auch die Erde einschließen?
-5. **Wasser ohne Käufer (D):** zuerst ausweisen (Weg 1)?
+5. ~~Wasser ohne Käufer (D)~~ – **entschieden 06.11.2026:** Teilen nach Konto (siehe oben).
 6. ~~Kostenfreie Wohnungen auf der Erde~~ – **entschieden 06.11.2026:** Miete nach Kaufpreis, private Besitzer legen sie fest.
 7. ~~Frachten~~ – **entschieden 06.11.2026:** Linienfracht jede Woche. Ursprünglich: Die Handelsfirma liefert seit 13 Tagen nichts. Soll ich klären, warum, und eine Mindestverbindung vorschlagen (zum Beispiel eine Fracht je Woche zu Mond und Mars)? Daran hängen Mitflug und Zuzug.
 
