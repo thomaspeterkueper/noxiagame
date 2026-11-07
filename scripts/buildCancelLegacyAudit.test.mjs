@@ -20,3 +20,11 @@ test('legacy build audit cannot expose player or build identifiers', () => {
   assert.doesNotMatch(statements, /b\.profile_id|b\.id\b|select\s+\*/i)
   assert.match(statements, /count\(\*\)/i)
 })
+
+test('legacy audit counts active cancellation blockers and invalid snapshots separately', () => {
+  assert.match(statements, /as invalid_refund_snapshots/i)
+  assert.match(statements, /as cancellation_blockers/i)
+  assert.match(statements, /where b\.status = 'building'/i)
+  assert.ok(statements.includes("!~ '^[0-9]+$'"), 'non-numeric or negative snapshots must be flagged')
+  assert.match(statements, /refund_credits_snapshot' is null/i)
+})
