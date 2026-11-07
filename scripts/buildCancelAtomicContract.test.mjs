@@ -41,3 +41,10 @@ test('cancellation rejects non-building targets and negative refund snapshots', 
   assert.match(migration, /target_type\s+is\s+distinct\s+from\s+'building'/i)
   assert.match(migration, /check\s*\(refund_credits_snapshot\s+is\s+null\s+or\s+refund_credits_snapshot\s*>=\s*0\)/i)
 })
+
+test('refund snapshot constraint is guarded for repeatable draft migrations', () => {
+  const migration = readFileSync(new URL('../supabase/migrations/20261107001000_atomic_build_cancel.sql', import.meta.url), 'utf8')
+  assert.match(migration, /if not exists\s*\(\s*select 1 from pg_constraint/i)
+  assert.match(migration, /conrelid\s*=\s*'public\.player_builds'::regclass/i)
+  assert.match(migration, /conname\s*=\s*'player_builds_refund_snapshot_nonnegative'/i)
+})
