@@ -10,6 +10,7 @@ on:
       - 'scripts/buildCancelLegacyAudit*'
       - 'scripts/buildCancelDatabasePreflight*'
       - 'scripts/buildCancelStartParity.test.mjs'
+      - 'scripts/buildCancelAtomicContract.test.mjs'
       - '.github/workflows/build-cancel-draft-contract.yml'
 
 permissions:
@@ -30,3 +31,11 @@ jobs:
           scripts/buildCancelLegacyAudit.test.mjs
           scripts/buildCancelDatabasePreflight.test.mjs
           scripts/buildCancelStartParity.test.mjs
+
+      # Run only the five SQL-source checks from the mixed RED/GREEN contract.
+      # The two API tests deliberately remain RED until the route is migrated.
+      - name: Run cancellation SQL source contract (API RED tests excluded)
+        run: >-
+          node --test
+          --test-name-pattern='cancellation SQL|cancellation rejects|refund snapshot constraint|build start snapshots|refund constraint uses'
+          scripts/buildCancelAtomicContract.test.mjs
