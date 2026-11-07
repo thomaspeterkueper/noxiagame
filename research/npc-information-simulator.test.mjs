@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {simulate} from './npc-information-simulator.mjs';
+const cfg={seed:42,trials:10000,bits:32,signalAccuracy:.55};
+const result=simulate(cfg);
+assert.deepEqual(result,simulate(cfg),'deterministic replay');
+for(const group of ['control','recombination','social','placebo']) assert.ok(Math.abs(result.groups[group].accuracy-.5)<.02,group);
+assert.ok(result.groups.signal.accuracy>.53&&result.groups.signal.accuracy<.57,'injected signal');
+assert.ok(Math.abs(simulate({...cfg,signalAccuracy:.5}).groups.signal.accuracy-.5)<.02,'ablation');
+assert.throws(()=>simulate({trials:0}));
+console.log('PASS: deterministic isolated cohort tests');
