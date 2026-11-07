@@ -3,6 +3,12 @@
 alter table public.player_builds
   add column if not exists refund_credits_snapshot integer;
 
+-- A snapshot is optional for legacy rows, but must never be negative.
+-- A missing snapshot prevents cancellation rather than guessing a refund.
+alter table public.player_builds
+  add constraint player_builds_refund_snapshot_nonnegative
+  check (refund_credits_snapshot is null or refund_credits_snapshot >= 0);
+
 create or replace function public.noxia_cancel_build(p_profile_id uuid, p_build_id uuid)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
@@ -16,6 +22,9 @@ begin
   where id = p_build_id for update;
   if not found or v_build.profile_id is distinct from p_profile_id then
     raise exception 'NOXIA_CANCEL_BUILD_NOT_FOUND' using errcode = 'P0001';
+  end if;
+  if v_build.target_type is distinct from 'building' then
+    raise exception 'NOXIA_CANCEL_TARGET_INVALID:%', v_build.target_type using errcode = 'P0001';
   end if;
   if v_build.status = 'cancelled' then
     return jsonb_build_object('build_id', v_build.id, 'status', 'cancelled',
