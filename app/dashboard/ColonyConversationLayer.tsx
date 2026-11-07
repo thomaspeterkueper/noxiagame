@@ -16,6 +16,7 @@ import type { ColonyResident } from '@/lib/store/colonyStateStore'
 import { useColonyInteractionStore } from '@/lib/store/colonyInteractionStore'
 import { getSessionInfo } from '@/lib/supabase/auth'
 import ConversationReport from '@/app/components/ConversationReport'
+import { translatedLanguageLabel } from '@/lib/game/cognition/languageDisplay'
 
 type TileEntity = { id:string; entity_id:string; entity_type:string; tile_row:number; tile_col:number; profile_id:string|null }
 type ChatEntry = { role:'user'|'assistant'; content:string }
@@ -39,6 +40,7 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
   const[sending,setSending]=useState(false)
   const conversationEnd=useConversationEnd()
   const[chatError,setChatError]=useState('')
+  const[languageLabel,setLanguageLabel]=useState<string|null>(null)
 
   useEffect(()=>{
     let live=true
@@ -115,6 +117,7 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
     setJoining(scene.mode==='direct')
     setOpen(scene.mode==='direct')
     setChatError('')
+    setLanguageLabel(null)
   },[scene?.mode,scene?.first.id,scene?.second?.id,scene?.conversation.item.id])
 
   async function sendMessage(){
@@ -141,6 +144,7 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
       })
       const data=await response.json().catch(()=>({}))
       if(!response.ok||!data.reply)throw new Error(data.error||'conversation_failed')
+      setLanguageLabel(translatedLanguageLabel(data.originalLanguageCode, Boolean(data.translatedForPlayer)))
       setHistory(current=>[...current,{role:'user' as const,content:player},{role:'assistant' as const,content:String(data.reply)}].slice(-10))
       setMessage('')
       conversationEnd.noteReply(scene.first.id,data)
@@ -159,6 +163,7 @@ export default function ColonyConversationLayer({locationSlug,population,entitie
       <div style={{marginTop:2,color:'#8fa3b1',fontSize:9}}>{scene.mode==='direct'?'du sprichst die Person direkt an':<>{scene.sameGroup?'gleicher Sozialkreis · ':''}{scene.playerNearby?'du kannst dich einmischen':'räumliche Begegnung'}</>}</div>
     </button>
     {open&&<div style={{border:'1px solid #45657c',borderTop:0,borderRadius:'0 0 9px 9px',background:'#071421f2',padding:11,fontSize:12,lineHeight:1.5}}>
+      {languageLabel&&<div style={{margin:'0 0 7px',color:'#8fb9d3',fontSize:10}}>Sprache: {languageLabel}</div>}
       <p style={{margin:'0 0 8px'}}><b>{scene.first.displayName}:</b> „{scene.conversation.opener}“</p>
       {scene.mode==='ambient'&&scene.second&&<p style={{margin:'0 0 9px',color:'#c8d5dd'}}><b>{scene.second.displayName}:</b> „{scene.conversation.followUp}“</p>}
       {history.map((entry,index)=><p key={`${entry.role}-${index}`} style={{margin:'6px 0',color:entry.role==='assistant'?'#d9e6ec':'#f1d57a'}}><b>{entry.role==='assistant'?scene.first.displayName:'Du'}:</b> „{entry.content}“</p>)}
