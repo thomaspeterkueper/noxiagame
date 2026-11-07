@@ -95,7 +95,8 @@ begin
     select 1 from pg_proc
     where oid = 'public.enforce_player_feedback_insert_rate()'::regprocedure
       and prosecdef
-      and 'search_path=' = any(proconfig)
+      -- PostgreSQL speichert die leere Einstellung als search_path="" (nicht als search_path=).
+      and exists (select 1 from unnest(proconfig) c where c in ('search_path=""', 'search_path='))
   ) then
     raise exception 'NOXIA_FEEDBACK_RATE_FUNCTION_NOT_HARDENED';
   end if;
