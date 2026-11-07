@@ -1,12 +1,13 @@
 // app/api/game/npc-conversation/route.ts
+// Aktualisiert: 07.11.2026 — Eskalation bei Provokation: auf Wunsch (NPC_LLM_ESCALATION=xai) antwortet Grok zuerst, Tageslimit je Spieler (G-8, #565)
 // Aktualisiert: 07.11.2026 — Verneinung des Spielers hat Vorrang vor Zustimmung und Marker; getarnte Aktionsmarker werden aus dem sichtbaren Text entfernt (conversationActions, #566)
 // Aktualisiert: 06.11.2026 — Erinnerter Traum der letzten Nacht und seltene Einsicht als Gesprächsstoff (npc_dreams, npc_insights, NOXIA-LIVING-0016)
 // Aktualisiert: 29.10.2026 — Wege zu Vorhandenem (gameGuide: Toilette, Lokal, Bücher, Akademie, Tanz, Raumhafen, Arbeit)
 // Aktualisiert: 29.10.2026 — Hinweise auf fehlende Funktionen im Protokoll (wish_kind, wish_object)
 // Aktualisiert: 28.10.2026 — Gesprächsende mit Wartezeit (retryAfterMs) für die Fenster; zuvor: Figur kennt Namen und Gefälligkeiten des Spielers (R-12) und ihr Alter (R-11), Abbruch beim dritten Grenztest
-// Version:      1.10.1
+// Version:      1.11.0
 
-import { chatComplete, chatProviderAvailable } from '@/lib/ai/chatProvider.server'
+import { chatComplete, chatProviderAvailable, providerModel } from '@/lib/ai/chatProvider.server'
 import { NextRequest, NextResponse, after } from 'next/server'
 import { looksLikeWish } from '@/lib/game/wishes/rules'
 import { submitWish } from '@/lib/game/wishes/service.server'
@@ -514,6 +515,20 @@ export async function POST(request: NextRequest) {
     if (claimError) console.error('npc learned claims read failed', { code: claimError.code })
     heardFromPlayers = heardClaimLines(selectHeardClaims((claimRows ?? []) as StoredClaim[], { currentSourceKey: claimSourceKey(user.id), now: Date.now() }))
   }
+  // G-8: Bei Provokation (Beleidigung, Grenztest) kann Grok zuerst antworten. Auslöser ist die
+  // deterministische Themenerkennung, nicht ein Modell. Nur auf Wunsch (NPC_LLM_ESCALATION=xai),
+  // mit Tageslimit je Spieler; ist es erreicht, antwortet die normale Reihenfolge.
+  let escalating = false
+  if (!opening && !sermonRequest && topic === 'provocation' && (process.env.NPC_LLM_ESCALATION ?? '').toLowerCase().split(',').map(part => part.trim()).includes('xai')) {
+    const xaiModel = providerModel('xai')
+    if (xaiModel) {
+      const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0)
+      const maxPerDay = Math.max(0, Number(process.env.NPC_LLM_ESCALATION_MAX_PER_DAY ?? 20) || 0)
+      const { count } = await serviceClient.from('npc_conversation_log').select('id', { count: 'exact', head: true })
+        .eq('player_profile_id', user.id).eq('model', xaiModel).gte('created_at', dayStart.toISOString())
+      escalating = (count ?? 0) < maxPerDay
+    }
+  }
   const system = [
     repeat.level === 'hint' && !sermon ? REPEAT_HINT_INSTRUCTION : '',
     `Du spielst ${npcName}, ${npcRole}, eine Person in der NOXIA-Welt am aktuellen Ort.`,
@@ -563,6 +578,7 @@ export async function POST(request: NextRequest) {
     knownPlayerName ? `Du kennst den Spieler: Er heißt ${knownPlayerName}. Sprich ihn mit diesem Namen an, wenn es passt.` : 'Den Namen des Spielers kennst du noch nicht. Nennt er ihn, merkst du ihn dir.',
     favorLines.length ? `Was der Spieler für dich getan hat:\n- ${favorLines.join('\n- ')}` : '',
     'Vom Gespräch selbst behältst du nur die letzten paar Wortwechsel. Den Namen des Spielers und was er für dich getan hat, behältst du; anderes nicht – versprich nicht, dir sonst etwas dauerhaft zu merken.',
+    escalating ? 'Dein Gegenüber pöbelt oder provoziert. Bleib in der Rolle, antworte knapp und direkt, setze eine klare Grenze und knicke nicht ein. Beleidige nicht zurück, drohe nicht, entschuldige dich nicht und erfinde nichts.' : '',
     'Grounding-Regel: Behaupte konkrete lokale Gebäude, Räume, Gewächskammern, Beete, Fahrzeuge, freie Plätze, Werkstätten, Geschäfte, Stationen oder andere Infrastruktur nur, wenn sie in den verifizierten lokalen Fakten ausdrücklich belegt sind.',
     'Auch konkrete Wegführung wie „vorne links“, „rechts abbiegen“, „am Wasser entlang“ oder „der Weg führt dort vorbei“ ist nur erlaubt, wenn genau diese Richtung oder Verbindung in den lokalen Fakten belegt ist. Die bloße Anwesenheit von Wasser oder Straßen reicht dafür nicht.',
     'Dasselbe gilt für lokale Verwaltungsformen, Kolonie-Räte, Behörden, Siedlungsnamen, Stadtteile oder Freigabeverfahren: erfinde sie nicht. Wenn sie nicht belegt sind, formuliere allgemein oder sage, dass du es vor Ort erst klären müsstest.',
@@ -578,6 +594,7 @@ export async function POST(request: NextRequest) {
   let model: string | null = null
   try {
     const result = await chatComplete({
+      prefer: escalating ? 'xai' : undefined,
       messages: [{ role: 'system', content: system }, ...history, { role: 'user', content: player }],
       maxTokens: sermon ? 480 : 380,
       temperature: 0.7,

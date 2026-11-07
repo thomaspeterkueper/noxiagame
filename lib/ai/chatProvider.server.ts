@@ -36,6 +36,11 @@ function providers(): Provider[] {
   return order.map(id => all[id]).filter(provider => !!provider.key)
 }
 
+/** Modellname eines Anbieters (für die Zählung eskalierter Gespräche). */
+export function providerModel(id: Provider['id']) {
+  return providers().find(provider => provider.id === id)?.model ?? null
+}
+
 export function chatProviderAvailable() {
   return providers().length > 0
 }
@@ -55,8 +60,13 @@ export async function chatComplete(options: {
   temperature: number
   json?: boolean
   timeoutMs: number
+  /** Diesen Anbieter zuerst fragen (z. B. xAI bei Provokation); die übrigen bleiben als Ausweichen. */
+  prefer?: Provider['id']
 }): Promise<ChatResult> {
-  const list = providers()
+  const all = providers()
+  const list = options.prefer
+    ? [...all.filter(provider => provider.id === options.prefer), ...all.filter(provider => provider.id !== options.prefer)]
+    : all
   if (!list.length) return { ok: false, error: 'no_provider', model: null }
   const deadline = Date.now() + options.timeoutMs
   let last: ChatResult = { ok: false, error: 'no_provider', model: null }

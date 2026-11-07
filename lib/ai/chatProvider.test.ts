@@ -27,6 +27,15 @@ describe('chatComplete', () => {
     expect(result).toMatchObject({ ok: true, provider: 'deepseek' })
   })
 
+  it('fragt mit prefer den bevorzugten Anbieter zuerst und fällt auf den anderen zurück', async () => {
+    process.env.XAI_API_KEY = 'x'; process.env.DeepSeek_NPC_API_KEY = 'd'; delete process.env.CHAT_PROVIDERS
+    const fetchMock = vi.fn().mockResolvedValueOnce(reply(503)).mockResolvedValueOnce(reply(200, 'von DeepSeek'))
+    vi.stubGlobal('fetch', fetchMock)
+    const result = await chatComplete({ messages: [{ role: 'user', content: 'hi' }], maxTokens: 10, temperature: 0, timeoutMs: 5000, prefer: 'xai' })
+    expect(String(fetchMock.mock.calls[0][0])).toContain('api.x.ai')
+    expect(result).toMatchObject({ ok: true, provider: 'deepseek' })
+  })
+
   it('wechselt nicht bei einer fehlerhaften Anfrage', () => {
     expect(shouldFallBack(400)).toBe(false)
     expect(shouldFallBack(402)).toBe(true)
